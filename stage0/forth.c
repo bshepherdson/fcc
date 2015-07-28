@@ -66,6 +66,7 @@ typedef struct fstate_ {
   unsigned char inputSource; // -1 = EVALUATE, 0 = keyboard, > 0 = fd
 } fstate;
 
+// Used by NATIVE_SPEC to build the native dictionary.
 word* latestWord = NULL;
 
 
@@ -74,7 +75,7 @@ cell pop(fstate* f) {
 }
 
 void push(fstate* f, cell value) {
-  f->stack[f->sp++];
+  f->stack[f->sp++] = value;
 }
 
 word** popR(fstate* f) {
@@ -82,7 +83,7 @@ word** popR(fstate* f) {
 }
 
 void pushR(fstate* f, word** value) {
-  f->returnStack[f->rsp++];
+  f->returnStack[f->rsp++] = value;
 }
 
 
@@ -142,7 +143,7 @@ string* parse_word(fstate *f) {
 word* find_word(fstate* f, string* s) {
   word* w = f->dictionary;
   while (w != NULL) {
-    if (!w->hidden && w->nameLen == s->length && strcmp(w->name, s->value) == 0) {
+    if (!w->hidden && w->nameLen == s->length && strncasecmp(w->name, s->value, s->length) == 0) {
       break;
     }
     w = w->link;
@@ -196,7 +197,7 @@ NATIVE(times, "*") {
 }
 
 NATIVE(plus, "+") {
-  push(f, pop(f) * pop(f));
+  push(f, pop(f) + pop(f));
 }
 
 // Unimplemented: +! +LOOP
@@ -218,6 +219,7 @@ NATIVE(divide, "/") {
 
 // Unimplemented: 0< 0= 1+ 1- 2! 2* 2/ 2@ 2DROP 2DUP 2OVER 2SWAP
 
+// Used by SEMICOLON, RECURSE, etc. to know what definition they're part of.
 word* latest_definition;
 
 NATIVE(colon, ":") {
@@ -231,8 +233,12 @@ NATIVE(colon, ":") {
   // Deliberately not adding this word to the dictionary, yet.
   w->native = false;
   w->immediate = false;
-  w->name = s->value;
+  w->hidden = true;
+
+  w->name = (char*) malloc(s->length);
+  strncpy(w->name, s->value, s->length);
   w->nameLen = s->length;
+
   w->code.words = (word**) (f->here);
 
   f->state = COMPILING;
@@ -254,7 +260,9 @@ NATIVE(semicolon, ";") {
   if (latest_definition->link != NULL) {
     f->dictionary = latest_definition;
   }
+  latest_definition->hidden = false;
   latest_definition = NULL;
+  f->state = INTERPRETING;
 }
 
 
@@ -283,9 +291,9 @@ NATIVE(inptr, ">IN") {
   push(f, (cell) &(f->inputStart[f->inputIndex]));
 }
 
-void to_number_(cell &len, char* &addr, cell &hi, cell &lo) {
-  while (len > 0) {
-    char c = *addr;
+void to_number_(fstate* f, cell* len, char** addr, cell* hi, cell* lo) {
+  while (*len > 0) {
+    char c = **addr;
     // Convert blindly as if in base 36, then double-check we're below our base.
     int digit = 1000;
     if ('0' <= c && c <= '9') digit = (int) (c - '0');
@@ -294,10 +302,10 @@ void to_number_(cell &len, char* &addr, cell &hi, cell &lo) {
 
     if (digit < f->base) {
       // Consume it.
-      lo *= f->base;
-      lo += digit;
-      len--;
-      addr++;
+      *lo *= f->base;
+      *lo += digit;
+      (*len)--;
+      (*addr)++;
     } else {
       break;
     }
@@ -312,7 +320,7 @@ NATIVE(to_number, ">NUMBER") {
   cell hi = pop(f);
   cell lo = pop(f);
 
-  to_number_(len, addr, hi, lo);
+  to_number_(f, &len, &addr, &hi, &lo);
 
   push(f, lo);
   push(f, hi);
@@ -354,7 +362,7 @@ NATIVE(abs, "ABS") {
 // Unimplemented: ACCEPT
 NATIVE(align, "ALIGN") {
   unsigned int mask = sizeof(cell) - 1;
-  f->here = (~mask) & (f->here + mask);
+  f->here = (unsigned char*) ((~mask) & (((int) f->here) + mask));
 }
 
 NATIVE(aligned, "ALIGNED") {
@@ -370,13 +378,13 @@ NATIVE(and, "AND") {
 }
 
 NATIVE(base, "BASE") {
-  push(f, & (f->base));
+  push(f, (cell) &(f->base));
 }
 
 NATIVE(branch, "(BRANCH)") {
   // Read the offset from the nextWord pointer, and jump to it.
   // The offset is in CELLS, NOT BYTES.
-  f->nextWord += *(f->nextWord);
+  f->nextWord += (int) *(f->nextWord);
 }
 
 NATIVE(zbranch, "(0BRANCH)") {
@@ -463,7 +471,7 @@ NATIVE(find, "FIND") {
   word* w = find_word(f, &s);
 
   if (w == NULL) {
-    push(f, addr);
+    push(f, (cell) addr);
     push(f, 0);
   } else {
     push(f, (cell) w);
@@ -572,7 +580,7 @@ NATIVE(quit, "QUIT") {
       char* addr = s->value;
       cell lo = 0;
       cell hi = 0;
-      to_number_(len, addr, hi, lo);
+      to_number_(f, &len, &addr, &hi, &lo);
       // If len == 0 now, parsing successful, otherwise error.
       if (len != 0) {
         char* errnum = (char*) malloc(s->length + 1);
@@ -583,7 +591,7 @@ NATIVE(quit, "QUIT") {
         if (f->state == INTERPRETING) {
           push(f, lo);
         } else {
-          write_cell(f, &word_lit);
+          write_cell(f, (cell) &word_lit);
           write_cell(f, lo);
         }
       }
@@ -599,6 +607,11 @@ NATIVE(rfetch, "R@") {
 NATIVE(recurse, "RECURSE") {
   // Should work even for :NONAME
   write_cell(f, (cell) latest_definition);
+}
+
+NATIVE(refill, "REFILL") {
+  refill_buffer(f);
+  push(f, -1);
 }
 
 // Unimplemented: REPEAT
@@ -629,7 +642,7 @@ NATIVE(litstring, "(LITSTRING)") {
   push(f, (cell) len);
 
   // Bump and realign.
-  f->nextWord = (f->nextWord + len + sizeof(cell) - 1) & ~(sizeof(cell) - 1);
+  f->nextWord = (word**) (((int) (f->nextWord + len + sizeof(cell) - 1)) & ~(sizeof(cell) - 1));
 }
 
 // IMMEDIATE
@@ -641,7 +654,7 @@ NATIVE(squote, "S\"") {
     write_byte(f, s->value[i]);
   }
 
-  f->here = (f->here + s->length + sizeof(cell) - 1) & !(sizeof(cell) - 1);
+  f->here = (unsigned char*) (((int) (f->here + s->length + sizeof(cell) - 1)) & ~(sizeof(cell) - 1));
 }
 
 // Unimplemented: S>D SIGN SM/REM
@@ -771,6 +784,7 @@ int main(char** argv, int argc) {
   NATIVE_SPEC(quit, "QUIT");
   NATIVE_SPEC(rfetch, "R@");
   NATIVE_SPEC(recurse, "RECURSE"); word_recurse.immediate = true;
+  NATIVE_SPEC(refill, "REFILL");
   NATIVE_SPEC(rot, "ROT");
   NATIVE_SPEC(rshift, "RSHIFT");
   NATIVE_SPEC(litstring, "(LITSTRING)");
@@ -787,7 +801,7 @@ int main(char** argv, int argc) {
 
   fstate f;
   f.here = f.space;
-  f.dictionary = latest_definition;
+  f.dictionary = latestWord;
   f.rsp = 0;
   f.sp = 0;
   f.nextWord = NULL;
@@ -795,5 +809,5 @@ int main(char** argv, int argc) {
   f.base = 10;
   f.inputSource = 0;
 
-  code_quit(f);
+  code_quit(&f);
 }
