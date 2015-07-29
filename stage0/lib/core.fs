@@ -1,5 +1,5 @@
 : ( 41 parse drop drop ; IMMEDIATE
-: \ refill ; IMMEDIATE
+: \ refill drop ; IMMEDIATE
 
 : BL 32 ;
 
@@ -18,23 +18,46 @@
 ;
 : 2OVER ( a b c d -- a b c d a b ) >r >r 2dup r> r> ( a b a b c d ) 2swap ;
 
-\ Unimplemented: # #> #S
-\ Unimplemented: ( */ */MOD
-\ Unimplemented: +! +LOOP
+: CELL+ ( a-addr -- a-addr ) 1 CELLS + ;
+
+: 2! ( x1 x2 a-addr -- ) dup >r   !   r> cell+ ! ;
+: 2@ ( a-addr -- x1 x2 ) dup cell+ @ swap @ ;
+: 2* ( x -- x ) 1 LSHIFT ;
+: 2/ ( x -- x ) 2 / ;
+
+: > ( a b -- ? ) swap < ;
+: <= ( a b -- ? ) 2dup = -rot   < and ;
+: >= ( a b -- ? ) swap <= ;
+
+: NEGATE ( n -- n ) 0 swap - ;
+
+: +! ( delta a-addr -- )
+  dup @ ( delta a-addr value )
+  rot + ( a-addr value' )
+  swap !
+;
+: -! >r negate r> +! ;
+
+
+: CHARS ( n -- n ) ;
+: CHAR+ 1 chars + ;
+
+: COUNT ( c-addr -- c-addr u ) dup c@ swap 1+ swap ;
+
+\ Unimplemented: # #> #S <#
+\ Unimplemented: */ */MOD
+\ Unimplemented: +LOOP
 \ Unimplemented: ." /MOD
-\ Unimplemented: 0< 0= 1+ 1- 2! 2* 2/ 2@ 2DROP 2DUP 2OVER 2SWAP
-\ Unimplemented: <# >
 \ Unimplemented: ACCEPT
-\ Unimplemented: ALLOT
-\ Unimplemented: BEGIN, BL
-\ Unimplemented: CELL+ CHAR CHAR+ CHARS CONSTANT COUNT
+\ Unimplemented: BEGIN
+\ Unimplemented: CHAR CONSTANT
 \ Unimplemented: CREATE DECIMAL DO DOES>
 \ Unimplemented: ELSE ENVIRONMENT?
 \ Unimplemented: FILL
 \ Unimplemented: FM/MOD HOLD I IF
 \ Unimplemented: J KEY LEAVE
 \ Unimplemented: LOOP M* MAX MIN
-\ Unimplemented: MOVE NEGATE
+\ Unimplemented: MOVE
 \ Unimplemented: REPEAT
 \ Unimplemented: S>D SIGN SM/REM
 \ Unimplemented: SPACE SPACES
