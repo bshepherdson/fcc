@@ -753,6 +753,21 @@ NATIVE(ulessthan, "U<") {
 }
 
 // Unimplemented: UM* UM/MOD UNLOOP UNTIL VARIABLE WHILE
+NATIVE(parse, "PARSE") {
+  char delim = (char) pop(f);
+  string* s = parse(f, delim); // Without skipping leading delimeters.
+  push(f, (cell) s->value); // Pointers directly into the input buffer.
+  push(f, (cell) s->length);
+  free(s);
+}
+
+NATIVE(parse_name, "PARSE-NAME") {
+  string *s = parse_word(f); // Skips leading spaces, delimited by space.
+  push(f, (cell) s->value);
+  push(f, (cell) s->length);
+  free(s);
+}
+
 NATIVE(word, "WORD") {
   char delim = (char) pop(f);
   string* s = parse(f, delim);
@@ -857,6 +872,8 @@ int main(int argc, char** argv) {
   NATIVE_SPEC(swap, "SWAP");
   NATIVE_SPEC(udot, "U.");
   NATIVE_SPEC(ulessthan, "U<");
+  NATIVE_SPEC(parse, "PARSE");
+  NATIVE_SPEC(parse_name, "PARSE-NAME");
   NATIVE_SPEC(word, "WORD");
   NATIVE_SPEC(xor, "XOR");
   NATIVE_SPEC(lbrac, "["); word_lbrac.immediate = true;
