@@ -248,10 +248,6 @@ NATIVE(store, "!") {
 
 // Unimplemented: # #> #S
 
-NATIVE(tick, "'") {
-  push(f, (cell) read_word(f));
-}
-
 NATIVE(minus, "-") {
   cell b = pop(f);
   cell a = pop(f);
@@ -429,8 +425,10 @@ NATIVE(base, "BASE") {
 
 NATIVE(branch, "(BRANCH)") {
   // Read the offset from the nextWord pointer, and jump to it.
-  // The offset is in CELLS, NOT BYTES.
-  f->nextWord += (int) *(f->nextWord);
+  // The offset is in BYTES, NOT CELLS.
+  char* ptr = (char*) f->nextWord;
+  ptr += (cell) *(f->nextWord);
+  f->nextWord = (word**) ptr;
 }
 
 NATIVE(zbranch, "(0BRANCH)") {
@@ -569,6 +567,33 @@ NATIVE(lit, "(LIT)") {
 NATIVE(literal, "LITERAL") {
   write_cell(f, (cell) &word_lit);
   write_cell(f, pop(f));
+}
+
+NATIVE(tick, "'") {
+  push(f, (cell) read_word(f));
+}
+
+NATIVE(bracket_tick, "[']") {
+  string* s = parse_word(f);
+  if (s->length == 0) {
+    fprintf(stderr, "*** Incomplete [']\n");
+    code_quit(f);
+    return;
+  }
+  word* w = find_word(f, s);
+  if (w == NULL) {
+    char* err = (char*) malloc(s->length + 1);
+    strncpy(err, s->value, s->length);
+    err[s->length] = '\0';
+    fprintf(stderr, "*** Unrecognized word in [']: %s\n", err);
+    free(err);
+    free(s);
+    code_quit(f);
+    return;
+  }
+
+  write_cell(f, (cell) &word_lit);
+  write_cell(f, (cell) w);
 }
 
 // Unimplemented: LOOP M* MAX MIN
@@ -819,6 +844,7 @@ void run(fstate* f) {
 int main(int argc, char** argv) {
   NATIVE_SPEC(store, "!");
   NATIVE_SPEC(tick, "'");
+  NATIVE_SPEC(bracket_tick, "[']"); word_bracket_tick.immediate = true;
   NATIVE_SPEC(minus, "-");
   NATIVE_SPEC(times, "*");
   NATIVE_SPEC(plus, "+");

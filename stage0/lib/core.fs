@@ -44,10 +44,30 @@
 
 : COUNT ( c-addr -- c-addr u ) dup c@ swap 1+ swap ;
 
+: /MOD ( a b -- r q ) 2dup mod -rot / ;
+
+\ TODO These are lame, non-double-cell versions.
+: */ ( n1 n2 n3 -- quotient ) >r * r> / ;
+: */MOD ( n1 n2 n3 -- remainder quotient ) >r * r> /MOD ;
+
+
+\ Control structures.
+: IF ( ? --   C: -- jumploc ) ['] (0branch) ,  HERE   0 , ; IMMEDIATE
+: THEN ( C: jumploc -- ) here over - swap ! ; IMMEDIATE
+: ELSE ( C: jumploc1 -- jumploc2 )
+  ['] (branch) ,
+  here
+  0 ,     ( ifloc endifloc )
+  here    ( ifloc endifloc elseloc )
+  rot     ( endifloc elseloc ifloc )
+  dup >r - ( endifloc delta  R: ifloc )
+  r> !     ( endifloc )
+; IMMEDIATE
+
+
 \ Unimplemented: # #> #S <#
-\ Unimplemented: */ */MOD
 \ Unimplemented: +LOOP
-\ Unimplemented: ." /MOD
+\ Unimplemented: ."
 \ Unimplemented: ACCEPT
 \ Unimplemented: BEGIN
 \ Unimplemented: CHAR CONSTANT
