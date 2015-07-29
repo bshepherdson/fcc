@@ -77,8 +77,13 @@ typedef struct fstate_ {
 // Used by NATIVE_SPEC to build the native dictionary.
 word* latestWord = NULL;
 
+void code_quit(fstate* f);
 
 cell pop(fstate* f) {
+  if (f->sp == 0) {
+    fprintf(stderr, "*** Stack underflow\n");
+    code_quit(f);
+  }
   return f->stack[--f->sp];
 }
 
