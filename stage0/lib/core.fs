@@ -77,10 +77,15 @@
   \ Then fill in the end location for the whileloc
   here over - swap ! ( )
 ; IMMEDIATE
+: UNTIL ( ? --   C: beginloc -- ) ['] (0branch) , here - , ; IMMEDIATE
 
 
 : CHAR ( "<spaces>name" -- char ) parse-name drop c@ ;
 : [CHAR] char ['] (lit) , , ; IMMEDIATE
+
+
+: SPACE bl emit ;
+: SPACES ( n -- ) BEGIN space 1- dup 0= UNTIL drop ;
 
 \ Unimplemented: # #> #S <#
 \ Unimplemented: +LOOP
@@ -95,6 +100,5 @@
 \ Unimplemented: LOOP M* MAX MIN
 \ Unimplemented: MOVE
 \ Unimplemented: S>D SIGN SM/REM
-\ Unimplemented: SPACE SPACES
 \ Unimplemented: TYPE
-\ Unimplemented: UM* UM/MOD UNLOOP UNTIL VARIABLE
+\ Unimplemented: UM* UM/MOD UNLOOP VARIABLE
