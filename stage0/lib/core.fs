@@ -79,11 +79,14 @@
 ; IMMEDIATE
 
 
+: CHAR ( "<spaces>name" -- char ) parse-name drop c@ ;
+: [CHAR] char ['] (lit) , , ; IMMEDIATE
+
 \ Unimplemented: # #> #S <#
 \ Unimplemented: +LOOP
 \ Unimplemented: ."
 \ Unimplemented: ACCEPT
-\ Unimplemented: CHAR CONSTANT
+\ Unimplemented: CONSTANT
 \ Unimplemented: CREATE DECIMAL DO DOES>
 \ Unimplemented: ENVIRONMENT?
 \ Unimplemented: FILL
@@ -95,4 +98,3 @@
 \ Unimplemented: SPACE SPACES
 \ Unimplemented: TYPE
 \ Unimplemented: UM* UM/MOD UNLOOP UNTIL VARIABLE
-\ Unimplemented: ['] [CHAR]
