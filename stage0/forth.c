@@ -4,6 +4,9 @@
 #include <string.h>
 #include <inttypes.h>
 
+#include <fcntl.h>
+#include <unistd.h>
+
 #include <readline/readline.h>
 #include <readline/history.h>
 
@@ -44,6 +47,15 @@ typedef struct word_ {
   } code;
 } word;
 
+typedef struct source_ {
+  struct source_* previous;
+  char internalBuffer[1024];
+  char *inputStart;
+  cell inputIndex;
+  unsigned int parseLength;
+  cell type; // -1 = EVALUATE, 0 = keyboard, > 0 = FILE*
+} source;
+
 typedef struct fstate_ {
   // All stacks, and codespace, are empty-ascending.
   unsigned char space[1024*1024];
@@ -59,11 +71,7 @@ typedef struct fstate_ {
   cell state; // This is a cell for use by the STATE word.
   cell base;  // Likewise.
 
-  char internalBuffer[1024];
-  char* inputStart;
-  cell inputIndex;
-  unsigned int parseLength;
-  unsigned char inputSource; // -1 = EVALUATE, 0 = keyboard, > 0 = fd
+  source* input;
 } fstate;
 
 // Used by NATIVE_SPEC to build the native dictionary.
@@ -101,28 +109,77 @@ void write_cell(fstate* f, cell c) {
 void run(fstate* f);
 
 
+// Clears all current input states, and adds a keyboard state.
+void init_input(fstate* f) {
+  source* src = f->input;
+  while (src != NULL) {
+    if (src->type != 0 && src->type != -1) fclose((FILE*) src->type);
+    source* old = src;
+    src = src->previous;
+    free(old);
+  }
+
+  f->input = (source*) malloc(sizeof(source));
+  f->input->type = 0; // keyboard
+  f->input->previous = NULL;
+}
+
 // Parsing words
 void refill_buffer(fstate* f) {
-  // TODO: EVALUATE, file input
-  // Read a line from the keyboard into the buffer.
-  char * raw = readline("> ");
-  unsigned int len = strlen(raw);
-  strcpy(f->internalBuffer, raw);
-  f->parseLength = len;
-  f->inputStart = f->internalBuffer;
-  f->inputIndex = 0;
-  free(raw);
+  if (f->input->type == -1) { // EVALUATE
+    // Can't refill EVALUATE; pop and recurse.
+    source* old = f->input;
+    f->input = f->input->previous;
+    free(old);
+    refill_buffer(f);
+  } else if (f->input->type == 0) { // KEYBOARD
+    // Read a line from the keyboard into the buffer.
+    char * raw = readline("> ");
+
+    // If the return is NULL, the stream has ended. If the keyboard stream is
+    // ended, exit with 0.
+    if (raw == NULL) exit(0);
+
+    unsigned int len = strlen(raw);
+    strcpy(f->input->internalBuffer, raw);
+    f->input->parseLength = len;
+    f->input->inputStart = f->input->internalBuffer;
+    f->input->inputIndex = 0;
+    free(raw);
+  } else { // file
+    size_t bufferSize = 1024;
+    char *buf = NULL;
+    ssize_t s = getline(&buf, &bufferSize, (FILE*) f->input->type);
+
+    if (s == -1) {
+      // Dump the source and recurse.
+      source* old = f->input;
+      f->input = old->previous;
+      free(old);
+      refill_buffer(f);
+      return;
+    }
+
+    // Knock off the trailing newline, if present.
+    if (buf[s - 1] == '\n') s--;
+    strncpy(f->input->internalBuffer, buf, s);
+    free(buf);
+
+    f->input->parseLength = (unsigned int) s;
+    f->input->inputIndex = 0;
+    f->input->inputStart = f->input->internalBuffer;
+  }
 }
 
 // Parses up to the given delimiter. Does NOT skip leading spaces.
 string* parse(fstate* f, unsigned char delim) {
   string* s = (string*) malloc(sizeof(string));
-  s->value = (char*) f->inputStart + f->inputIndex;
+  s->value = (char*) f->input->inputStart + f->input->inputIndex;
   s->length = 0;
 
-  while (f->inputIndex < f->parseLength && f->inputStart[f->inputIndex] != delim) {
+  while (f->input->inputIndex < f->input->parseLength && f->input->inputStart[f->input->inputIndex] != delim) {
     s->length++;
-    f->inputIndex++;
+    f->input->inputIndex++;
   }
 
   return s;
@@ -130,8 +187,8 @@ string* parse(fstate* f, unsigned char delim) {
 
 
 void skip_leading(fstate* f, unsigned char delim) {
-  while (f->inputIndex < f->parseLength && f->inputStart[f->inputIndex] == delim) {
-    f->inputIndex++;
+  while (f->input->inputIndex < f->input->parseLength && f->input->inputStart[f->input->inputIndex] == delim) {
+    f->input->inputIndex++;
   }
 }
 
@@ -288,7 +345,7 @@ NATIVE(to_body, ">BODY") {
 }
 
 NATIVE(inptr, ">IN") {
-  push(f, (cell) &(f->inputStart[f->inputIndex]));
+  push(f, (cell) &(f->input->inputStart[f->input->inputIndex]));
 }
 
 void to_number_(fstate* f, cell* len, char** addr, cell* hi, cell* lo) {
@@ -537,13 +594,14 @@ NATIVE(postpone, "POSTPONE") {
 }
 
 
-NATIVE(quit, "QUIT") {
+
+void quit_(fstate* f) {
   // Main interpreting loop: empty the stacks, then read a line, interpret that
   // line, etc. etc.
   // Calls into run, which will return back here if it has a null next-word.
   f->rsp = 0;
   f->sp = 0;
-  f->inputSource = 0; // keyboard
+
   f->state = INTERPRETING;
 
   refill_buffer(f);
@@ -586,7 +644,7 @@ NATIVE(quit, "QUIT") {
         char* errnum = (char*) malloc(s->length + 1);
         strncpy(errnum, s->value, s->length);
         errnum[s->length] = '\0';
-        fprintf(stderr, "ERROR: Failed to parse number: %s", errnum);
+        fprintf(stderr, "ERROR: Failed to parse number: %s\n", errnum);
       } else {
         if (f->state == INTERPRETING) {
           push(f, lo);
@@ -597,6 +655,11 @@ NATIVE(quit, "QUIT") {
       }
     }
   }
+}
+
+NATIVE(quit, "QUIT") {
+  init_input(f);
+  quit_(f);
 }
 
 
@@ -660,8 +723,8 @@ NATIVE(squote, "S\"") {
 // Unimplemented: S>D SIGN SM/REM
 
 NATIVE(source, "SOURCE") {
-  push(f, (cell) f->inputStart);
-  push(f, (cell) f->parseLength);
+  push(f, (cell) f->input->inputStart);
+  push(f, (cell) f->input->parseLength);
 }
 
 // Unimplemented: SPACE SPACES
@@ -730,7 +793,7 @@ void run(fstate* f) {
 }
 
 
-int main(char** argv, int argc) {
+int main(int argc, char** argv) {
   NATIVE_SPEC(store, "!");
   NATIVE_SPEC(tick, "'");
   NATIVE_SPEC(minus, "-");
@@ -807,7 +870,26 @@ int main(char** argv, int argc) {
   f.nextWord = NULL;
   f.state = INTERPRETING;
   f.base = 10;
-  f.inputSource = 0;
 
-  code_quit(&f);
+  init_input(&f);
+
+  // Work backward through the arguments, adding them as file input sources.
+  for (int i = argc - 1; i > 0; i--) {
+    source* src = (source*) malloc(sizeof(source));
+    src->previous = f.input;
+    f.input = src;
+
+    FILE* file = fopen(argv[i], "r");
+    if (file == NULL) {
+      fprintf(stderr, "Could not load input file: %s\n", argv[i]);
+      exit(1);
+    }
+
+    src->type = (cell) file;
+    src->inputStart = src->internalBuffer;
+    src->inputIndex = 0;
+    src->parseLength = 0;
+  }
+
+  quit_(&f);
 }
