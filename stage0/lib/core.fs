@@ -29,6 +29,10 @@
 : <= ( a b -- ? ) 2dup = -rot   < and ;
 : >= ( a b -- ? ) swap <= ;
 
+: 0> 0 > ;
+: 0<= 0 <= ;
+: 0>= 0 >= ;
+
 : NEGATE ( n -- n ) 0 swap - ;
 
 : +! ( delta a-addr -- )
@@ -64,23 +68,31 @@
   r> !     ( endifloc )
 ; IMMEDIATE
 
+: BEGIN ( C: -- beginloc ) here ; IMMEDIATE
+: WHILE ( ? -- C: -- whileloc ) ['] (0branch) , here 0 , ; IMMEDIATE
+: REPEAT ( C: beginloc whileloc -- )
+  \ First, write the unconditional jump to the begin.
+  ['] (branch) , swap ( whileloc beginloc )
+  here - , ( whileloc )
+  \ Then fill in the end location for the whileloc
+  here over - swap ! ( )
+; IMMEDIATE
+
 
 \ Unimplemented: # #> #S <#
 \ Unimplemented: +LOOP
 \ Unimplemented: ."
 \ Unimplemented: ACCEPT
-\ Unimplemented: BEGIN
 \ Unimplemented: CHAR CONSTANT
 \ Unimplemented: CREATE DECIMAL DO DOES>
-\ Unimplemented: ELSE ENVIRONMENT?
+\ Unimplemented: ENVIRONMENT?
 \ Unimplemented: FILL
-\ Unimplemented: FM/MOD HOLD I IF
+\ Unimplemented: FM/MOD HOLD I
 \ Unimplemented: J KEY LEAVE
 \ Unimplemented: LOOP M* MAX MIN
 \ Unimplemented: MOVE
-\ Unimplemented: REPEAT
 \ Unimplemented: S>D SIGN SM/REM
 \ Unimplemented: SPACE SPACES
-\ Unimplemented: THEN TYPE
-\ Unimplemented: UM* UM/MOD UNLOOP UNTIL VARIABLE WHILE
+\ Unimplemented: TYPE
+\ Unimplemented: UM* UM/MOD UNLOOP UNTIL VARIABLE
 \ Unimplemented: ['] [CHAR]
