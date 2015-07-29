@@ -182,6 +182,12 @@ string* parse(fstate* f, unsigned char delim) {
     f->input->inputIndex++;
   }
 
+  // If we ended on a delimiter, advance to after it.
+  // Guarded so the pointer doesn't move out of the parse area.
+  if (f->input->inputIndex < f->input->parseLength && f->input->inputStart[f->input->inputIndex] == delim) {
+    f->input->inputIndex++;
+  }
+
   return s;
 }
 
@@ -300,28 +306,6 @@ NATIVE(colon, ":") {
 
   f->state = COMPILING;
 }
-
-// Executed at the end of a colon-definition.
-// Returns to interpretation mode, and handles the return stack.
-NATIVE(exitcolon, "(EXITCOLON)") {
-  f->state = INTERPRETING;
-  f->nextWord = popR(f);
-}
-
-// Immediate word.
-NATIVE(semicolon, ";") {
-  // Compile one last word.
-  write_cell(f, (cell) &word_exitcolon);
-  // That's the end of this word's code. Now add it back to the dictionary.
-  // If the link pointer is null, this was a :NONAME, so we skip it.
-  if (latest_definition->link != NULL) {
-    f->dictionary = latest_definition;
-  }
-  latest_definition->hidden = false;
-  latest_definition = NULL;
-  f->state = INTERPRETING;
-}
-
 
 
 NATIVE(lessthan, "<") {
@@ -518,6 +502,21 @@ void exit_(fstate* f) {
 NATIVE(exit, "EXIT") {
   exit_(f);
 }
+
+// Immediate word.
+NATIVE(semicolon, ";") {
+  // Compile one last word.
+  write_cell(f, (cell) &word_exit);
+  // That's the end of this word's code. Now add it back to the dictionary.
+  // If the link pointer is null, this was a :NONAME, so we skip it.
+  if (latest_definition->link != NULL) {
+    f->dictionary = latest_definition;
+  }
+  latest_definition->hidden = false;
+  latest_definition = NULL;
+  f->state = INTERPRETING;
+}
+
 
 // Unimplemented: FILL
 NATIVE(find, "FIND") {
@@ -818,7 +817,6 @@ int main(int argc, char** argv) {
   NATIVE_SPEC(dot, ".");
   NATIVE_SPEC(divide, "/");
   NATIVE_SPEC(colon, ":");
-  NATIVE_SPEC(exitcolon, "(exitcolon)");
   NATIVE_SPEC(semicolon, ";"); word_semicolon.immediate = true;
   NATIVE_SPEC(lessthan, "<");
   NATIVE_SPEC(equals, "=");
@@ -887,6 +885,7 @@ int main(int argc, char** argv) {
   f.nextWord = NULL;
   f.state = INTERPRETING;
   f.base = 10;
+  f.input = NULL;
 
   init_input(&f);
 
