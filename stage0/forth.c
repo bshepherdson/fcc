@@ -547,6 +547,10 @@ NATIVE(here, "HERE") {
   push(f, (cell) f->here);
 }
 
+NATIVE(allot, "ALLOT") {
+  f->here += pop(f);
+}
+
 NATIVE(immediate, "IMMEDIATE") {
   f->dictionary->immediate = true;
 }
