@@ -12,9 +12,6 @@
 
 // TODO: Make these portable to other platforms.
 // Sizes in address units.
-#define CHAR_SIZE 1
-#define CELL_SIZE sizeof(intptr_t)
-
 #define COMPILING (1)
 #define INTERPRETING (0)
 
@@ -24,6 +21,8 @@ typedef uintptr_t ucell;
 typedef unsigned char bool;
 #define true (1)
 #define false (0)
+#define CHAR_SIZE 1
+#define CELL_SIZE sizeof(cell)
 
 struct fstate_;
 
@@ -326,7 +325,7 @@ NATIVE(equals, "=") {
 NATIVE(to_body, ">BODY") {
   word* xt = (word*) pop(f);
   word** ws = xt->code.words;
-  push(f, (cell) ws[1]);
+  push(f, (cell) ws);
 }
 
 NATIVE(inptr, ">IN") {
@@ -403,8 +402,8 @@ NATIVE(abs, "ABS") {
 
 // Unimplemented: ACCEPT
 NATIVE(align, "ALIGN") {
-  unsigned int mask = sizeof(cell) - 1;
-  f->here = (unsigned char*) ((~mask) & (((int) f->here) + mask));
+  cell mask = sizeof(cell) - 1;
+  f->here = (unsigned char*) ((~mask) & (((cell) f->here) + mask));
 }
 
 NATIVE(aligned, "ALIGNED") {
@@ -738,7 +737,7 @@ NATIVE(litstring, "(LITSTRING)") {
   push(f, (cell) len);
 
   // Bump and realign.
-  f->nextWord = (word**) (((int) (f->nextWord + len + sizeof(cell) - 1)) & ~(sizeof(cell) - 1));
+  f->nextWord = (word**) (((cell) (str + len + sizeof(cell) - 1)) & ~(sizeof(cell) - 1));
 }
 
 // IMMEDIATE
@@ -750,7 +749,7 @@ NATIVE(squote, "S\"") {
     write_byte(f, s->value[i]);
   }
 
-  f->here = (unsigned char*) (((int) (f->here + s->length + sizeof(cell) - 1)) & ~(sizeof(cell) - 1));
+  f->here = (unsigned char*) (((cell) (f->here + sizeof(cell) - 1)) & ~(sizeof(cell) - 1));
 }
 
 // Unimplemented: S>D SIGN SM/REM
@@ -826,6 +825,34 @@ NATIVE(rbrac, "]") {
   f->state = COMPILING;
 }
 
+NATIVE(create, "CREATE") {
+  // Parse a name and create a new definition for it that returns its own data
+  // space pointer. (That is, HERE after the new definition.)
+  string* s = parse_word(f);
+  word* w = (word*) malloc(sizeof(word));
+  w->name = (char*) malloc(s->length);
+  w->nameLen = s->length;
+  strncpy(w->name, s->value, s->length);
+  w->hidden = false;
+  w->immediate = false;
+  w->native = false;
+  w->link = f->dictionary;
+  w->code.words = (word**) f->here;
+  f->dictionary = w;
+
+  // Align the HERE-space pointer if it isn't already.
+  code_align(f);
+  // A CREATE'd definition looks like: LIT (HERE*) EXIT EXIT
+  write_cell(f, (cell) &word_lit);
+  write_cell(f, (cell) (f->here + CELL_SIZE*3));
+  write_cell(f, (cell) &word_exit);
+  write_cell(f, (cell) &word_exit);
+}
+
+NATIVE(latest, "(LATEST)") {
+  push(f, (cell) f->dictionary);
+}
+
 // Unimplemented: ['] [CHAR]
 
 
@@ -836,6 +863,13 @@ void run(fstate* f) {
   while (f->nextWord != NULL) {
     word* next = *(f->nextWord);
     f->nextWord++;
+
+    char* name = (char*) malloc(next->nameLen + 1);
+    strncpy(name, next->name, next->nameLen);
+    name[next->nameLen] = '\0';
+    fprintf(stderr, "executing: %s\n", name);
+    free(name);
+
     execute_(f, next);
   }
 }
@@ -874,6 +908,8 @@ int main(int argc, char** argv) {
   NATIVE_SPEC(ccomma, "C,");
   NATIVE_SPEC(cfetch, "C@");
   NATIVE_SPEC(cells, "CELLS");
+  NATIVE_SPEC(create, "CREATE");
+  NATIVE_SPEC(latest, "(LATEST)");
   NATIVE_SPEC(cr, "CR");
   NATIVE_SPEC(depth, "DEPTH");
   NATIVE_SPEC(drop, "DROP");

@@ -87,9 +87,62 @@
 : SPACE bl emit ;
 : SPACES ( n -- ) BEGIN space 1- dup 0= UNTIL drop ;
 
+: TYPE ( c-addr u -- )
+  BEGIN dup 0> WHILE
+    1- swap
+    dup c@ emit
+    char+ swap
+  REPEAT
+  2drop
+;
+
+: ." postpone S" ['] type , ; IMMEDIATE
+
+\ When DOES> is called, there are three layers of nested compilation.
+\ DOES> is immediate, running during compilation of a word like CONSTANT.
+\ It compiles things into the definition of eg. CONSTANT, which will themselves
+\ compile interesting things into the words created by eg. CONSTANT.
+\ : DOES>
+\   here 16 cells + ( target )
+\   ['] (latest) ,
+\   ['] >body ,
+\   ['] cell+ ,
+\   ['] cell+ ,
+\   ['] (lit) ,
+\   ['] (branch) ,
+\   ['] over ,
+\   ['] ! ,
+\   ['] (lit) ,
+\   , \ Compile the HERE value computed at the beginning
+\   ['] here ,
+\   ['] - ,
+\   ['] swap ,
+\   ['] cell+ ,
+\   ['] ! ,
+\   ['] exit ,
+\ 
+\   \ Now we're aimed after the above exit, after the real end of eg. CONSTANT.
+\   \ This is where the code after the DOES> will be compiled, and where we just
+\   \ added a branch to the CREATEd word to jump to. It has no more EXIT.
+\ ; IMMEDIATE
+
+\ Runs during the execution of eg. CONSTANT. The CREATEd word is newly made, and
+\ I've got the here-value from DOES> below on the stack.
+\ I need to compile a jump to that address into eg. CONSTANT.
+: (DOES>) ( target -- )
+  (latest) >body 2 cells + ( target addr )
+  ['] (branch) over !      ( target addr )
+  cell+                    ( target addr' )
+  here rot - ( addr delta )
+  swap !
+;
+: DOES> here 4 cells +   ['] (lit) , , ['] (does>) , ['] exit , ; IMMEDIATE
+
+: VARIABLE CREATE 0 , ;
+: CONSTANT CREATE 0 , DOES> @ ;
+
 \ Unimplemented: # #> #S <#
 \ Unimplemented: +LOOP
-\ Unimplemented: ."
 \ Unimplemented: ACCEPT
 \ Unimplemented: CONSTANT
 \ Unimplemented: CREATE DECIMAL DO DOES>
