@@ -132,14 +132,14 @@
 : (DOES>) ( target -- )
   (latest) >body 2 cells + ( target addr )
   ['] (branch) over !      ( target addr )
-  cell+                    ( target addr' )
-  here rot - ( addr delta )
-  swap !
+  cell+ 2dup -             ( target addr' delta )
+  swap !   drop ( )
 ;
 : DOES> here 4 cells +   ['] (lit) , , ['] (does>) , ['] exit , ; IMMEDIATE
 
 : VARIABLE CREATE 0 , ;
-: CONSTANT CREATE 0 , DOES> @ ;
+: CONSTANT CREATE , DOES> @ ;
+: ARRAY ( length --   exec: index -- a-addr ) create cells allot DOES> cells + ;
 
 \ Unimplemented: # #> #S <#
 \ Unimplemented: +LOOP

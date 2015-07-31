@@ -1,7 +1,8 @@
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
-#include <string.h>
+#include <strings.h>
 #include <inttypes.h>
 
 #include <fcntl.h>
@@ -867,7 +868,6 @@ void run(fstate* f) {
     char* name = (char*) malloc(next->nameLen + 1);
     strncpy(name, next->name, next->nameLen);
     name[next->nameLen] = '\0';
-    fprintf(stderr, "executing: %s\n", name);
     free(name);
 
     execute_(f, next);
