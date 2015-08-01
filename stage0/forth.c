@@ -831,8 +831,7 @@ NATIVE(word, "WORD") {
   string* s = parse(f, delim);
   char* str = (char*) f->here;
   *str = (char) s->length;
-  str++;
-  strncpy(str, s->value, s->length);
+  strncpy(str + 1, s->value, s->length);
   free(s);
   // Transient region, so don't move HERE.
   push(f, (cell) str);
@@ -849,6 +848,10 @@ NATIVE(lbrac, "[") {
 
 NATIVE(rbrac, "]") {
   f->state = COMPILING;
+}
+
+NATIVE(debug, "(DEBUG)") {
+  // Doesn't do anything, but provides a breakpoint.
 }
 
 NATIVE(create, "CREATE") {
@@ -889,12 +892,6 @@ void run(fstate* f) {
   while (f->nextWord != NULL) {
     word* next = *(f->nextWord);
     f->nextWord++;
-
-    char* name = (char*) malloc(next->nameLen + 1);
-    strncpy(name, next->name, next->nameLen);
-    name[next->nameLen] = '\0';
-    free(name);
-
     execute_(f, next);
   }
 }
@@ -913,6 +910,7 @@ int main(int argc, char** argv) {
   NATIVE_SPEC(colon, ":");
   NATIVE_SPEC(noname, ":NONAME");
   NATIVE_SPEC(semicolon, ";"); word_semicolon.immediate = true;
+  NATIVE_SPEC(debug, "(DEBUG)");
   NATIVE_SPEC(lessthan, "<");
   NATIVE_SPEC(equals, "=");
   NATIVE_SPEC(to_body, ">BODY");
