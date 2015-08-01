@@ -668,6 +668,12 @@ void quit_(fstate* f) {
       // Attempt to parse as a number.
       cell len = s->length;
       char* addr = s->value;
+      bool negated = false;
+      if (*addr == '-') {
+        negated = true;
+        addr++;
+        len--;
+      }
       cell lo = 0;
       cell hi = 0;
       to_number_(f, &len, &addr, &hi, &lo);
@@ -678,6 +684,7 @@ void quit_(fstate* f) {
         errnum[s->length] = '\0';
         fprintf(stderr, "ERROR: Failed to parse number: %s\n", errnum);
       } else {
+        if (negated) lo = -lo;
         if (f->state == INTERPRETING) {
           push(f, lo);
         } else {
@@ -686,6 +693,7 @@ void quit_(fstate* f) {
         }
       }
     }
+    free(s);
   }
 }
 

@@ -195,13 +195,16 @@ VARIABLE (loop-top)
 ;
 
 
+: MOVE> ( a1 a2 u -- ) 0 DO over i + c@   over i + c! LOOP 2drop ;
+: MOVE< ( a1 a2 u -- ) 1- -1 swap DO over i + c@   over i + c! -1 +LOOP 2drop ;
+: MOVE ( a1 a2 u -- ) >R 2dup <   R> swap   IF MOVE< ELSE MOVE> THEN ;
+
+
 \ Unimplemented: # #> #S <#
 \ Unimplemented: ACCEPT
 \ Unimplemented: ENVIRONMENT?
-\ Unimplemented: FILL
 \ Unimplemented: FM/MOD HOLD
 \ Unimplemented: KEY
 \ Unimplemented: M*
-\ Unimplemented: MOVE
 \ Unimplemented: S>D SIGN SM/REM
 \ Unimplemented: UM* UM/MOD
