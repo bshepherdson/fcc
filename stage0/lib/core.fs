@@ -181,13 +181,27 @@ VARIABLE (loop-top)
   >R
 ;
 
+
+: MIN ( a b -- min ) 2dup > IF swap THEN drop ;
+: MAX ( a b -- max ) 2dup < IF swap THEN drop ;
+
+: FILL ( c-addr u char -- )
+  -rot ( char c-addr u )
+  dup 0<= IF drop 2drop EXIT THEN
+  0 DO ( char c-addr )
+    2dup i + c! ( char c-addr )
+  LOOP
+  2drop
+;
+
+
 \ Unimplemented: # #> #S <#
 \ Unimplemented: ACCEPT
 \ Unimplemented: ENVIRONMENT?
 \ Unimplemented: FILL
 \ Unimplemented: FM/MOD HOLD
 \ Unimplemented: KEY
-\ Unimplemented: M* MAX MIN
+\ Unimplemented: M*
 \ Unimplemented: MOVE
 \ Unimplemented: S>D SIGN SM/REM
 \ Unimplemented: UM* UM/MOD
