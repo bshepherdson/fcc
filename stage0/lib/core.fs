@@ -200,11 +200,7 @@ VARIABLE (loop-top)
 : MOVE ( a1 a2 u -- ) >R 2dup <   R> swap   IF MOVE< ELSE MOVE> THEN ;
 
 
-\ Unimplemented: # #> #S <#
-\ Unimplemented: ACCEPT
-\ Unimplemented: ENVIRONMENT?
-\ Unimplemented: FM/MOD HOLD
-\ Unimplemented: KEY
-\ Unimplemented: M*
-\ Unimplemented: S>D SIGN SM/REM
-\ Unimplemented: UM* UM/MOD
+\ Unimplemented: # #> #S <# HOLD
+\ Unimplemented: ACCEPT ENVIRONMENT? KEY
+\ Unimplemented: FM/MOD UM/MOD SM/REM
+\ Unimplemented: M* UM* S>D SIGN

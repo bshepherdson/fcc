@@ -308,6 +308,24 @@ NATIVE(colon, ":") {
   f->state = COMPILING;
 }
 
+NATIVE(noname, ":NONAME") {
+  word *w = (word*) malloc(sizeof(word));
+  latest_definition = w;
+
+  w->link = NULL; // Signals to semicolon not to add to the dictionary.
+  w->native = false;
+  w->immediate = false;
+  w->hidden = true;
+  w->name = NULL;
+  w->nameLen = 0;
+  w->code.words = (word**) f->here;
+
+  f->state = COMPILING;
+
+  // Push the xt, the word*.
+  push(f, (cell) w);
+}
+
 
 NATIVE(lessthan, "<") {
   cell b = pop(f);
@@ -893,6 +911,7 @@ int main(int argc, char** argv) {
   NATIVE_SPEC(dot, ".");
   NATIVE_SPEC(divide, "/");
   NATIVE_SPEC(colon, ":");
+  NATIVE_SPEC(noname, ":NONAME");
   NATIVE_SPEC(semicolon, ";"); word_semicolon.immediate = true;
   NATIVE_SPEC(lessthan, "<");
   NATIVE_SPEC(equals, "=");
