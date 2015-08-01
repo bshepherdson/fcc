@@ -98,33 +98,6 @@
 
 : ." postpone S" ['] type , ; IMMEDIATE
 
-\ When DOES> is called, there are three layers of nested compilation.
-\ DOES> is immediate, running during compilation of a word like CONSTANT.
-\ It compiles things into the definition of eg. CONSTANT, which will themselves
-\ compile interesting things into the words created by eg. CONSTANT.
-\ : DOES>
-\   here 16 cells + ( target )
-\   ['] (latest) ,
-\   ['] >body ,
-\   ['] cell+ ,
-\   ['] cell+ ,
-\   ['] (lit) ,
-\   ['] (branch) ,
-\   ['] over ,
-\   ['] ! ,
-\   ['] (lit) ,
-\   , \ Compile the HERE value computed at the beginning
-\   ['] here ,
-\   ['] - ,
-\   ['] swap ,
-\   ['] cell+ ,
-\   ['] ! ,
-\   ['] exit ,
-\ 
-\   \ Now we're aimed after the above exit, after the real end of eg. CONSTANT.
-\   \ This is where the code after the DOES> will be compiled, and where we just
-\   \ added a branch to the CREATEd word to jump to. It has no more EXIT.
-\ ; IMMEDIATE
 
 \ Runs during the execution of eg. CONSTANT. The CREATEd word is newly made, and
 \ I've got the here-value from DOES> below on the stack.
@@ -135,23 +108,86 @@
   cell+ 2dup -             ( target addr' delta )
   swap !   drop ( )
 ;
+
+\ DOES> itself. compiles a literal, a call to (does>), and EXIT into the
+\ defining word (eg. CONSTANT). The literal is the address after the EXIT, ie.
+\ where the code after DOES> is about to go.
 : DOES> here 4 cells +   ['] (lit) , , ['] (does>) , ['] exit , ; IMMEDIATE
 
 : VARIABLE CREATE 0 , ;
 : CONSTANT CREATE , DOES> @ ;
 : ARRAY ( length --   exec: index -- a-addr ) create cells allot DOES> cells + ;
 
+
+: HEX 16 base ! ;
+: DECIMAL 10 base ! ;
+
+\ DO ... LOOP design:
+\ old value of (loop-top) is pushed onto the compile-time stack.
+\ new value of the top of the loop is placed in (loop-top).
+\ LEAVE can use that address.
+\ DO compiles code to push the index and limit onto the runtime return stack.
+\ It also compiles a 0branch and code to push a 1 before it, so it doesn't
+\ branch on initial entry. LEAVE pushes a 0 before jumping, so it will branch.
+\ +LOOP jumps to the location after that in (loop-top), and restores the old
+\ value into (loop-top).
+
+VARIABLE (loop-top)
+
+: DO ( limit index --   C: old-jump-addr )
+  ['] swap , ['] >r dup , ,
+  ['] (lit) , 1 , ['] (0branch) ,
+  (loop-top) @    here (loop-top) ! ( C: old-jump-addr )
+  0 , \ Placeholder for the jump offset to go.
+; IMMEDIATE
+
+: I ( -- index ) ['] R@ , ; IMMEDIATE
+: J ( -- index )
+  R> R> R> R@ ( exit index1 limit1 index2 )
+  -rot ( exit index2 index1 limit1 )
+  >R >R ( exit index2 )
+  swap >R ( index2 )
+;
+
+: +LOOP ( step --    C: old-jump-addr )
+  \ Compute the point where the end of the loop will be.
+  \ 9 cells after this point.
+  ['] R> ,  ['] + , ( index' ) ['] R> , ( index' limit )
+  ['] 2dup , ['] >R dup , ,
+  ['] = , ['] (0branch) ,
+  (loop-top) @ cell+   here - ,
+
+  \ End of the loop, start of the postlude ( C: -- )
+  here ( C: old-jump-addr end-addr )
+  (loop-top) @ ( C: old-jump-addr end-addr target )
+  2dup -       ( C: old-jump-addr end-addr target delta )
+  swap !       ( C: old-jump-addr end-addr )
+  drop (loop-top) ! ( C: -- )
+  ['] R> dup , , ['] 2drop ,  ( )
+; IMMEDIATE
+
+: LOOP ( --   C: jump-addr ) ['] (lit) , 1 , POSTPONE +LOOP ; IMMEDIATE
+
+: LEAVE ( -- ) ( R: loop-details -- ) ( C: -- )
+  (loop-top) @ 1 cells -
+  ['] (lit) , 0 , \ Force a branch.
+  ['] (branch) ,
+  here - ,
+; IMMEDIATE
+
+: UNLOOP ( -- ) ( R: limit index exit -- exit )
+  R> ( exit )
+  R> R> 2drop ( exit   R: -- )
+  >R
+;
+
 \ Unimplemented: # #> #S <#
-\ Unimplemented: +LOOP
 \ Unimplemented: ACCEPT
-\ Unimplemented: CONSTANT
-\ Unimplemented: CREATE DECIMAL DO DOES>
 \ Unimplemented: ENVIRONMENT?
 \ Unimplemented: FILL
-\ Unimplemented: FM/MOD HOLD I
-\ Unimplemented: J KEY LEAVE
-\ Unimplemented: LOOP M* MAX MIN
+\ Unimplemented: FM/MOD HOLD
+\ Unimplemented: KEY
+\ Unimplemented: M* MAX MIN
 \ Unimplemented: MOVE
 \ Unimplemented: S>D SIGN SM/REM
-\ Unimplemented: TYPE
-\ Unimplemented: UM* UM/MOD UNLOOP VARIABLE
+\ Unimplemented: UM* UM/MOD

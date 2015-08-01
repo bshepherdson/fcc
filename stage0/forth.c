@@ -414,7 +414,6 @@ NATIVE(aligned, "ALIGNED") {
   push(f, c);
 }
 
-// Unimplemented: ALLOT
 NATIVE(and, "AND") {
   push(f, pop(f) & pop(f));
 }
@@ -900,6 +899,7 @@ int main(int argc, char** argv) {
   NATIVE_SPEC(abs, "ABS");
   NATIVE_SPEC(align, "ALIGN");
   NATIVE_SPEC(aligned, "ALIGNED");
+  NATIVE_SPEC(allot, "ALLOT");
   NATIVE_SPEC(and, "AND");
   NATIVE_SPEC(base, "BASE");
   NATIVE_SPEC(branch, "(BRANCH)");
