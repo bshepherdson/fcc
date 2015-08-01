@@ -850,6 +850,10 @@ NATIVE(rbrac, "]") {
   f->state = COMPILING;
 }
 
+NATIVE(source_id, "SOURCE-ID") {
+  push(f, f->input->type);
+}
+
 NATIVE(debug, "(DEBUG)") {
   // Doesn't do anything, but provides a breakpoint.
 }
