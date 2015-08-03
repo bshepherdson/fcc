@@ -26,7 +26,7 @@
 : 2/ ( x -- x ) 2 / ;
 
 : > ( a b -- ? ) swap < ;
-: <= ( a b -- ? ) 2dup = -rot   < and ;
+: <= ( a b -- ? ) 2dup = -rot   < or ;
 : >= ( a b -- ? ) swap <= ;
 
 : 0> 0 > ;
@@ -198,6 +198,8 @@ VARIABLE (loop-top)
 : MOVE> ( a1 a2 u -- ) 0 DO over i + c@   over i + c! LOOP 2drop ;
 : MOVE< ( a1 a2 u -- ) 1- -1 swap DO over i + c@   over i + c! -1 +LOOP 2drop ;
 : MOVE ( a1 a2 u -- ) >R 2dup <   R> swap   IF MOVE< ELSE MOVE> THEN ;
+
+: ABORT" postpone IF postpone ." ['] ABORT , postpone THEN ; IMMEDIATE
 
 
 \ Unimplemented pictured output: # #> #S <# HOLD SIGN

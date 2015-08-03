@@ -112,6 +112,7 @@ void write_cell(fstate* f, cell c) {
 
 // Main interpreter words.
 void run(fstate* f);
+void quit_(fstate* f);
 
 
 // Clears all current input states, and adds a keyboard state.
@@ -409,9 +410,7 @@ NATIVE(fetch, "@") {
 }
 
 NATIVE(abort, "ABORT") {
-  f->sp = 0;
-  f->rsp = 0;
-  // TODO Call QUIT from here.
+  quit_(f);
 }
 
 
