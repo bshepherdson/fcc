@@ -10,6 +10,8 @@
 
 #include <readline/readline.h>
 
+#include <md.h>
+
 // Sizes in address units.
 #define COMPILING (1)
 #define INTERPRETING (0)
@@ -81,6 +83,8 @@ cell inputIndex;
 cell c1;
 char ch1;
 char* str1;
+char** strptr1;
+size_t tempSize;
 header* tempHeader;
 char tempBuf[256];
 
@@ -228,7 +232,7 @@ WORD(branch, "(BRANCH)", 8, &header_here_ptr) {
 // address. Otherwise, identical to branch above.
 WORD(zbranch, "(0BRANCH)", 9, &header_branch) {
   char *p = (char*) ip;
-  p += *sp-- == 0 ? (cell) *ip : sizeof(cell);
+  p += *sp-- == 0 ? (cell) *ip : (cell) sizeof(cell);
   ip = (code***) p;
   NEXT;
 }
@@ -251,9 +255,9 @@ void refill_(void) {
     SRC.inputPtr = 0;
     free(str1);
   } else {
-    str1 = 0;
-    c1 = 256;
-    c1 = getline(&str1, &c1, (FILE*) SRC.type);
+    strptr1 = NULL;
+    tempSize = 0;
+    c1 = getline(strptr1, &tempSize, (FILE*) SRC.type);
 
     if (c1 == -1) {
       // Dump the source and recurse.
@@ -417,7 +421,8 @@ WORD(find, "(FIND)", 6, &header_to_number) {
 }
 
 WORD(depth, "DEPTH", 5, &header_find) {
-  *(--sp) = (cell) (((char*) spTop) - ((char*) sp)) / sizeof(cell);
+  c1 = (cell) (((char*) spTop) - ((char*) sp)) / sizeof(cell);
+  *(--sp) = c1;
   NEXT;
 }
 
@@ -493,8 +498,8 @@ quit_loop:
         cfa = (code**) sp[1];
         sp += 2;
         //NEXT1;
-        asm("jmpq *%0" : /* outputs */ : "r" (*cfa) : "memory");
-        __builtin_unreachable;
+        QUIT_JUMP_IN;
+        __builtin_unreachable();
       } else { // Compiling mode
         *(dsp.cells++) = sp[1];
         sp += 2;
