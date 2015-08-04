@@ -49,7 +49,6 @@ cell *rsp;
 code ***ip;
 code **cfa;
 
-code **exitPtr;
 code *quitTop = NULL;
 code **quitTopPtr = &quitTop;
 
@@ -65,10 +64,16 @@ cell base;
 header *dictionary;
 header *latest;
 
-cell parseLength;
-cell inputPtr; // Indexes into parseBuffer.
-char parseBuffer[256];
+typedef struct {
+  cell parseLength;
+  cell inputPtr; // Indexes into parseBuffer.
+  cell type;     // 0 = KEYBOARD, -1 = EVALUATE, 0> fileid
+  char parseBuffer[256];
+} source;
 
+source inputSources[16];
+cell inputIndex;
+#define SRC (inputSources[inputIndex])
 
 
 // And some miscellaneous helpers. These exist because I can't use locals in
@@ -147,8 +152,37 @@ WORD(xor, "XOR", 3, &header_or) {
   NEXT;
 }
 
+// Stack manipulation
+WORD(dup, "DUP", 3, &header_xor) {
+  sp--;
+  sp[0] = sp[1];
+  NEXT;
+}
+
+WORD(swap, "SWAP", 4, &header_dup) {
+  c1 = sp[0];
+  sp[0] = sp[1];
+  sp[1] = c1;
+  NEXT;
+}
+
+WORD(drop, "DROP", 4, &header_swap) {
+  sp++;
+  NEXT;
+}
+
+WORD(to_r, ">R", 2, &header_drop) {
+  *(--rsp) = *(sp++);
+  NEXT;
+}
+
+WORD(from_r, "R>", 2, &header_to_r) {
+  *(--sp) = *(rsp++);
+  NEXT;
+}
+
 // Memory access
-WORD(fetch, "@", 1, &header_xor) {
+WORD(fetch, "@", 1, &header_from_r) {
   sp[0] = *((cell*) sp[0]);
   NEXT;
 }
@@ -206,17 +240,35 @@ WORD(execute, "EXECUTE", 7, &header_zbranch) {
 
 
 // Input
-// This is an interal REFILL command. It takes a buffer address as a parameter,
-// and returns the number of characters parsed. ie. ( buf -- #parsed )
-// TODO: This won't work if sp becomes $rsp or similar. The locals screw it up.
-// That could just be worked around, but that's playing with fire.
 void refill_(void) {
-  str1 = readline("> ");
-  parseLength = strlen(str1);
-  strncpy(parseBuffer, str1, parseLength);
-  inputPtr = 0;
-  free(str1);
+  if (SRC.type == -1) { // EVALUATE
+    // EVALUATE strings cannot be refilled. Pop the source.
+    inputIndex--;
+  } else if ( SRC.type == 0) { // KEYBOARD
+    str1 = readline("> ");
+    SRC.parseLength = strlen(str1);
+    strncpy(SRC.parseBuffer, str1, SRC.parseLength);
+    SRC.inputPtr = 0;
+    free(str1);
+  } else {
+    str1 = 0;
+    c1 = 256;
+    c1 = getline(&str1, &c1, (FILE*) SRC.type);
+
+    if (c1 == -1) {
+      // Dump the source and recurse.
+      inputIndex--;
+    } else {
+      // Knock off the trailing newline, if present.
+      if (str1[c1 - 1] == '\n') c1--;
+      strncpy(SRC.parseBuffer, str1, c1);
+      free(str1);
+      SRC.parseLength = c1;
+      SRC.inputPtr = 0;
+    }
+  }
 }
+
 WORD(refill, "REFILL", 6, &header_execute) {
   refill_();
   NEXT;
@@ -228,7 +280,7 @@ WORD(latest, "(LATEST)", 8, &header_refill) {
 }
 
 WORD(in_ptr, ">IN", 3, &header_latest) {
-  *(--sp) = (cell) (&inputPtr);
+  *(--sp) = (cell) (&SRC.inputPtr);
   NEXT;
 }
 
@@ -266,18 +318,18 @@ WORD(dolit, "(DOLIT)", 5, &header_docol) {
 }
 
 void parse_(void) {
-  if ( inputPtr >= parseLength ) {
+  if ( SRC.inputPtr >= SRC.parseLength ) {
     sp[0] = 0;
     *(--sp) = 0;
   } else {
     ch1 = (char) sp[0];
-    str1 = parseBuffer + inputPtr;
+    str1 = SRC.parseBuffer + SRC.inputPtr;
     c1 = 0;
-    while ( inputPtr < parseLength && parseBuffer[inputPtr] != ch1 ) {
-      inputPtr++;
+    while ( SRC.inputPtr < SRC.parseLength && SRC.parseBuffer[SRC.inputPtr] != ch1 ) {
+      SRC.inputPtr++;
       c1++;
     }
-    if ( inputPtr < parseLength ) inputPtr++; // Skip over the delimiter.
+    if ( SRC.inputPtr < SRC.parseLength ) SRC.inputPtr++; // Skip over the delimiter.
     sp[0] = (cell) str1;
     *(--sp) = c1;
   }
@@ -285,16 +337,16 @@ void parse_(void) {
 
 void parse_name_(void) {
   // Skip any leading delimiters.
-  while ( inputPtr < parseLength && parseBuffer[inputPtr] == ' ' ) {
-    inputPtr++;
+  while ( SRC.inputPtr < SRC.parseLength && SRC.parseBuffer[SRC.inputPtr] == ' ' ) {
+    SRC.inputPtr++;
   }
   c1 = 0;
-  str1 = parseBuffer + inputPtr;
-  while ( inputPtr < parseLength && parseBuffer[inputPtr] != ' ' ) {
-    inputPtr++;
+  str1 = SRC.parseBuffer + SRC.inputPtr;
+  while ( SRC.inputPtr < SRC.parseLength && SRC.parseBuffer[SRC.inputPtr] != ' ' ) {
+    SRC.inputPtr++;
     c1++;
   }
-  if (inputPtr < parseLength) inputPtr++; // Jump over a trailing delimiter.
+  if (SRC.inputPtr < SRC.parseLength) SRC.inputPtr++; // Jump over a trailing delimiter.
   *(--sp) = (cell) str1;
   *(--sp) = c1;
 }
@@ -390,7 +442,7 @@ quit_loop:
       if (sp[0] != 0) {
         break;
       } else {
-        printf("  ok\n");
+        if (SRC.type == 0) printf("  ok\n");
         refill_();
         sp += 2;
       }
@@ -437,9 +489,8 @@ quit_loop:
       // Successful parse. ( xt 1 ) indicates immediate, ( xt -1 ) not.
       if (sp[0] == 1 || state == INTERPRETING) {
         quitTop = &&quit_loop;
-        *(--rsp) = (cell) &quitTopPtr;
+        ip = &quitTopPtr;
         cfa = (code**) sp[1];
-        ip = &exitPtr;
         sp += 2;
         //NEXT1;
         asm("jmpq *%0" : /* outputs */ : "r" (*cfa) : "memory");
@@ -466,6 +517,8 @@ WORD(colon, ":", 1, &header_quit) {
     // Never returns
   }
 
+  tempHeader->name = (char*) malloc(sp[0]);
+  strncpy(tempHeader->name, (char*) sp[1], sp[0]);
   tempHeader->metadata = sp[0] | HIDDEN;
   tempHeader->code_field = &code_docol;
 
@@ -491,11 +544,26 @@ WORD(semicolon, ";", 1 | IMMEDIATE, &header_exit) {
 // NB: If anything gets added after SEMICOLON, change the dictionary below.
 
 // TODO: File input
-int main(void) {
+int main(int argc, char **argv) {
   dictionary = &header_semicolon;
   base = 10;
-  parseLength = inputPtr = 0;
-  exitPtr = &(header_exit.code_field);
+  inputIndex = 0;
+  SRC.type = SRC.parseLength = SRC.inputPtr = 0;
+
+  // Open the input files in reverse order and push them as file inputs.
+  argc--;
+  for (; argc > 0; argc--) {
+    inputIndex++;
+    SRC.type = (cell) fopen(argv[argc], "r");
+    if ((FILE*) SRC.type == NULL) {
+      fprintf(stderr, "Could not load input file: %s\n", argv[argc]);
+      exit(1);
+    }
+
+    SRC.inputPtr = 0;
+    SRC.parseLength = 0;
+  }
+
   code_quit();
 }
 
