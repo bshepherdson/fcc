@@ -121,13 +121,13 @@ WORD(minus, "-", 1, &header_plus) {
 }
 
 WORD(times, "*", 1, &header_minus) {
-  sp[1] = sp[1] - sp[0];
+  sp[1] = sp[1] * sp[0];
   sp++;
   NEXT;
 }
 
 WORD(div, "/", 1, &header_times) {
-  sp[1] = sp[1] - sp[0];
+  sp[1] = sp[1] / sp[0];
   sp++;
   NEXT;
 }
@@ -156,8 +156,40 @@ WORD(xor, "XOR", 3, &header_or) {
   NEXT;
 }
 
+// Shifts
+WORD(lshift, "LSHIFT", 6, &header_xor) {
+  sp[1] = ((ucell) sp[1]) << sp[0];
+  sp++;
+  NEXT;
+}
+
+WORD(rshift, "RSHIFT", 7, &header_lshift) {
+  sp[1] = ((ucell) sp[1]) >> sp[0];
+  sp++;
+  NEXT;
+}
+
+// Comparison
+WORD(less_than, "<", 1, &header_rshift) {
+  sp[1] = (sp[1] < sp[0]) ? -1 : 0;
+  sp++;
+  NEXT;
+}
+
+WORD(less_than_unsigned, "U<", 2, &header_less_than) {
+  sp[1] = ((ucell) sp[1]) < ((ucell) sp[0]) ? -1 : 0;
+  sp++;
+  NEXT;
+}
+
+WORD(equal, "=", 1, &header_less_than_unsigned) {
+  sp[1] = sp[0] == sp[1] ? -1 : 0;
+  sp++;
+  NEXT;
+}
+
 // Stack manipulation
-WORD(dup, "DUP", 3, &header_xor) {
+WORD(dup, "DUP", 3, &header_equal) {
   sp--;
   sp[0] = sp[1];
   NEXT;
@@ -244,24 +276,27 @@ WORD(execute, "EXECUTE", 7, &header_zbranch) {
 
 
 // Input
-void refill_(void) {
+cell refill_(void) {
   if (SRC.type == -1) { // EVALUATE
     // EVALUATE strings cannot be refilled. Pop the source.
     inputIndex--;
+    return 0;
   } else if ( SRC.type == 0) { // KEYBOARD
     str1 = readline("> ");
     SRC.parseLength = strlen(str1);
     strncpy(SRC.parseBuffer, str1, SRC.parseLength);
     SRC.inputPtr = 0;
     free(str1);
+    return -1;
   } else {
-    strptr1 = NULL;
+    str1 = NULL;
     tempSize = 0;
-    c1 = getline(strptr1, &tempSize, (FILE*) SRC.type);
+    c1 = getline(&str1, &tempSize, (FILE*) SRC.type);
 
     if (c1 == -1) {
       // Dump the source and recurse.
       inputIndex--;
+      return 0;
     } else {
       // Knock off the trailing newline, if present.
       if (str1[c1 - 1] == '\n') c1--;
@@ -269,12 +304,13 @@ void refill_(void) {
       free(str1);
       SRC.parseLength = c1;
       SRC.inputPtr = 0;
+      return -1;
     }
   }
 }
 
 WORD(refill, "REFILL", 6, &header_execute) {
-  refill_();
+  *(--sp) = refill_();
   NEXT;
 }
 
@@ -289,7 +325,7 @@ WORD(in_ptr, ">IN", 3, &header_latest) {
 }
 
 WORD(emit, "EMIT", 4, &header_in_ptr) {
-  printf("%c", (int) *(sp++));
+  fputc(*(sp++), stdout);
   NEXT;
 }
 
@@ -486,7 +522,7 @@ quit_loop:
         }
       } else { // Failed parse of a number. Unrecognized word.
         strncpy(tempBuf, savedString, savedLength);
-        tempBuf[c1] = '\0';
+        tempBuf[savedLength] = '\0';
         fprintf(stderr, "*** Unrecognized word: %s\n", tempBuf);
         goto quit_top;
       }
