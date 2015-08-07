@@ -266,23 +266,9 @@ WORD(state, "STATE", 5, &header_here_ptr) {
   NEXT;
 }
 
-// TODO: DEBUG Remove me
-WORD(dot, ".", 1, &header_state) {
-  printf("%" PRIdPTR " ", *(sp++));
-  NEXT;
-}
-WORD(udot, "U.", 2, &header_dot) {
-  printf("%" PRIuPTR " ", (ucell) *(sp++));
-  NEXT;
-}
-// TODO: DEBUG Remove me
-WORD(debug, "debug", 5, &header_udot) {
-  NEXT;
-}
-
 // Branches
 // Jumps unconditionally by the delta (in bytes) of the next CFA.
-WORD(branch, "(BRANCH)", 8, &header_debug) {
+WORD(branch, "(BRANCH)", 8, &header_state) {
   str1 = (char*) ip;
   str1 += (cell) *ip;
   ip = (code***) str1;
@@ -297,12 +283,6 @@ WORD(zbranch, "(0BRANCH)", 9, &header_branch) {
   ip = (code***) str1;
   NEXT;
 }
-
-//WORD(literal, "LITERAL", 7, &header_zbranch) {
-//  *(dsp.cells++) = &(header_dolit.code_field);
-//  *(dsp.cells++) = *(sp++);
-//  NEXT;
-//}
 
 WORD(execute, "EXECUTE", 7, &header_zbranch) {
   cfa = (code**) *(sp++);
@@ -376,16 +356,18 @@ WORD(size_char, "(/CHAR)", 7, &header_size_cell) {
   NEXT;
 }
 
-// Converts a header* eg. from (latest) into the CFA.
-WORD(to_code, ">CODE", 5, &header_size_char) {
+// Converts a header* eg. from (latest) into the DOES> address, which is
+// the cell after the CFA.
+WORD(to_does, "(>DOES)", 7, &header_size_char) {
   tempHeader = (header*) sp[0];
-  sp[0] = (cell) &(tempHeader->code_field);
+  sp[0] = ((cell) &(tempHeader->code_field)) + sizeof(cell);
   NEXT;
 }
 
-// Advances a CFA to the data-space pointer.
-WORD(to_body, ">BODY", 5, & header_to_code) {
-  sp[0] += (cell) sizeof(cell);
+// Advances a CFA to be the data-space pointer, which is for a CREATEd
+// definition two cells after the xt.
+WORD(to_body, ">BODY", 5, & header_to_does) {
+  sp[0] += (cell) (2 * sizeof(cell));
   NEXT;
 }
 
@@ -469,6 +451,7 @@ void parse_name_(void) {
   *(--sp) = c1;
 }
 
+// TODO: Support the fancy numeric parsing from the standard.
 void to_number_(void) {
   // sp[0] is the length, sp[1] the pointer, sp[2] the high word, sp[3] the low.
   // ( lo hi c-addr u -- lo hi c-addr u )
