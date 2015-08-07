@@ -107,6 +107,15 @@ header header_ ## id = { link, metadata, name, &code_ ## id };\
 __attribute__((__noreturn__, __used__)) void code_ ## id (void)
 
 
+void print(char *str, cell len) {
+  str1 = (char*) malloc(len + 1);
+  strncpy(str1, str, len);
+  str1[len] = '\0';
+  printf("%s", str1);
+  free(str1);
+}
+
+
 // Math operations
 WORD(plus, "+", 1, NULL) {
   sp[1] = sp[0] + sp[1];
@@ -249,11 +258,25 @@ WORD(here_ptr, "(>HERE)", 7, &header_raw_alloc) {
   NEXT;
 }
 
+WORD(state, "STATE", 5, &header_here_ptr) {
+  *(--sp) = (cell) &state;
+  NEXT;
+}
+
+// TODO: DEBUG Remove me
+WORD(dot, ".", 1, &header_state) {
+  printf("%d ", *(sp++));
+  NEXT;
+}
+// TODO: DEBUG Remove me
+WORD(debug, "debug", 5, &header_dot) {
+  NEXT;
+}
 
 
 // Branches
 // Jumps unconditionally by the delta (in bytes) of the next CFA.
-WORD(branch, "(BRANCH)", 8, &header_here_ptr) {
+WORD(branch, "(BRANCH)", 8, &header_debug) {
   char *p = (char*) ip;
   p += (cell) *ip;
   ip = (code***) ip;
@@ -352,8 +375,18 @@ WORD(docol, "(DOCOL)", 7, &header_size_char) {
 }
 
 // Pushes its data field onto the stack.
-WORD(dolit, "(DOLIT)", 5, &header_docol) {
+WORD(dolit, "(DOLIT)", 7, &header_docol) {
   *(--sp) = (cell) *(ip++);
+  NEXT;
+}
+
+WORD(dostring, "(DOSTRING)", 10, &header_dolit) {
+  str1 = ((char*) ip);
+  c1 = (cell) *str1;
+  ip = (code***) (str1 + 1 + c1);
+  sp -= 2;
+  sp[1] = (cell) (str1 + 1);
+  sp[0] = c1;
   NEXT;
 }
 
@@ -400,9 +433,9 @@ void to_number_(void) {
     if ('0' <= c1 && c1 <= '9') {
       c1 -= '0';
     } else if ('A' <= c1 && c1 <= 'Z') {
-      c1 -= 'A' + 10;
+      c1 = c1 - 'A' + 10;
     } else if ('a' <= c1 && c1 <= 'z') {
-      c1 -= 'a' + 10;
+      c1 = c1 - 'a' + 10;
     } else {
       break;
     }
@@ -436,7 +469,7 @@ void find_(void) {
   sp[0] = 0;
 }
 
-WORD(parse, "PARSE", 5, &header_dolit) {
+WORD(parse, "PARSE", 5, &header_dostring) {
   parse_();
   NEXT;
 }
@@ -465,7 +498,8 @@ WORD(depth, "DEPTH", 5, &header_find) {
 // This could easily enough be turned into a Forth word.
 char *savedString;
 cell savedLength;
-WORD(quit, "QUIT", 4, &header_depth) {
+
+void quit_(void) {
   // Empty the stacks.
 quit_top:
   sp = spTop;
@@ -492,6 +526,8 @@ quit_loop:
     // ( c-addr u ) and u is nonzero
     savedString = (char*) sp[1]; // Set aside the string and length.
     savedLength = sp[0];
+    //print(savedString, savedLength);
+    //printf("\n");
     find_(); // xt immediate (or 0 0)
     if (sp[0] == 0) { // Failed to parse. Try to parse as a number.
       // I can use the existing ( 0 0 ) as the empty number for >number
@@ -543,6 +579,12 @@ quit_loop:
     }
   }
   // Should never be reachable.
+}
+
+WORD(quit, "QUIT", 4, &header_depth) {
+  inputIndex = 0;
+  quit_();
+  NEXT;
 }
 
 WORD(colon, ":", 1, &header_quit) {
@@ -605,6 +647,6 @@ int main(int argc, char **argv) {
     SRC.parseLength = 0;
   }
 
-  code_quit();
+  quit_();
 }
 

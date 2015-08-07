@@ -30,6 +30,9 @@
 : CHARS (/CHAR) * ;
 : CHAR+ 1 CHARS + ;
 
+\ TODO Check me.
+: >BODY ( xt -- a-addr ) cell+ ;
+
 : 2! ( x1 x2 a-addr -- ) dup >r   !   r> cell+ ! ;
 : 2@ ( a-addr -- x1 x2 ) dup cell+ @ swap @ ;
 : 2* ( x -- x ) 1 LSHIFT ;
@@ -67,12 +70,28 @@
 
 : HERE (>HERE) @ ;
 
-: , HERE !   1 cells (>HERE) +! ;
-: COMPILE, , ;
+: , ( x -- ) HERE !   1 cells (>HERE) +! ;
+: COMPILE, ( xt -- ) , ;
+: C, ( c -- ) here c!   1 chars (>HERE) +! ;
+
+: ALIGNED ( addr - a-addr ) (/cell) 1-   dup >R   + R>   invert and ;
+: ALIGN (>here) @ aligned (>here) ! ;
+
+: [ 0 state ! ; IMMEDIATE
+: ] 1 state ! ;
+
 
 \ Unsafe ['], to be replaced below with a version using IF.
-: ['] parse-name (find) drop compile, ; IMMEDIATE
+: ' ( "name" -- xt ) parse-name (find) drop ;
 
+\ Compiles a literal into the current definition.
+: LITERAL ( x -- ) ( RT: -- x ) [ ' (dolit) dup . ] compile,   , ;
+
+: ['] ( "<spaces>name<space>" -- xt ) parse-name (find) drop literal ; IMMEDIATE
+
+: test ['] align . ;
+
+quit
 
 \ Control structures.
 : IF ( ? --   C: -- jumploc ) ['] (0branch) compile,  HERE   0 , ; IMMEDIATE
@@ -86,6 +105,8 @@
   dup >r - ( endifloc delta  R: ifloc )
   r> !     ( endifloc )
 ; IMMEDIATE
+
+quit 
 
 : BEGIN ( C: -- beginloc ) here ; IMMEDIATE
 : WHILE ( ? -- C: -- whileloc ) ['] (0branch) compile, here 0 , ; IMMEDIATE
@@ -115,8 +136,6 @@
   2drop
 ;
 
-: ." postpone S" ['] type compile, ; IMMEDIATE
-
 
 \ Runs during the execution of eg. CONSTANT. The CREATEd word is newly made, and
 \ I've got the here-value from DOES> below on the stack.
@@ -127,6 +146,7 @@
   cell+ 2dup -             ( target addr' delta )
   swap !   drop ( )
 ;
+
 
 \ DOES> itself. compiles a literal, a call to (does>), and EXIT into the
 \ defining word (eg. CONSTANT). The literal is the address after the EXIT, ie.
@@ -218,6 +238,15 @@ VARIABLE (loop-top)
 : MOVE> ( a1 a2 u -- ) 0 DO over i + c@   over i + c! LOOP 2drop ;
 : MOVE< ( a1 a2 u -- ) 1- -1 swap DO over i + c@   over i + c! -1 +LOOP 2drop ;
 : MOVE ( a1 a2 u -- ) >R 2dup <   R> swap   IF MOVE< ELSE MOVE> THEN ;
+
+: S"
+  [CHAR] " parse
+  ['] (dostring) compile, dup c, ( c-addr u )
+  here swap ( c-addr here u )
+  move ( )
+; IMMEDIATE
+
+: ." postpone S" ['] type compile, ; IMMEDIATE
 
 : ABORT" postpone IF postpone ." ['] ABORT compile, postpone THEN ; IMMEDIATE
 
