@@ -2,13 +2,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-//#include <stdint.h>
 #include <inttypes.h>
 
-//#include <fcntl.h>
-//#include <unistd.h>
-
 #include <readline/readline.h>
+//#include <readline/history.h>
 
 #include <md.h>
 
@@ -178,8 +175,13 @@ WORD(rshift, "RSHIFT", 7, &header_lshift) {
   NEXT;
 }
 
+WORD(base, "BASE", 4, &header_rshift) {
+  *(--sp) = (cell) base;
+  NEXT;
+}
+
 // Comparison
-WORD(less_than, "<", 1, &header_rshift) {
+WORD(less_than, "<", 1, &header_base) {
   sp[1] = (sp[1] < sp[0]) ? -1 : 0;
   sp++;
   NEXT;
@@ -242,6 +244,7 @@ WORD(cfetch, "C@", 2, &header_store) {
 }
 WORD(cstore, "C!", 2, &header_cfetch) {
   *((char*) sp[0]) = (char) sp[1];
+  sp += 2;
   NEXT;
 }
 
@@ -265,14 +268,17 @@ WORD(state, "STATE", 5, &header_here_ptr) {
 
 // TODO: DEBUG Remove me
 WORD(dot, ".", 1, &header_state) {
-  printf("%d ", (int)  *(sp++));
+  printf("%" PRIdPTR " ", *(sp++));
+  NEXT;
+}
+WORD(udot, "U.", 2, &header_dot) {
+  printf("%" PRIuPTR " ", (ucell) *(sp++));
   NEXT;
 }
 // TODO: DEBUG Remove me
-WORD(debug, "debug", 5, &header_dot) {
+WORD(debug, "debug", 5, &header_udot) {
   NEXT;
 }
-
 
 // Branches
 // Jumps unconditionally by the delta (in bytes) of the next CFA.
@@ -287,7 +293,7 @@ WORD(branch, "(BRANCH)", 8, &header_debug) {
 // address. Otherwise, identical to branch above.
 WORD(zbranch, "(0BRANCH)", 9, &header_branch) {
   str1 = (char*) ip;
-  str1 += (*sp--) == 0 ? (cell) *ip : (cell) sizeof(cell);
+  str1 += *(sp++) == 0 ? (cell) *ip : (cell) sizeof(cell);
   ip = (code***) str1;
   NEXT;
 }
@@ -370,11 +376,24 @@ WORD(size_char, "(/CHAR)", 7, &header_size_cell) {
   NEXT;
 }
 
+// Converts a header* eg. from (latest) into the CFA.
+WORD(to_code, ">CODE", 5, &header_size_char) {
+  tempHeader = (header*) sp[0];
+  sp[0] = (cell) &(tempHeader->code_field);
+  NEXT;
+}
+
+// Advances a CFA to the data-space pointer.
+WORD(to_body, ">BODY", 5, & header_to_code) {
+  sp[0] += (cell) sizeof(cell);
+  NEXT;
+}
+
 
 // Compiler helpers
 
 // Pushes ip -> rsp, and puts my own data field into ip.
-WORD(docol, "(DOCOL)", 7, &header_size_char) {
+WORD(docol, "(DOCOL)", 7, &header_to_body) {
   *(--rsp) = (cell) ip;
   ip = (code***) &(cfa[1]);
   NEXT;
@@ -389,10 +408,30 @@ WORD(dolit, "(DOLIT)", 7, &header_docol) {
 WORD(dostring, "(DOSTRING)", 10, &header_dolit) {
   str1 = ((char*) ip);
   c1 = (cell) *str1;
-  ip = (code***) (str1 + 1 + c1);
   sp -= 2;
   sp[1] = (cell) (str1 + 1);
   sp[0] = c1;
+
+  str1 += c1 + 1 + (sizeof(cell) - 1);
+  str1 = (char*) (((cell) str1) & ~(sizeof(cell) - 1));
+  ip = (code***) str1;
+
+  NEXT;
+}
+
+// CREATE compiles 0 and then the user's code into the data space.
+// It uses (dodoes) as the doer word, not docol! That will push the address of
+// the user's data space area, as intended (cfa + 2 cells) and then check that
+// 0 at cfa + 1 cell. If it's 0, do nothing. Otherwise, jump to that point.
+WORD(dodoes, "(DODOES)", 8, &header_dostring) {
+  *(--sp) = (cell) &(cfa[2]);
+  c1 = (cell) cfa[1];
+
+  // Similar to docol, push onto the return stack and jump.
+  if (c1 != 0) {
+    *(--rsp) = (cell) ip;
+    ip = (code***) c1;
+  }
   NEXT;
 }
 
@@ -475,7 +514,7 @@ void find_(void) {
   sp[0] = 0;
 }
 
-WORD(parse, "PARSE", 5, &header_dostring) {
+WORD(parse, "PARSE", 5, &header_dodoes) {
   parse_();
   NEXT;
 }
@@ -490,7 +529,28 @@ WORD(to_number, ">NUMBER", 7, &header_parse_name) {
   NEXT;
 }
 
-WORD(find, "(FIND)", 6, &header_to_number) {
+// Parses a name, and constructs a header for it.
+// When finished, HERE is the data space properly, ready for compilation.
+WORD(create, "CREATE", 6, &header_to_number) {
+  parse_name_(); // sp[0] = length, sp[1] = string
+  dsp.chars = (char*) ((((cell)dsp.chars) + sizeof(cell) - 1) & ~(sizeof(cell) - 1));
+  tempHeader = (header*) dsp.chars;
+  dsp.chars += sizeof(header);
+  tempHeader->link = dictionary;
+  latest = dictionary = tempHeader;
+
+  tempHeader->metadata = sp[0];
+  tempHeader->name = (char*) malloc(sp[0] * sizeof(char));
+  strncpy(tempHeader->name, (char*) sp[1], sp[0]);
+  sp += 2;
+  tempHeader->code_field = &code_dodoes;
+
+  // Add the extra cell for dodoes; this is the DOES> address, or 0 for none.
+  *(dsp.cells++) = 0;
+  NEXT;
+}
+
+WORD(find, "(FIND)", 6, &header_create) {
   find_();
   NEXT;
 }
@@ -621,7 +681,37 @@ WORD(exit, "EXIT", 4, &header_colon) {
   NEXT;
 }
 
-WORD(semicolon, ";", 1 | IMMEDIATE, &header_exit) {
+WORD(see, "SEE", 3, &header_exit) {
+  // Parses a word and visualizes its contents.
+  parse_name_();
+  printf("Decompiling ");
+  print((char*) sp[1], sp[0]);
+  printf("\n");
+
+  find_(); // Now xt and flag on the stack.
+  if (sp[0] == 0) {
+    printf("NOT FOUND!\n");
+  } else {
+    cfa = (code**) sp[1];
+    if (*cfa != &code_docol) {
+      printf("Not compiled using DOCOL; can't SEE native words.\n");
+    } else {
+      do {
+        cfa++;
+        str1 = (char*) *cfa;
+        tempHeader = (header*) (str1 - sizeof(cell) * 3);
+        printf("%" PRIuPTR ": ", (ucell) cfa);
+        print(tempHeader->name, tempHeader->metadata & LEN_MASK);
+        printf("\n");
+      } while (*cfa != (code*) &(header_exit.code_field));
+    }
+  }
+
+  sp += 2; // Drop the parsed values.
+  NEXT;
+}
+
+WORD(semicolon, ";", 1 | IMMEDIATE, &header_see) {
   latest->metadata &= (~HIDDEN); // Clear the hidden bit.
   // Compile an EXIT
   *(dsp.cells++) = (cell) &(header_exit.code_field);

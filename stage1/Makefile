@@ -1,5 +1,5 @@
 LIBS=-lreadline
-CFLAGS=-g -std=c99 -O0 -Wall -Wextra
+CFLAGS=-g -std=c99 -O0 -Wall -Wextra -fomit-frame-pointer
 INCLUDES=-Iinclude
 
 default: all

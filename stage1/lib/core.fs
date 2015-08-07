@@ -30,9 +30,6 @@
 : CHARS (/CHAR) * ;
 : CHAR+ 1 CHARS + ;
 
-\ TODO Check me.
-: >BODY ( xt -- a-addr ) cell+ ;
-
 : 2! ( x1 x2 a-addr -- ) dup >r   !   r> cell+ ! ;
 : 2@ ( a-addr -- x1 x2 ) dup cell+ @ swap @ ;
 : 2* ( x -- x ) 1 LSHIFT ;
@@ -68,6 +65,7 @@
 : */MOD ( n1 n2 n3 -- remainder quotient ) >r * r> /MOD ;
 
 
+: ALLOT ( n -- ) (>HERE) +! ;
 : HERE (>HERE) @ ;
 
 : , ( x -- ) HERE !   1 cells (>HERE) +! ;
@@ -80,6 +78,7 @@
 : [ 0 state ! ; IMMEDIATE
 : ] 1 state ! ;
 
+: R@ ( -- x ) ( R: x -- x ) R> R> dup >R swap >R ;
 
 \ Unsafe ['], to be replaced below with a version using IF.
 : ' ( "name" -- xt ) parse-name (find) drop ;
@@ -101,10 +100,6 @@
   r> !     ( endifloc )
 ; IMMEDIATE
 
-: test debug IF 65 emit ELSE 66 emit THEN ;
-
-quit
-
 : BEGIN ( C: -- beginloc ) here ; IMMEDIATE
 : WHILE ( ? -- C: -- whileloc ) ['] (0branch) compile, here 0 , ; IMMEDIATE
 : REPEAT ( C: beginloc whileloc -- )
@@ -118,11 +113,11 @@ quit
 
 
 : CHAR ( "<spaces>name" -- char ) parse-name drop c@ ;
-: [CHAR] char ['] (lit) compile, , ; IMMEDIATE
+: [CHAR] char ['] (dolit) compile, , ; IMMEDIATE
 
 
 : SPACE bl emit ;
-: SPACES ( n -- ) BEGIN space 1- dup 0= UNTIL drop ;
+: SPACES ( n -- ) dup 0<= IF EXIT THEN BEGIN space 1- dup 0= UNTIL drop ;
 
 : TYPE ( c-addr u -- )
   BEGIN dup 0> WHILE
@@ -133,26 +128,26 @@ quit
   2drop
 ;
 
+: POSTPONE ( "<spaces>name" -- ) parse-name (find) drop compile, ; IMMEDIATE
 
-\ Runs during the execution of eg. CONSTANT. The CREATEd word is newly made, and
-\ I've got the here-value from DOES> below on the stack.
-\ I need to compile a jump to that address into eg. CONSTANT.
-: (DOES>) ( target -- )
-  (latest) >body 2 cells + ( target addr )
-  ['] (branch) over !      ( target addr )
-  cell+ 2dup -             ( target addr' delta )
-  swap !   drop ( )
-;
-
-
-\ DOES> itself. compiles a literal, a call to (does>), and EXIT into the
-\ defining word (eg. CONSTANT). The literal is the address after the EXIT, ie.
-\ where the code after DOES> is about to go.
-: DOES> here 4 cells +   ['] (lit) compile, , ['] (does>) compile, [']
-exit compile, ; IMMEDIATE
+\ DOES> is tricky. It runs during compilation of a word like CONSTANT.
+\ It compiles code into CONSTANT, which will write the HERE address of the
+\ post-DOES> code into the first cell of the freshly CREATEd definition.
+: DOES>
+  ['] (dolit) compile, here 0 , ( xt-here )
+  \ Now CONSTANT will have the do-address on the stack.
+  \ It should store that in the first body cell of the CREATEd word.
+  ['] (latest) compile,
+  ['] >code compile,
+  ['] >body compile,
+  ['] ! ,
+  ['] EXIT compile,
+  here swap !
+; IMMEDIATE
 
 : VARIABLE CREATE 0 , ;
 : CONSTANT CREATE , DOES> @ ;
+
 : ARRAY ( length --   exec: index -- a-addr ) create cells allot DOES> cells + ;
 
 
@@ -173,7 +168,7 @@ VARIABLE (loop-top)
 
 : DO ( limit index --   C: old-jump-addr )
   ['] swap compile, ['] >r dup compile, compile,
-  ['] (lit) compile, 1 , ['] (0branch) compile,
+  ['] (dolit) compile, 1 , ['] (0branch) compile,
   (loop-top) @    here (loop-top) ! ( C: old-jump-addr )
   0 , \ Placeholder for the jump offset to go.
 ; IMMEDIATE
@@ -203,11 +198,11 @@ VARIABLE (loop-top)
   ['] R> dup compile, compile, ['] 2drop compile,  ( )
 ; IMMEDIATE
 
-: LOOP ( --   C: jump-addr ) ['] (lit) compile, 1 , POSTPONE +LOOP ; IMMEDIATE
+: LOOP ( --   C: jump-addr ) ['] (dolit) compile, 1 , POSTPONE +LOOP ; IMMEDIATE
 
 : LEAVE ( -- ) ( R: loop-details -- ) ( C: -- )
   (loop-top) @ 1 cells -
-  ['] (lit) compile, 0 , \ Force a branch.
+  ['] (dolit) compile, 0 , \ Force a branch.
   ['] (branch) compile,
   here - ,
 ; IMMEDIATE
@@ -236,17 +231,28 @@ VARIABLE (loop-top)
 : MOVE< ( a1 a2 u -- ) 1- -1 swap DO over i + c@   over i + c! -1 +LOOP 2drop ;
 : MOVE ( a1 a2 u -- ) >R 2dup <   R> swap   IF MOVE< ELSE MOVE> THEN ;
 
+: ABORT quit ;
+
+: ['] ( "<spaces>name<space>" -- xt )
+  parse-name (find)
+  IF literal ELSE ABORT THEN
+; IMMEDIATE
+
 : S"
   [CHAR] " parse
   ['] (dostring) compile, dup c, ( c-addr u )
   here swap ( c-addr here u )
+  dup >R
   move ( )
+  R> allot
+  align
 ; IMMEDIATE
 
 : ." postpone S" ['] type compile, ; IMMEDIATE
 
 : ABORT" postpone IF postpone ." ['] ABORT compile, postpone THEN ; IMMEDIATE
 
+: CR 10 emit ;
 
 \ Unimplemented pictured output: # #> #S <# HOLD SIGN
 \ Unimplemented: ACCEPT ENVIRONMENT? KEY
