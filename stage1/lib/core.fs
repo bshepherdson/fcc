@@ -83,15 +83,10 @@
 
 \ Unsafe ['], to be replaced below with a version using IF.
 : ' ( "name" -- xt ) parse-name (find) drop ;
-
 \ Compiles a literal into the current definition.
-: LITERAL ( x -- ) ( RT: -- x ) [ ' (dolit) dup . ] compile,   , ;
-
+: LITERAL ( x -- ) ( RT: -- x ) [ ' (dolit) dup compile, , ] compile, , ;
 : ['] ( "<spaces>name<space>" -- xt ) parse-name (find) drop literal ; IMMEDIATE
 
-: test ['] align . ;
-
-quit
 
 \ Control structures.
 : IF ( ? --   C: -- jumploc ) ['] (0branch) compile,  HERE   0 , ; IMMEDIATE
@@ -106,7 +101,9 @@ quit
   r> !     ( endifloc )
 ; IMMEDIATE
 
-quit 
+: test debug IF 65 emit ELSE 66 emit THEN ;
+
+quit
 
 : BEGIN ( C: -- beginloc ) here ; IMMEDIATE
 : WHILE ( ? -- C: -- whileloc ) ['] (0branch) compile, here 0 , ; IMMEDIATE

@@ -265,7 +265,7 @@ WORD(state, "STATE", 5, &header_here_ptr) {
 
 // TODO: DEBUG Remove me
 WORD(dot, ".", 1, &header_state) {
-  printf("%d ", *(sp++));
+  printf("%d ", (int)  *(sp++));
   NEXT;
 }
 // TODO: DEBUG Remove me
@@ -277,20 +277,26 @@ WORD(debug, "debug", 5, &header_dot) {
 // Branches
 // Jumps unconditionally by the delta (in bytes) of the next CFA.
 WORD(branch, "(BRANCH)", 8, &header_debug) {
-  char *p = (char*) ip;
-  p += (cell) *ip;
-  ip = (code***) ip;
+  str1 = (char*) ip;
+  str1 += (cell) *ip;
+  ip = (code***) str1;
   NEXT;
 }
 
 // Consumes the top argument on the stack. If it's 0, jumps over the branch
 // address. Otherwise, identical to branch above.
 WORD(zbranch, "(0BRANCH)", 9, &header_branch) {
-  char *p = (char*) ip;
-  p += *sp-- == 0 ? (cell) *ip : (cell) sizeof(cell);
-  ip = (code***) p;
+  str1 = (char*) ip;
+  str1 += (*sp--) == 0 ? (cell) *ip : (cell) sizeof(cell);
+  ip = (code***) str1;
   NEXT;
 }
+
+//WORD(literal, "LITERAL", 7, &header_zbranch) {
+//  *(dsp.cells++) = &(header_dolit.code_field);
+//  *(dsp.cells++) = *(sp++);
+//  NEXT;
+//}
 
 WORD(execute, "EXECUTE", 7, &header_zbranch) {
   cfa = (code**) *(sp++);
