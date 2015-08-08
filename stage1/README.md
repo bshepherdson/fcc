@@ -78,6 +78,8 @@ alphabetical order:
 - `(0BRANCH)`: `( ? -- )` Accepts a flag and conditionally branches, when the
   flag is 0 (false). See `(BRANCH)` below for branching spec. When the flag is
   true, it branches to immediately after the unused branch offset.
+- `(>CFA)`: `( a-addr -- a-addr )` Takes the address of a word header (eg. from
+  `(LATEST)`) and converts it to the CFA (the `xt`).
 - `(>DOES)`: `( a-addr -- a-addr )` Takes the address of a word header (eg. from
   `(LATEST)`) and converts it to the address for the `DOES>` code. (See
   `(DODOES)` below.)

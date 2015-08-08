@@ -226,9 +226,9 @@ VARIABLE (loop-top)
 ;
 
 
-: MOVE> ( a1 a2 u -- ) 0 DO over i + c@   over i + c! LOOP 2drop ;
-: MOVE< ( a1 a2 u -- ) 1- -1 swap DO over i + c@   over i + c! -1 +LOOP 2drop ;
-: MOVE ( a1 a2 u -- ) >R 2dup <   R> swap   IF MOVE< ELSE MOVE> THEN ;
+: MOVE> ( src dst u -- ) 0 DO over i + c@   over i + c! LOOP 2drop ;
+: MOVE< ( src dst u -- ) 1- -1 swap DO over i + c@   over i + c! -1 +LOOP 2drop ;
+: MOVE ( src dst u -- ) >R 2dup <   R> swap   IF MOVE< ELSE MOVE> THEN ;
 
 : ABORT quit ;
 
@@ -251,7 +251,21 @@ VARIABLE (loop-top)
 
 : ABORT" postpone IF postpone ." ['] ABORT compile, postpone THEN ; IMMEDIATE
 
-: CR 10 emit ;
+\ Turns a two-cell string into a counted string.
+\ The new string is in a transient region!
+: UNCOUNT ( c-addr u -- c-addr ) dup here c!   here 1+ swap move ;
+
+: WORD ( char "<chars>ccc<char>" -- c-addr )
+  BEGIN dup parse ( char c-addr u ) dup 0= WHILE 2drop REPEAT ( char c-addr u )
+  uncount swap drop ( c-addr )
+;
+
+: FIND ( c-addr -- c-addr 0 | xt 1 | xt -1 )
+  dup count (find) ( c-addr xt flag )
+  dup 0= IF 2drop 0 ELSE rot drop THEN
+;
+
+: RECURSE (latest) (>CFA) compile, ; IMMEDIATE
 
 \ Unimplemented pictured output: # #> #S <# HOLD SIGN
 \ Unimplemented: ACCEPT ENVIRONMENT? KEY

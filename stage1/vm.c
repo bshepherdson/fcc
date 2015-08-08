@@ -364,9 +364,17 @@ WORD(to_does, "(>DOES)", 7, &header_size_char) {
   NEXT;
 }
 
+// Converts a header* eg. from (latest) into the DOES> address, which is
+// the cell after the CFA.
+WORD(to_cfa, "(>CFA)", 6, &header_to_does) {
+  tempHeader = (header*) sp[0];
+  sp[0] = (cell) &(tempHeader->code_field);
+  NEXT;
+}
+
 // Advances a CFA to be the data-space pointer, which is for a CREATEd
 // definition two cells after the xt.
-WORD(to_body, ">BODY", 5, & header_to_does) {
+WORD(to_body, ">BODY", 5, & header_to_cfa) {
   sp[0] += (cell) (2 * sizeof(cell));
   NEXT;
 }
