@@ -48,7 +48,7 @@
 : NIP ( a b -- b ) swap drop ;
 : TUCK ( a b -- b a b ) swap over ;
 
-: PAD ( -- c-addr ) here ;
+1024 BUFFER: PAD
 
 : PICK ( xn ... x1 x0 u -- xn ... x1 x0 xn )
   dup 0= IF drop dup EXIT THEN

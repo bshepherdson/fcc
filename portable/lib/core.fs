@@ -147,7 +147,10 @@
 : VARIABLE CREATE 0 , ;
 : CONSTANT CREATE , DOES> @ ;
 
-: ARRAY ( length --   exec: index -- a-addr ) create cells allot DOES> cells + ;
+: ARRAY ( length --   exec: index -- a-addr )
+  create cells allot
+  DOES> swap cells +
+;
 
 
 : HEX 16 base ! ;
@@ -267,8 +270,33 @@ VARIABLE (loop-top)
 
 : RECURSE (latest) (>CFA) compile, ; IMMEDIATE
 
-\ Unimplemented pictured output: # #> #S <# HOLD SIGN
+: ABS ( n -- u ) dup 0< IF negate THEN ;
+
+\ Pictured numeric output. Uses HERE (which is not PAD).
+\ These ignore the second part of the supposed double-cell value.
+VARIABLE (picout)
+: (picout-top) here 256 chars + ;
+: <# (picout-top) (picout) ! ;
+: HOLD ( c -- ) (picout) @ 1- dup >R c!   R> (picout) ! ;
+: SIGN ( n -- ) 0< IF [CHAR] - hold THEN ;
+: # ( ud1 -- ud2 )
+  >R base @ /mod ( r q )
+  swap dup 10 < IF [char] 0 ELSE 10 - [char] A THEN + HOLD ( q )
+  R> ( dq )
+;
+: #S
+  over 0= IF [char] 0 emit EXIT THEN \ Special case for 0.
+  BEGIN over WHILE # REPEAT
+;
+: #> 2drop (picout) @ (picout-top) over - ( c-addr len ) ;
+
+: S>D 0 ;
+
+\ TODO U. chokes on negative numbers...
+: U. <# S>D #S #> type space ;
+: .  <# dup abs S>D #S rot sign #> type space ;
+
 \ Unimplemented: ACCEPT ENVIRONMENT? KEY
 \ Unimplemented: FM/MOD UM/MOD SM/REM
-\ Unimplemented: M* UM* S>D
+\ Unimplemented: M* UM*
 

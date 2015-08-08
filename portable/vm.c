@@ -84,6 +84,7 @@ char** strptr1;
 size_t tempSize;
 header* tempHeader;
 char tempBuf[256];
+FILE* tempFile;
 
 // NB: If NEXT changes, EXECUTE might need to change too (it uses NEXT1)
 #define NEXT1 do { goto **cfa; } while(0)
@@ -169,14 +170,14 @@ WORD(lshift, "LSHIFT", 6, &header_xor) {
   NEXT;
 }
 
-WORD(rshift, "RSHIFT", 7, &header_lshift) {
+WORD(rshift, "RSHIFT", 6, &header_lshift) {
   sp[1] = ((ucell) sp[1]) >> sp[0];
   sp++;
   NEXT;
 }
 
 WORD(base, "BASE", 4, &header_rshift) {
-  *(--sp) = (cell) base;
+  *(--sp) = (cell) &base;
   NEXT;
 }
 
