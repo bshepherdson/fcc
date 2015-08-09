@@ -19,12 +19,26 @@ VARIABLE out
 : LABEL ( "<spaces>name" -- ) DH CONSTANT ;
 
 \ Big-endian format
-: H, ( h -- ) dup 8 rshift 255 and out @ mem + !   255 and out @ 1+ mem + !   2 out +! ;
+: H@ ( addr -- h )
+  1 lshift \ Convert DCPU address to byte index.
+  dup mem + c@ ( addr' hi )
+  8 lshift
+  swap 1+ mem + c@ ( hi lo )
+  or ( h )
+;
+
+: H! ( h addr -- )
+  1 LSHIFT \ Convert the DCPU address to a byte index into mem.
+  over 8 rshift 255 and over mem + C! ( h addr' )
+  swap 255 and swap 1+ mem + C! ( )
+;
+: H, ( h -- ) DH H!    2 out +! ;
 
 \ Masks values to 16 bits.
 : H# ( x -- h ) 65535 and ;
 
-: ALLOT, ( u -- addr ) out @   swap out +! ;
+\ Allocates space for u words.
+: ALLOT, ( u -- ) 1 lshift   swap out +! ;
 : DAT, ( h -- ) H, ;
 
 VARIABLE #extras
@@ -48,6 +62,7 @@ VARIABLE #extras
   31 and 5 lshift or swap
   63 and 10 lshift or
   h,
+  drain-extras
 ;
 
 : SET,  1 binop, ;
@@ -85,6 +100,7 @@ VARIABLE #extras
   31 and 5 lshift swap
   63 and 10 lshift or
   h,
+  drain-extras
 ;
 
 : JSR,  1 specop, ;
@@ -139,16 +155,16 @@ VARIABLE #extras
 : [RJ+] +EXTRA 23 ;
 
 \ These two are actually the same; it's context-aware.
-: PUSH 24 ;
-: POP  24 ;
+: RPUSH 24 ;
+: RPOP  24 ;
 
-: PEEK 25 ;
-: PICK ( h -- ) +EXTRA 26 ;
+: RPEEK 25 ;
+: RPICK ( h -- ) +EXTRA 26 ;
 : RSP 27 ;
 : RPC 28 ;
 : REX 29 ;
 
-: [+] +EXTRA 30 ;
+: [LIT] +EXTRA 30 ;
 
 \ Smart literals based on the value. The immediate range is -1..30.
 \ Also, since there's only room for immediate values on the a arg, not b,
@@ -165,3 +181,41 @@ VARIABLE #extras
   THEN
 ;
 
+\ Sometimes it's useful to know we're assembling a long literal, for jumps etc.
+: LONG-LIT ( h -- arg ) +EXTRA 31 ;
+
+
+\ Forth-like control structures
+\ The tricky bit here is that we're not just using status flags, as in ARM
+\ or 68000. There are several distinct branching opcodes with different
+\ semantics.
+\ The condition-expecting control words want to branch when the condition is NOT
+\ true. That fits neatly with the skip-next-instruction style: The user writes
+\ code to assemble an IFx, and then the control word after. The control word
+\ assembles an unconditional jump, which will be skipped by the branch.
+\ TODO Consider using ADD PC, foo and SUB PC, foo here instead? Only makes a
+\ difference when the delta is small enough for immediate literals, which is
+\ fairly often.
+: BEGIN, DH ;
+: UNTIL, LIT RPC SET, ;
+: AGAIN, UNTIL, ; \ Effectively always unconditional.
+
+: DO, DH ;
+: LOOP, UNTIL, ;
+
+\ Pushes address of the /jump address/
+: IF, 0 LONG-LIT RPC SET, DH 1- ;
+: THEN, DH swap h! ;
+\ Generates a new jump to the end (IF,) and then resolves the previous (THEN,)
+: ELSE, IF, swap THEN, ;
+
+: WHILE, IF, swap ;
+: REPEAT, AGAIN, THEN, ;
+
+\ General Utilities for the DCPU-16
+
+\ Compiles a series of bytes into the DCPU, each to a word.
+: DSTR, ( c-addr u -- )
+  BEGIN dup WHILE 1- swap dup c@ h, char+ swap REPEAT
+  2drop
+;
