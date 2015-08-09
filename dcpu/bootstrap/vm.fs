@@ -167,7 +167,10 @@ DVAR VAR-DSP (>HERE)
   ra ri add,
 ;WORD
 
-:WORD EXIT ri poprsp, ;WORD
+:WORD EXIT
+  DH 1- CONSTANT cfa-EXIT \ cfa-EXIT can be used by ; below
+  ri poprsp,
+;WORD
 
 DVAR VAR-LATEST (LATEST)
 
@@ -416,8 +419,9 @@ DH CONSTANT code-parse-name
 ;WORD
 
 
-\ Parses a word and assembles a new dictionary header for it.
-:WORD CREATE
+\ Parses a word and assembles a new (partial) dictionary header for it.
+\ Returns the code field address in A.
+DH CONSTANT code-(CREATE)
   \ Read the current (target) data space pointer, because that's the new LATEST.
   var-dsp lit ra set, \ A - *dsp
   [ra] rb set,        \ B - dsp
@@ -444,12 +448,27 @@ DH CONSTANT code-parse-name
   repeat,
 
   \ Now C=0 and B = codeword slot
-  \ Write the address of (DODOES) into that slot.
-  [DODOES] lit [rb] set,
-  0 lit 1 [rb+] set, \ Write a 0 after the codeword; the DOES> slot.
-  2 lit rb add, \ The beginning of the data space for this new word.
-  \ Finally, write this updated dsp into the variable again.
+  rb rx set, \ Set aside the codeword address.
+
+  \ Update the DSP to after the codeword.
+  1 lit rb add,
   rb [ra] set,
+  rx ra set, \ Copy the code field address to A for return.
+  rpop rpc set,
+
+
+:WORD CREATE
+  \ First, call into code-(CREATE) to get a partial header.
+  code-(CREATE) lit jsr,
+  \ Now A = code field address.
+  \ Write [DODOES] into it.
+  [DODOES] lit [ra] set,
+  0 lit 1 [ra+] set, \ Write a 0 after the codeword; the DOES> slot.
+
+  \ Now we need to bump DSP to after that DOES> address.
+  var-DSP lit rb set,
+  1 lit [rb] add,
+  \ New word created and ready!
 ;WORD
 
 
@@ -536,8 +555,33 @@ DH CONSTANT code-(find)
 ;WORD
 
 
+\ Defining words
+:WORD :
+  \ Call (CREATE), which builds a partial header.
+  code-(CREATE) lit jsr,
+  \ Now A is the code field address.
+  [DOCOL] lit [ra] set, \ Which we fill with DOCOL
+  \ Everything is ready for the compilation to write xt's into this definition.
+  \ So I just need to set compilation mode and stand back.
+  \ TODO New : words need to be hidden, new CREATE words not. Now, neither is.
+  var-STATE lit rx set,
+  1 lit [rx] set,
+;WORD
 
-\ - Defining: `:`, `;`
+:WORD ;
+  \ Compile EXIT into the definition.
+  var-DSP lit rx set, \ X - *dsp
+  [rx] ry set,        \ Y - dsp
+  cfa-EXIT lit [ry] set, \ Compile the EXIT
+  1 lit ry add,
+  ry [rx] set,        \ Write the new DSP
+
+  \ Finally, switch back to interpreting mode.
+  var-STATE lit rx set,
+  0 lit [rx] set,
+;WORD
+
+
 \ - Debugging: `SEE` (optional)
 
 \ TODO QUIT KEY EMIT REFILL
