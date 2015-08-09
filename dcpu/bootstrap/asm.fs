@@ -190,21 +190,29 @@ VARIABLE #extras
 \ or 68000. There are several distinct branching opcodes with different
 \ semantics.
 \ The condition-expecting control words want to branch when the condition is NOT
-\ true. That fits neatly with the skip-next-instruction style: The user writes
-\ code to assemble an IFx, and then the control word after. The control word
-\ assembles an unconditional jump, which will be skipped by the branch.
+\ true. That's a pain because DCPU's IFx instructions execute the next only when
+\ the condition is true.
+\ Therefore we do some contortions and add extra instructions to get the right
+\ semantics even though it means more instructions.
 \ TODO Consider using ADD PC, foo and SUB PC, foo here instead? Only makes a
 \ difference when the delta is small enough for immediate literals, which is
 \ fairly often.
 : BEGIN, DH ;
-: UNTIL, LIT RPC SET, ;
-: AGAIN, UNTIL, ; \ Effectively always unconditional.
+: AGAIN, ( dh -- ) long-lit rpc set, ;
+: UNTIL,
+  2 lit rpc add, \ Skip the next when true.
+  again,
+;
 
 : DO, DH ;
 : LOOP, UNTIL, ;
 
-\ Pushes address of the /jump address/
-: IF, 0 LONG-LIT RPC SET, DH 1- ;
+\ Pushes address of the /jump address/ inside the instruction.
+: IF,
+  2 lit rpc add, \ Jumps over the below jump and into the loop on true.
+  0 LONG-LIT RPC SET,
+  DH 1-
+;
 : THEN, DH swap h! ;
 \ Generates a new jump to the end (IF,) and then resolves the previous (THEN,)
 : ELSE, IF, swap THEN, ;

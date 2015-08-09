@@ -108,8 +108,8 @@ F_HIDDEN MASK_LEN OR CONSTANT MASK_LEN_HIDDEN
   ;WORD
 ;
 
-' ifu, CMPOP <
-' ifl, CMPOP U<
+' ifa, CMPOP <
+' ifg, CMPOP U<
 ' ife, CMPOP =
 
 \ Stack ops
@@ -295,9 +295,9 @@ DH CONSTANT code-parse
   rx rz add,                 \ Z - Address past the end of the parse buffer.
 
   begin,
-    ry rz ifg,   \ Continue while Y < Z
+    rz ry ifl,   \ Continue while Y < Z
     [ry] ra ifn, \ and [Y] != A
-  while,
+  while, \ Writes a branch to past the end, we want to skip it.
     1 lit ry add,
   repeat,
 
@@ -306,7 +306,7 @@ DH CONSTANT code-parse
   ry rpush set, \ Pushed!
 
   \ Now check if Y < Z; if that's still true then we found a delimiter.
-  ry rz ifg,
+  rz ry ifl, \ Backwards: skip when Y = Z
   if,
     \ Advance the pointer one more, past the delimiter.
     1 lit ry add,
@@ -346,7 +346,7 @@ DH CONSTANT code-parse-name
   rx rz add,                 \ Z - Address past the end of the parse buffer.
 
   begin,
-    ry rz ifg,   \ Continue while Y < Z
+    rz ry ifl,   \ Continue while Y < Z
     [ry] ra ife, \ and [Y] == A
   while,
     1 lit ry add,
@@ -381,10 +381,10 @@ DH CONSTANT code-parse-name
   begin,
     [rc] ry set, \ Read the new digit character into Y
     [char] 0 lit ry sub, \ Adjust so '0' -> 0
-    10 lit ry ifg, \ When the new digit is > 10
+    9 lit ry ifg, \ When the new digit is > 9
     if,
       [char] A [char] 0 - lit ry sub, \ Now 'A' = 0
-      26 lit ry ifg, \ When the new digit is still > 26, try lowercase.
+      25 lit ry ifg, \ When the new digit is still > 25, try lowercase.
       if,
         [char] a [char] A - lit ry sub, \ Now 'a' = 0
         10 lit ry add, \ Add back 10. Y is the correct numerical value.
@@ -505,7 +505,7 @@ DH CONSTANT code-(find)
 
     \ Now abusing repeat, it's supposed to be unconditional, but I can arrange
     \ to skip over it.
-    0 lit ra ife,
+    0 lit ra ifn, \ When A = 0, we haven't found anything: don't skip.
   repeat,
 
   \ Down here, X and C are still the name, I is the header.
@@ -527,8 +527,16 @@ DH CONSTANT code-(find)
     0 lit rpush set,
   else,
     ra rpush set,
+    -1 lit rb set,
+    1 [ra+] rc set, \ The length and metadata word.
+    F_IMMED lit rc ifb, \ bits in common
+      1 lit rb set,    \ so it's immediate, set to 1
+    rb rpush set,
+  then,
+;WORD
 
-\ - Parsing: `PARSE`, `PARSE-NAME`, `>NUMBER`, `CREATE`, `(FIND)`
+
+
 \ - Defining: `:`, `;`
 \ - Debugging: `SEE` (optional)
 
