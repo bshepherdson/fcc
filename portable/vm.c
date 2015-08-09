@@ -553,6 +553,27 @@ WORD(depth, "DEPTH", 5, &header_find) {
   NEXT;
 }
 
+// File access
+// This is a hack included to support the assemblers and such.
+// It writes a block of bytes to a binary file.
+WORD(dump_file, "(DUMP-FILE)", 11, &header_depth) {
+  // ( c-addr1 u1 c-addr2 u2 ) String on top (2) and binary data below (1)
+  // Open the named file for truncated write-only.
+  strncpy(tempBuf, (char*) sp[1], sp[0]);
+  tempBuf[sp[0]] = '\0';
+  tempFile = fopen(tempBuf, "wb");
+  if (tempFile == NULL) {
+    fprintf(stderr, "*** Failed to open file for writing: %s\n", tempBuf);
+  } else {
+    c1 = (cell) fwrite((void*) sp[3], 1, sp[2], tempFile);
+    printf("(Dumped %" PRIdPTR " of %" PRIdPTR " bytes to %s)\n", c1, sp[2], tempBuf);
+    fclose(tempFile);
+    tempFile = NULL;
+  }
+  NEXT;
+}
+
+
 // This could easily enough be turned into a Forth word.
 char *savedString;
 cell savedLength;
@@ -639,7 +660,7 @@ quit_loop:
   // Should never be reachable.
 }
 
-WORD(quit, "QUIT", 4, &header_depth) {
+WORD(quit, "QUIT", 4, &header_dump_file) {
   inputIndex = 0;
   quit_();
   NEXT;
