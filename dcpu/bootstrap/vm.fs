@@ -330,6 +330,8 @@ DH CONSTANT code-parse
 ;WORD
 
 \ Skips leading delimiters, then parses to a space.
+\ Returns the length in C, address in X.
+\ Clobbers all kinds of things.
 DH CONSTANT code-parse-name
   32 lit ra set, \ A - the delimiter
 
@@ -582,9 +584,159 @@ DH CONSTANT code-(find)
 ;WORD
 
 
+\ TODO Use the display instead of the serial terminal.
+\ Expects B to be the character to push. Clobbers A, C.
+DH CONSTANT code-EMIT
+  2 lit ra set,
+  var-HW-SERIAL lit rc set,
+  [rc] hwi,
+  rpop rpc set,
+
+:WORD EMIT
+  rpop rb set,
+  code-EMIT lit jsr,
+;WORD
+
+
+\ Returns the next key typed (serial!) in C. Clobbers A, B.
+DH CONSTANT code-KEY
+  var-HW-SERIAL lit rb set,
+  1 lit ra set,
+  begin,
+    [rb] hwi,
+    -1 lit rc ifn,
+  until,
+  \ Got a character!
+  rpop rpc set,
+
+
+:WORD KEY
+  code-KEY lit jsr,
+  rc rpush set,
+;WORD
+
+
+\ Reloads a line from the input source.
+\ For the console, that means calling KEY repeatedly until the buffer
+\ is filled, allowing for backspace.
+\ For a block, that means loading the block into the buffer and then
+\ copying the next pseudo-line into the block parsing buffer.
+\ When a source is exhausted, pop the source. When landing on a block source,
+\ the line is again copied into place.
+\ TODO Block support!
+\ Returns the REFILL success/failure flag in A.
+\ Clobbers: A B C X Y
+DH CONSTANT code-REFILL
+  var-source-index [lit] rx set,
+  /source lit rx mul,
+  input-sources lit rx add, \ X - *source
+
+  parse-buf lit   source-buffer [rx+] set, \ Update the buffer to parse-buf.
+  0 lit           source-index  [rx+] set, \ And the index to 0.
+
+  parse-buf lit ry set, \ Y is the start of the parse area.
+
+  \ Now we keep the next-character address in Y, and start accepting characters.
+  \ There are two special characters: backspace (8) and enter (10).
+  \ Everything else gets written in.
+  begin,
+    code-KEY lit jsr, \ A B clobbered, C holds the character typed.
+    8 lit rc ife,
+    if, \ backspace
+      \ move the pointer back by 1
+      1 lit ry sub,
+      \ but not before the start.
+      parse-buf lit  ry ifl, \ Check Y < parse-buf
+        parse-buf lit ry set, \ Reset it if less.
+    else,
+      10 lit rc ifn,
+      if, \ not newline
+        \ write the character into the buffer and bump the buffer.
+        rc [ry] set,
+        1 lit ry add,
+      then,
+    then,
+
+    10 lit rc ife,
+  until,
+
+  \ We have a complete line. Subtract the parse-buf start from Y to get the
+  \ length.
+  parse-buf lit ry sub, \ Y = parse length
+  ry   source-size [rx+] set, \ Written into the source.
+
+  \ Refilling complete!
+  \ Always return true for the keyboard, even if we got nothing.
+  -1 lit ra set,
+  rpop rpc set,
+
+
+:WORD REFILL
+  code-REFILL lit jsr,
+  ra rpush set,
+;WORD
+
+
+
+\ QUIT process:
+\ - Empty the stacks.
+\ - Switch to interpreting.
+\ - Keep reading input and trying to parse names from it.
+\ - Handle each word found according to STATE.
+DH CONSTANT code-QUIT
+  \ Empty both stacks.
+  data-stack-top   lit rsp set,
+  return-stack-top lit rj  set,
+  \ Switch to interpreting mode.
+  0 lit  var-STATE [lit] set,
+
+  \ Refill once before we start, dumping whatever was in the input when we
+  \ first called QUIT.
+  code-REFILL lit jsr,
+
+  begin,
+    begin,
+      \ Try to parse a name from the input
+      code-parse-name lit jsr, \ X = address, C = length.
+      \ Loop until C != 0, meaning we found a word.
+      0 lit rc ife,
+    while,
+      code-REFILL lit jsr,
+    repeat,
+
+    \ Now we've got a word loaded. X = address, C = length.
+    \ And then try to (FIND) (preserves X, C, returns *header in A)
+    code-(find) lit jsr,
+
+    \ If it's 0, not found. Try to parse it as a number.
+    0 lit ra ife,
+    if, \ Not found, try to parse as a number.
+    else, \ Found! Either execute or interpret.
+      \ Check if the word is immediate.
+      1 [ra+] rb set, \ B is the metadata word
+      F_IMMED lit rc and, \ C now the IMMED flag
+
+      \ Need to combine the immediacy flag and the interpreting mode somehow.
+
+
+      var-STATE [lit] 0 lit ife,
+      if,
+        \ Interpreting: run the word.
+        \ Requires setting I to something sane: a pointer just ahead.
+
+        .... ri set,
+        
+    then,
+
+
+  again, \ Infinite interpreter loop.
+
+:WORD QUIT
+
+
 \ - Debugging: `SEE` (optional)
 
-\ TODO QUIT KEY EMIT REFILL
+\ TODO QUIT main()
 
 
 \ Final output!
