@@ -445,7 +445,7 @@ void parse_(void) {
 
 void parse_name_(void) {
   // Skip any leading delimiters.
-  while ( SRC.inputPtr < SRC.parseLength && SRC.parseBuffer[SRC.inputPtr] == ' ' ) {
+  while ( SRC.inputPtr < SRC.parseLength && (SRC.parseBuffer[SRC.inputPtr] == ' ' || SRC.parseBuffer[SRC.inputPtr] == '\t') ) {
     SRC.inputPtr++;
   }
   c1 = 0;
