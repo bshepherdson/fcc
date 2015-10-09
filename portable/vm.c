@@ -680,6 +680,7 @@ WORD(colon, ":", 1, &header_quit) {
   tempHeader->name = (char*) malloc(sp[0]);
   strncpy(tempHeader->name, (char*) sp[1], sp[0]);
   tempHeader->metadata = sp[0] | HIDDEN;
+  sp += 2;
   tempHeader->code_field = &code_docol;
 
   state = COMPILING;
