@@ -61,7 +61,6 @@ union {
 cell state;
 cell base;
 header *dictionary;
-header *latest;
 
 typedef struct {
   cell parseLength;
@@ -331,7 +330,7 @@ WORD(refill, "REFILL", 6, &header_execute) {
 }
 
 WORD(latest, "(LATEST)", 8, &header_refill) {
-  *(--sp) = (cell) latest;
+  *(--sp) = (cell) dictionary;
   NEXT;
 }
 
@@ -529,7 +528,7 @@ WORD(create, "CREATE", 6, &header_to_number) {
   tempHeader = (header*) dsp.chars;
   dsp.chars += sizeof(header);
   tempHeader->link = dictionary;
-  latest = dictionary = tempHeader;
+  dictionary = tempHeader;
 
   tempHeader->metadata = sp[0];
   tempHeader->name = (char*) malloc(sp[0] * sizeof(char));
@@ -671,7 +670,6 @@ WORD(colon, ":", 1, &header_quit) {
   dsp.chars += sizeof(header);
   tempHeader->link = dictionary;
   dictionary = tempHeader;
-  latest = tempHeader;
   parse_name_(); // ( c-addr u )
   if (sp[0] == 0) {
     fprintf(stderr, "*** Colon definition with no name\n");
@@ -725,7 +723,7 @@ WORD(see, "SEE", 3, &header_exit) {
 }
 
 WORD(semicolon, ";", 1 | IMMEDIATE, &header_see) {
-  latest->metadata &= (~HIDDEN); // Clear the hidden bit.
+  dictionary->metadata &= (~HIDDEN); // Clear the hidden bit.
   // Compile an EXIT
   *(dsp.cells++) = (cell) &(header_exit.code_field);
   // And stop compiling.
