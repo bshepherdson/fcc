@@ -183,12 +183,29 @@ VARIABLE (loop-top)
   swap >R ( index2 )
 ;
 
+\ Implementation taken from the Forth 2012 appendix.
+\ WITHIN is actually from CORE EXT, but it's useful here.
+: WITHIN ( test lo hi -- ? ) over - >R   - R> U< ;
+
+\ Called at the end of a +loop, with the delta.
+\ Remember that the real return address is on the return stack.
+: (LOOP-END) ( delta -- ?   R: limit index ret -- limit index' ret )
+  R> SWAP ( ret delta )
+  R> ( ret delta index )
+  swap over + ( ret index index' )
+  R> ( ret index index' limit )
+  2dup >R >R ( ret index index' limit   R: limit index' )
+  2dup = >R ( ret index index' limit   R: limit index' equal? )
+  -rot within ( ret in?   R: limit index' equal? )
+  R> OR
+  swap >R ( ?   R: limit index' ret )
+;
+
+
 : +LOOP ( step --    C: old-jump-addr )
   \ Compute the point where the end of the loop will be.
   \ 9 cells after this point.
-  ['] R> compile,  ['] + compile, ( index' ) ['] R> compile, ( index' limit )
-  ['] 2dup compile, ['] >R dup compile, compile,
-  ['] = compile, ['] (0branch) compile,
+  ['] (LOOP-END) compile, ['] (0branch) compile,
   (loop-top) @ cell+   here - ,
 
   \ End of the loop, start of the postlude ( C: -- )

@@ -75,9 +75,6 @@
 ; IMMEDIATE
 
 
-\ Implementation taken from the Forth 2012 appendix.
-: WITHIN ( test lo hi -- ? ) over - >R   - R> U< ;
-
 \ Unimplemented output: .R HOLDS U.R
 \ Unimplemented double-cell: 2>R 2R> 2R@
 \ Unimplemented strings: C" S\"
