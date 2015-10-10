@@ -18,7 +18,7 @@ trace: vm.c
 	gcc $(CFLAGS) $(CFLAGS_TRACE)  $(INCLUDES) -o forth vm.c $(LIBS)
 
 asm: vm.c
-	gcc $(CFLAGS) $(INCLUDES) -S vm.c $(LIBS)
+	gcc $(CFLAGS) $(CFLAGS_NORMAL) $(INCLUDES) -S vm.c $(LIBS)
 
 clean:
 	rm forth

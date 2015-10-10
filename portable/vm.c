@@ -670,8 +670,8 @@ quit_loop:
         break;
       } else {
         if (SRC.type == 0) printf("  ok\n");
-        refill_();
         sp += 2;
+        refill_();
       }
     }
 
@@ -683,7 +683,6 @@ quit_loop:
     find_(); // xt immediate (or 0 0)
     if (sp[0] == 0) { // Failed to parse. Try to parse as a number.
       // I can use the existing ( 0 0 ) as the empty number for >number
-      // TODO: Handle negative numbers.
       // TODO: Parse $ff numbers and so on. Maybe do that from Forth?
       ch1 = 0; // ch1 = negate here.
       if (*savedString == '-') { // Negative number.
