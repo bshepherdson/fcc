@@ -708,13 +708,28 @@ WORD(see, "SEE", 3, &header_exit) {
     if (*cfa != &code_docol) {
       printf("Not compiled using DOCOL; can't SEE native words.\n");
     } else {
+      tempHeader = NULL;
       do {
         cfa++;
-        str1 = (char*) *cfa;
-        tempHeader = (header*) (str1 - sizeof(cell) * 3);
-        printf("%" PRIuPTR ": ", (ucell) cfa);
-        print(tempHeader->name, tempHeader->metadata & LEN_MASK);
-        printf("\n");
+        // If the previous word was dolit, then this value is a literal, not
+        // a word pointer.
+        // Likewise, if it was a branch, we should show the branch target.
+        if (tempHeader == &header_dolit) {
+          tempHeader = NULL; // Reset tempHeader, or it gets stuck on this case.
+          c1 = (cell) *cfa;
+          printf("%" PRIuPTR ": (literal) %" PRIdPTR "\n", (ucell) cfa, c1);
+        } else if (tempHeader == &header_zbranch || tempHeader == &header_branch) {
+          tempHeader = NULL;
+          c1 = (cell) *cfa;
+          c1 = (cell) (((char*) cfa) + c1);
+          printf("%" PRIuPTR ": branch by %" PRIdPTR " to: %" PRIuPTR "\n", (ucell) cfa, (cell) *cfa, c1);
+        } else {
+          str1 = (char*) *cfa;
+          tempHeader = (header*) (str1 - sizeof(cell) * 3);
+          printf("%" PRIuPTR ": ", (ucell) cfa);
+          print(tempHeader->name, tempHeader->metadata & LEN_MASK);
+          printf("\n");
+        }
       } while (*cfa != (code*) &(header_exit.code_field));
     }
   }
