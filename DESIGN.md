@@ -1,69 +1,69 @@
 # Design Notes
 
-FCC is a Forth compiler compiler. That is, it's an interpreter and compiler for
-Forth systems that can compile itself from scratch, and compile Forth programs
-liekwise.
-
-## Compilation process
-
-There are several stages to compiling FCC, and compiling software with FCC.
-
-It is not necessary to start from Stage 0; indeed FCC ships with Stage 1
-(UPDATE) already compiled for a given platform.
-
-### Stage 0 - Standalone interpreter
-
-FCC includes a basic Forth interpreter, which is written by hand in portable C.
-This interpreter is minimal, and not very efficient, but it's sufficient to load
-the library (see below) and the rest of the compiler.
-
-### Stage 1.0 - Platform-specific Forth assemblers
-
-The directory `asm/$platform/asm.fs` defines a set of assembler commands in
-Forth, that output their text into an assembly file for compiliation by a third
-party tool like GNU `asm`.
-
-### Stage 1.1 - Cross-platform Forth "VM"
-
-Part of Stage 1.0 is that each assembler defines, in terms of its own
-primitives, a universal set of words for various Forth primitives, like basic
-math, reading and writing variously-sized values, and stack operations.
-
-### Stage 1.2 - Cross-platform Forth core
-
-A basic Forth system, written in the above cross-platform operations, also
-sufficient to load the library, or to perform all of Stage 1. Equivalent in
-power, but different in source, than Stage 0.
-
-### Stage 1 - Overall
-
-All of Stage 1 together results in an equivalent to Stage 0 - a basic Forth
+FCC is intended to be an eminently portable, and ideally also performant, Forth
 system.
 
-### Stage 2 - Forth compiler
+The original plan, which gave fcc its name ("Forth Compiler Compiler"), called
+for much more metaprogramming than goes on in this version.
 
-A more sophisticated Forth tool capable of inlining and otherwise optimizing
-Forth code. It is used to compile the core used in Stage 1.2 and the library,
-resulting in an optimized Forth core.
+## Model
 
-### Stage 3 - Forth compiler, compiled
+Here's the layers of the FCC system:
 
-The compiler compiles itself, resulting in an optimized and fast compiler, which
-can be deployed if Forth loading and compilation is desired at deployment-time.
+- Layer 0: Virtual machine, written by hand for the host computer.
+    - `portable/` contains a portable C implementation of this VM.
+- Layer 1: Low-level Forth library
+    - Uses the Forth VM library in `assembler/` to build the heart of the Forth
+      system in Forth. Defines machine-independent parts of the engine, enough
+      to support `:` and other basic words.
+- Layer 2: ANS Forth 2012 library
+    - Uses Layer 1's core Forth pieces to build a full Forth system.
+- Layer 3 and up: User code on top of the above.
 
-This is also the fast compiler you might build, and then run over your code.
+The portability comes from the fact that only Layer 0 needs to be ported for
+different platforms.
 
-### Stage 4 - Compiling your code
+## Organization
 
-The Stage 3 optimized compiler is used to compile the core, library and user
-code to produce a fast binary.
+`portable/` contains a C version of layer 0.
+
+`assembler/` contains an assembler for VM code written in Forth. The assembler is
+capable of cross-compilation, meaning that you can use a build of FCC on one
+machine (say, any platform supported by Gforth or having a binary of FCC) to
+target another (including self-hosting FCC). `assembler/scripts/` contains
+scripts that load the assembler and configure it for various platforms.
+
+`layer1/` contains code that uses the above assembler to define Layer 1's
+low-level operations.
+
+`layer2/` contains the Forth files for the main ANS Forth 2012 system.
+
+## Compilation
+
+To start from a fresh checkout of this repository, you'll need two things:
+
+- A C compiler, like gcc or Clang.
+- A standard-ish Forth system, that can run the assembler.
+    - Since this project previously resulted in a portable C system roughly
+      equivalent to Layers 0 and 1, it can be used to bootstrap FCC.
+
+`./bootstrap.sh` will use the included portable C Forth core in `bootstrap/` to
+build FCC for the current machine.
+
+### Building by hand
+
+If you like doing things by hand, can't execute that script, or are
+cross-compiling, here are the manual steps:
+
+1. Acquire a standard-ish Forth system.
+    1. Run `make` in `bootstrap/` to use that one, if you like.
+1. Run `make` in `portable/` to get Layer 0.
+1. Switch to `layer1/`. Run it with your standard-ish Forth system.
+    1. Configure its parameters for your target machine.
+    1. Execute `assemble` to build the output.
+
 
 ## Current state
 
 Haven't even started. This doc is a pipe dream.
 
-## Future Work
-
-- Allow deploying the stage 3 compiler along with user code, and generating
-  efficient Forth code at runtime in deployments.
-- Using the above for FOAM-style metaprogramming.
