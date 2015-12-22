@@ -1,14 +1,13 @@
-# Stage 1 - Forth core and library
+# FCC - Portable C engine
 
-Stage 1 defines a minimal set of library functions for Forth, with a portable C
-implementation of that set. This enables the resulting Forth to run on more or
-less any machine we have a decent C compiler for. It should be fairly
-straightforward to write a compatible implementation in assembly code on other
-systems.
+This C code implements a modest set of library functions for Forth. This enables
+the resulting Forth system to run on more or less any machine we have a decent C
+compiler for. It should be fairly straightforward to write a compatible
+implementation in assembly code on other systems.
 
-There is of course an associated library written in Forth itself. Pains are
-taken using machine-detail-abstracting words like `>CODE`, `(>HERE)`, `(/CELL)`
-to abstract across differences in word size.
+There is of course an associated library written in Forth itself. It is intended
+that this library use words hiding the system details (eg. `>CODE`, `CELLS`) so
+that it is portable across machines.
 
 ## Engine Design
 
