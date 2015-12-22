@@ -11,13 +11,14 @@ for much more metaprogramming than goes on in this version.
 Here's the layers of the FCC system:
 
 - Layer 0: Virtual machine, written by hand for the host computer.
-    - `portable/` contains a portable C implementation of this VM.
+    - `layer0/portable/` contains a portable C implementation of this VM.
 - Layer 1: Low-level Forth library
-    - Uses the Forth VM library in `assembler/` to build the heart of the Forth
-      system in Forth. Defines machine-independent parts of the engine, enough
-      to support `:` and other basic words.
+    - Uses the Forth VM library in `layer1/assembler/` to build the heart of the
+      Forth system in Forth. Defines machine-independent parts of the engine,
+      enough to support `:` and other basic words.
 - Layer 2: ANS Forth 2012 library
-    - Uses Layer 1's core Forth pieces to build a full Forth system.
+    - Uses Layer 1's core Forth pieces to build a full, nearly-standard Forth
+      system.
 - Layer 3 and up: User code on top of the above.
 
 The portability comes from the fact that only Layer 0 needs to be ported for
@@ -25,13 +26,13 @@ different platforms.
 
 ## Organization
 
-`portable/` contains a C version of layer 0.
+`layer0/portable/` contains a C version of layer 0.
 
-`assembler/` contains an assembler for VM code written in Forth. The assembler is
-capable of cross-compilation, meaning that you can use a build of FCC on one
-machine (say, any platform supported by Gforth or having a binary of FCC) to
-target another (including self-hosting FCC). `assembler/scripts/` contains
-scripts that load the assembler and configure it for various platforms.
+`layer1/assembler/` contains an assembler for VM code written in Forth. The
+assembler is capable of cross-compilation, meaning that you can use a build of
+FCC on one machine (say, any platform supported by Gforth or having a binary of
+FCC) to target another (including self-hosting FCC). `assembler/scripts/`
+contains scripts that load the assembler and configure it for various platforms.
 
 `layer1/` contains code that uses the above assembler to define Layer 1's
 low-level operations.
