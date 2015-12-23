@@ -51,14 +51,10 @@ The following standard words are **missing** from the Core word set:
 
 - `ACCEPT` and `KEY`
 - `ENVIRONMENT?` (and its standard queries)
-- `FM/MOD`, `UM/MOD` and `SM/REM`
-- `M*` and `UM*`
 
 Known deviations from the specification in Section 3:
 
 - Prefixed numbers are not supported (eg. `$09` for hex).
-- Some words, like those for pictured numeric output, are nominally double-cell
-  but really ignore the high cell.
 
 ### Core Extensions
 
@@ -127,7 +123,7 @@ As required in Section 4.1.1, and appearing in the same order.
 - `PAD` returns an area of 1024 address units (bytes, usually).
 - FCC is case-insensitive.
 - The prompt looks like `"   ok\n> "`.
-- Uses the host system's division routines.
+- Uses the host system's division routines. (Usually libc, which is symmetric.)
 - `STATE` is either `0` (interpreting) or `1` (compiling).
 - Arithmetic overflow is that of the host system. Generally, wrapping around and
   not throwing exceptions.
@@ -164,8 +160,8 @@ General conditions, in the same order as Section 4.1.2.
 - Modifying the input buffer is not formally supported, but it will work
   as one would expect: the edited text is what gets parsed. Likewise, editing
   string literals should work sanely, though it's not formally supported.
-- Pictured numeric output uses data space, so overflow is unlikely (but see
-  above).
+- Pictured numeric output uses data space after `HERE`, so overflow is unlikely
+  (and described above).
 - Parsed strings are dynamically allocated by `readline`, so overflow there is
   usually impossible (other than exhausting the system RAM). A maximum of 256
   bytes of each input line are copied to the parse buffer, so no overflow is
@@ -215,8 +211,8 @@ Conditions specific to particular words, in the same order as Section 4.1.2.
   `DOES>` for words not defined by `CREATE` will overwrite the cell 2 cells
   after the code field, which might be any other data.
 - Using the pictured numeric output words outside `<#` `#>` will cause
-  unpredictable results, and usually consume parts of the stack and write into
-  `HERE` space.
+  unpredictable results, and usually mangle parts of the stack and write into
+  data space after `HERE`.
 - Words defined with `DEFER` which are accessed before being assigned an `xt`
   will attempt to `EXECUTE` with `0` as the CFA, which is a segfault.
 - Accessing a non-deferred word like a deferred word will treat it like a

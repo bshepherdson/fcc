@@ -60,10 +60,6 @@
 
 : /MOD ( a b -- r q ) 2dup mod -rot / ;
 
-\ TODO These are lame, non-double-cell versions.
-: */ ( n1 n2 n3 -- quotient ) >r * r> / ;
-: */MOD ( n1 n2 n3 -- remainder quotient ) >r * r> /MOD ;
-
 
 : ALLOT ( n -- ) (>HERE) +! ;
 : HERE (>HERE) @ ;
@@ -289,31 +285,145 @@ VARIABLE (loop-top)
 
 : ABS ( n -- u ) dup 0< IF negate THEN ;
 
+
+\ Awkward double-cell calculations.
+: (C+!) ( char c-addr -- ) swap over ( a c a ) C@ + ( a c')   255 and   swap C! ;
+
+HERE 2 cells allot CONSTANT (M*RES)
+: UM* ( u1 u2 -- ud )
+  \ First, write all 0s into the result buffer.
+  2 cells 0 DO 0 (m*res) i + c! LOOP
+  \ Then go through each input a byte at a time.
+  1 cells 0 DO
+    over i 8 * rshift 255 and ( n1 n2 b1 )
+    0 ( n1 n2 b1 carry )
+    1 cells 0 DO
+      rot dup >r -rot r> ( n1 n2 b1 carry n2 )
+      i 8 * rshift 255 and ( n1 n2 b1 carry b2 )
+      rot dup >R ( n1 n2 carry b2 b1   R: b1 )
+      * + ( n1 n2 res ) \ res is 16 bits. Need to write it in two parts.
+      dup 255 and ( n1 n2 res lo   R: b1 )
+      \ Can't have anything on the return stack and use I and J.
+      R> -rot ( n1 n2 b1 res lo )
+      i j + (m*res) + ( n1 n2 b1 res lo c-addr )
+      (C+!) ( n1 n2 b1 res )
+      8 rshift 255 and ( n1 n2 b1 carry   )
+    LOOP
+    1 cells i + (m*res) + (C+!) ( n1 n2 b1 )
+    drop ( n1 n2 )
+  LOOP
+
+  2drop \ Discard the inputs.
+
+  \ Don't assume endianness of the host; load those values a byte at a time.
+  0 1 cells 0 DO i (m*res) + c@   i 8 * lshift   + LOOP
+  0 1 cells 0 DO i 1 cells +   (m*res) + c@   i 8 * lshift   + LOOP
+;
+
+: M* ( n1 n2 -- d )
+  over 0< over 0< xor >R
+  abs swap abs swap UM*
+  R> IF negate swap negate swap THEN
+;
+
+\ Some helpers for working with halfsize integers.
+1 cells 2 / (address-unit-bits) * CONSTANT (HALF-WIDTH)
+0 invert (half-width) rshift CONSTANT (HALF-MASK)
+: (HI) ( u -- uh ) (half-width) rshift   (half-mask) and ;
+: (LO) ( u -- uh ) (half-mask) and ;
+
+\ Hi on top, like a double-cell value.
+: (half-split) ( u -- uh1 uh2 ) dup (lo) swap (hi) ;
+: (half-join) ( uh1 uh2 -- u ) (half-width) lshift   or ;
+
+\ Works in half-size parts.
+: UM/MOD ( ud u1 -- u2-r u3-q )
+  \ Chop up the dividend into 16-bit pieces.
+  >R >R ( lo )
+  (half-split) R> (half-split) ( ll lh hl hh   R: d )
+  R@ /mod ( ll lh hl r q  R: d )
+  \ This is the high part of the high part of the quotient; discard it.
+  drop
+  (half-join) R@ /mod ( ll lh r q ) \ Still high quotient, discard.
+  drop
+  (half-join) R@ /mod ( ll r qh  R: d )
+  \ Juggle the high quotient part onto the return stack.
+  R> swap >R ( ll r d   R: qh )
+  >R (half-join) R> ( temp d   R: qh )
+  /mod ( r ql  R: qh )
+  R> (half-join) ( r q )
+;
+
+\ Invert and add 1, but in a double-cell way.
+: DNEGATE ( d1 -- d2 )
+  invert swap invert ( hi' lo' )
+  1+ \ Now if that made the lo part 0, we need to carry.
+  swap ( lo' hi' )
+  over 0= IF 1+ THEN
+;
+
+: (DIV-CORE) ( d n -- u u dividend-neg? divisor-neg? differ? )
+  dup 0< ( d n divisor-neg? )
+  dup >R IF negate THEN ( d u    R: divisor-neg? )
+  >R ( d   R: divisor-neg? u )
+  dup 0< ( d dividend-neg?   R: divisor-neg? u )
+  dup >R IF dnegate THEN ( ud   R: divisor-neg? u dividend-neg? )
+  R> R> swap >R ( ud u    R: divisor-neg? dividend-neg? )
+  um/mod ( u u   R: divisor-neg? dividend-neg? )
+  R> R>
+  2dup xor
+;
+
+\ Symmetric division is the simpler one: the remainder carries the sign of the
+\ dividend or is zero, and the quotient carries the main sign.
+: SM/REM ( d n -- n n )
+  (div-core) ( u u dividend-neg? divisor-neg? differ? )
+  >R drop ( u u dividend-neg?    R: differ? )
+  IF swap negate swap THEN ( n u   R: differ? )
+  R> IF negate THEN ( n n )
+;
+
+\ Floored division is the weirder one, where the remainder has the sign of the
+\ divisor (or is zero), while the quotient has the combined sign.
+\ When the signs do differ, add 1 to the unsigned results before doing the
+\ negation.
+: FM/MOD ( d n -- n n )
+  (div-core) ( u u dividend-neg? divisor-neg? differ? )
+  -rot >R >R >R ( u u    R: divisor-neg? dividend-neg? differ? )
+  R@ IF 1+ swap 1+ swap THEN ( u' u' R: divisor-neg? dividend-neg? differ? )
+  R> IF negate THEN \ Negate the quotient when the signs differ.
+  R> drop
+  R> IF swap negate swap THEN \ Negate the remainder when the divisor is neg.
+  ( n n )
+;
+
+\ These use symmetric division, SM/REM.
+: */MOD ( n1 n2 n3 -- remainder quotient ) >r M* r> SM/REM ;
+: */ ( n1 n2 n3 -- quotient ) */mod swap drop ;
+
+
 \ Pictured numeric output. Uses HERE (which is not PAD).
-\ These ignore the second part of the supposed double-cell value.
 VARIABLE (picout)
 : (picout-top) here 256 chars + ;
 : <# (picout-top) (picout) ! ;
 : HOLD ( c -- ) (picout) @ 1- dup >R c!   R> (picout) ! ;
 : SIGN ( n -- ) 0< IF [CHAR] - hold THEN ;
 : # ( ud1 -- ud2 )
-  >R base @ /mod ( r q )
-  swap dup 10 < IF [char] 0 ELSE 10 - [char] A THEN + HOLD ( q )
+  base @ 2dup / >R ( ud1 base   R: hi-q )
+  um/mod ( r lo-q   R: hi-q )
+  swap dup 10 < IF [char] 0 ELSE 10 - [char] A THEN + HOLD ( lo-q   R: hi-q )
   R> ( dq )
 ;
 : #S
-  over 0= IF [char] 0 emit EXIT THEN \ Special case for 0.
-  BEGIN over WHILE # REPEAT
+  2dup or 0= IF [char] 0 emit EXIT THEN \ Special case for 0.
+  BEGIN 2dup or WHILE # REPEAT
 ;
 : #> 2drop (picout) @ (picout-top) over - ( c-addr len ) ;
 
-: S>D 0 ;
+: S>D ( n -- d ) dup 0< IF -1 ELSE 0 THEN ;
 
-\ TODO U. chokes on negative numbers...
-: U. <# S>D #S #> type space ;
+: U. <# 0 #S #> type space ;
 : .  <# dup abs S>D #S rot sign #> type space ;
 
 \ Unimplemented: ACCEPT ENVIRONMENT? KEY
-\ Unimplemented: FM/MOD UM/MOD SM/REM
-\ Unimplemented: M* UM*
 

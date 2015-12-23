@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <inttypes.h>
+#include <limits.h>
 
 #include <readline/readline.h>
 //#include <readline/history.h>
@@ -416,9 +417,15 @@ WORD(size_char, "(/CHAR)", 7, &header_size_cell) {
   NEXT;
 }
 
+WORD(unit_bits, "(ADDRESS-UNIT-BITS)", 19, &header_size_char) {
+  PRINT_TRACE("(ADDRESS-UNIT-BITS)");
+  *(--sp) = (cell) (CHAR_BIT);
+  NEXT;
+}
+
 // Converts a header* eg. from (latest) into the DOES> address, which is
 // the cell after the CFA.
-WORD(to_does, "(>DOES)", 7, &header_size_char) {
+WORD(to_does, "(>DOES)", 7, &header_unit_bits) {
   PRINT_TRACE("(>DOES)");
   tempHeader = (header*) sp[0];
   sp[0] = ((cell) &(tempHeader->code_field)) + sizeof(cell);
@@ -625,10 +632,20 @@ WORD(depth, "DEPTH", 5, &header_find) {
   NEXT;
 }
 
+WORD(dot_s, ".S", 2, &header_depth) {
+  PRINT_TRACE(".S");
+  printf("[%d] ", (cell) (((char*) spTop) - ((char*) sp)) / sizeof(cell));
+  for (c1 = (cell) (&spTop[-1]); c1 >= (cell) sp; c1 -= sizeof(cell*)) {
+    printf("%" PRIdPTR " ", *((cell*) c1));
+  }
+  printf("\n");
+  NEXT;
+}
+
 // File access
 // This is a hack included to support the assemblers and such.
 // It writes a block of bytes to a binary file.
-WORD(dump_file, "(DUMP-FILE)", 11, &header_depth) {
+WORD(dump_file, "(DUMP-FILE)", 11, &header_dot_s) {
   PRINT_TRACE("(DUMP-FILE)");
   // ( c-addr1 u1 c-addr2 u2 ) String on top (2) and binary data below (1)
   // Open the named file for truncated write-only.
