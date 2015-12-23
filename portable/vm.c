@@ -812,6 +812,7 @@ WORD(see, "SEE", 3, &header_exit) {
         cfa++;
         // If the previous word was dolit, then this value is a literal, not
         // a word pointer.
+        // Likewise, if it was dostring, we should print the string.
         // Likewise, if it was a branch, we should show the branch target.
         if (tempHeader == &header_dolit) {
           tempHeader = NULL; // Reset tempHeader, or it gets stuck on this case.
@@ -822,6 +823,19 @@ WORD(see, "SEE", 3, &header_exit) {
           c1 = (cell) *cfa;
           c1 = (cell) (((char*) cfa) + c1);
           printf("%" PRIuPTR ": branch by %" PRIdPTR " to: %" PRIuPTR "\n", (ucell) cfa, (cell) *cfa, c1);
+        } else if (tempHeader == &header_dostring) {
+          tempHeader = NULL;
+          str1 = (char*) cfa;
+          c1 = (cell) *str1;
+          str1++;
+          strncpy(tempBuf, str1, c1);
+          tempBuf[c1] = '\0';
+          while (c1 > 0) {
+            printf("%d ", *str1);
+            str1++;
+            c1--;
+          }
+          printf("\"%s\"\n", tempBuf);
         } else {
           str1 = (char*) *cfa;
           tempHeader = (header*) (str1 - sizeof(cell) * 3);

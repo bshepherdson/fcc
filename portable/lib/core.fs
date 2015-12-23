@@ -46,7 +46,7 @@
 : NEGATE ( n -- n ) 0 swap - ;
 
 : INVERT -1 xor ;
-: NOT invert ;
+: NOT 0= ;
 
 : +! ( delta a-addr -- )
   dup @ ( delta a-addr value )
@@ -191,9 +191,11 @@ VARIABLE (loop-top)
   swap over + ( ret index index' )
   R> ( ret index index' limit )
   2dup >R >R ( ret index index' limit   R: limit index' )
-  2dup = >R ( ret index index' limit   R: limit index' equal? )
-  -rot within ( ret in?   R: limit index' equal? )
-  R> OR
+  rot ( ret index' limit index   R: limit index' )
+  2dup = >R  ( ret index' limit index   R: limit index' equal? )
+  2dup < IF swap THEN
+  within
+  R> or
   swap >R ( ?   R: limit index' ret )
 ;
 
@@ -243,7 +245,7 @@ VARIABLE (loop-top)
 
 
 : MOVE> ( src dst u -- ) 0 DO over i + c@   over i + c! LOOP 2drop ;
-: MOVE< ( src dst u -- ) 1- -1 swap DO over i + c@   over i + c! -1 +LOOP 2drop ;
+: MOVE< ( src dst u -- ) 1- 0 swap DO over i + c@   over i + c! -1 +LOOP 2drop ;
 : MOVE ( src dst u -- ) >R 2dup <   R> swap   IF MOVE< ELSE MOVE> THEN ;
 
 : ABORT quit ;
