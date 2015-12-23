@@ -423,9 +423,20 @@ WORD(unit_bits, "(ADDRESS-UNIT-BITS)", 19, &header_size_char) {
   NEXT;
 }
 
+WORD(stack_cells, "(STACK-CELLS)", 13, &header_unit_bits) {
+  PRINT_TRACE("(STACK-CELLS)");
+  *(--sp) = (cell) DATA_STACK_SIZE;
+  NEXT;
+}
+WORD(return_stack_cells, "(RETURN-STACK-CELLS)", 20, &header_stack_cells) {
+  PRINT_TRACE("(RETURN-STACK-CELLS)");
+  *(--sp) = (cell) RETURN_STACK_SIZE;
+  NEXT;
+}
+
 // Converts a header* eg. from (latest) into the DOES> address, which is
 // the cell after the CFA.
-WORD(to_does, "(>DOES)", 7, &header_unit_bits) {
+WORD(to_does, "(>DOES)", 7, &header_return_stack_cells) {
   PRINT_TRACE("(>DOES)");
   tempHeader = (header*) sp[0];
   sp[0] = ((cell) &(tempHeader->code_field)) + sizeof(cell);

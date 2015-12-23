@@ -427,5 +427,34 @@ VARIABLE (picout)
 : U. <# 0 #S #> type space ;
 : .  <# dup abs S>D #S rot sign #> type space ;
 
-\ Unimplemented: ACCEPT ENVIRONMENT? KEY
+\ Helper that compares strings.
+: (S=) ( c-addr1 u1 c-addr2 u2 -- ? )
+  rot 2dup = NOT IF 2drop 2drop 0 EXIT THEN
+  drop ( c-addr1 c-addr2 u )
+  0 DO
+    over i + c@
+    over i + c@
+    = NOT IF 2drop 0 UNLOOP EXIT THEN
+  LOOP
+  2drop -1
+;
+
+: ENVIRONMENT? ( c-addr u -- i*x true | false )
+  2dup S" /COUNTED-STRING" (S=) IF 2drop 255 -1 EXIT THEN
+  2dup S" /HOLD"           (S=) IF 2drop 256 -1 EXIT THEN
+  2dup S" /PAD"            (S=) IF 2drop 1024 -1 EXIT THEN
+  2dup S" ADDRESS-UNIT-BITS" (S=) IF 2drop (address-unit-bits) -1 EXIT THEN
+  2dup S" FLOORED" (S=) IF 2drop 0 -1 EXIT THEN
+  2dup S" MAX-CHAR" (S=) IF 2drop 255 -1 EXIT THEN
+  2dup S" MAX-D" (S=) IF 2drop -1 -1 1 rshift  -1 EXIT THEN
+  2dup S" MAX-N" (S=) IF 2drop -1 1 rshift   -1 EXIT THEN
+  2dup S" MAX-U" (S=) IF 2drop -1 -1 EXIT THEN
+  2dup S" MAX-UD" (S=) IF 2drop -1 -1 -1 EXIT THEN
+  2dup S" RETURN-STACK-CELLS" (S=) IF 2drop (return-stack-cells) -1 EXIT THEN
+  2dup S" STACK-CELLS" (S=) IF 2drop (stack-cells) -1 EXIT THEN
+  2drop 0
+;
+
+
+\ Unimplemented: ACCEPT KEY
 

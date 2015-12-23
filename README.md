@@ -50,7 +50,6 @@ FCC is a **Forth-2012 System Subset**.
 The following standard words are **missing** from the Core word set:
 
 - `ACCEPT` and `KEY`
-- `ENVIRONMENT?` (and its standard queries)
 
 Known deviations from the specification in Section 3:
 
@@ -87,7 +86,7 @@ As required in Section 4.1.1, and appearing in the same order.
 - Counted strings have a maximum length of 255 characters.
 - Parsed strings have a maximum length of 255 characters.
 - Definition names have a maximum length of 255 characters.
-- `ENVIRONMENT?` is not defined.
+- No limit on the length of `ENVIRONMENT?` queries.
 - File names can be given on the command line; they will be loaded in order.
   Then the input device will remain the user's terminal.
 - The only supported output device is the user's terminal. (It can be redirected
