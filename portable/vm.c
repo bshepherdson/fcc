@@ -4,6 +4,8 @@
 #include <string.h>
 #include <inttypes.h>
 #include <limits.h>
+#include <unistd.h>
+#include <termios.h>
 
 #include <readline/readline.h>
 //#include <readline/history.h>
@@ -86,9 +88,19 @@ header* tempHeader;
 char tempBuf[256];
 FILE* tempFile;
 
+struct termios old_tio, new_tio;
+
 // NB: If NEXT changes, EXECUTE might need to change too (it uses NEXT1)
+// This flag is set in my YCM compile flags, which prevents errors.
+// Clang (used by YCM) whines about computed GOTOs when the function defines no
+// labels.
+#ifdef __YCM__
+#define NEXT1 __junk: do { goto __junk; } while(0)
+#define NEXT __junk: do { goto __junk; } while(0)
+#else
 #define NEXT1 do { goto **cfa; } while(0)
 #define NEXT do { cfa = *ip++; goto **cfa; } while(0)
+#endif
 
 // Implementations of the VM primitives.
 // These functions MUST NOT USE locals, since that will use the stack.
@@ -385,7 +397,39 @@ WORD(refill, "REFILL", 6, &header_execute) {
   NEXT;
 }
 
-WORD(latest, "(LATEST)", 8, &header_refill) {
+WORD(accept, "ACCEPT", 6, &header_refill) {
+  PRINT_TRACE("ACCEPT");
+  str1 = readline(NULL); // No prompt.
+  c1 = strlen(str1);
+  if (sp[0] < c1) c1 = sp[0];
+  strncpy((char*) sp[1], str1, c1);
+  sp[1] = c1;
+  sp++;
+  free(str1);
+  NEXT;
+}
+
+WORD(key, "KEY", 3, &header_accept) {
+  PRINT_TRACE("KEY");
+
+  // Grab the current terminal settings.
+  tcgetattr(STDIN_FILENO, &old_tio);
+  // Copy to preserve the original.
+  new_tio = old_tio;
+  // Disable the canonical mode (buffered I/O) flag and local echo.
+  new_tio.c_lflag &= (~ICANON & ~ECHO);
+  // And write it back.
+  tcsetattr(STDIN_FILENO, TCSANOW, &new_tio);
+
+  // Read a single character.
+  *(--sp) = getchar();
+
+  // And put things back.
+  tcsetattr(STDIN_FILENO, TCSANOW, &old_tio);
+  NEXT;
+}
+
+WORD(latest, "(LATEST)", 8, &header_key) {
   PRINT_TRACE("(LATEST)");
   *(--sp) = (cell) dictionary;
   NEXT;
@@ -645,7 +689,7 @@ WORD(depth, "DEPTH", 5, &header_find) {
 
 WORD(dot_s, ".S", 2, &header_depth) {
   PRINT_TRACE(".S");
-  printf("[%d] ", (cell) (((char*) spTop) - ((char*) sp)) / sizeof(cell));
+  printf("[%lu] ", (cell) (((char*) spTop) - ((char*) sp)) / sizeof(cell));
   for (c1 = (cell) (&spTop[-1]); c1 >= (cell) sp; c1 -= sizeof(cell*)) {
     printf("%" PRIdPTR " ", *((cell*) c1));
   }

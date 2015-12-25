@@ -455,6 +455,3 @@ VARIABLE (picout)
   2drop 0
 ;
 
-
-\ Unimplemented: ACCEPT KEY
-

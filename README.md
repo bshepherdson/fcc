@@ -47,9 +47,7 @@ This section details the compliance of FCC with the [Forth 2012 standard](http:/
 
 FCC is a **Forth-2012 System Subset**.
 
-The following standard words are **missing** from the Core word set:
-
-- `ACCEPT` and `KEY`
+All standard CORE words are implemented.
 
 Known deviations from the specification in Section 3:
 
@@ -70,15 +68,16 @@ As required in Section 4.1.1, and appearing in the same order.
   (eg. 32 bits on 32-bit machines, 64 bits on 64-bit machines).
 - `EMIT` will try to print whatever you give it; the result depends on the
   output device, generally the terminal.
-- `ACCEPT` is not defined.
-- The character set for `EMIT` is ASCII, generally. `KEY` is not supported.
+- `ACCEPT` uses GNU readline to support editing.
+- The character set for `EMIT` and `KEY` is standard ASCII.
 - All addresses are character-aligned, since characters and address units are
   the same size (bytes, 8 bits).
 - Spaces (`0x20`, `' '`) and tabs (`0x09`, `'\t'`) are treated as spaces.
 - The control-flow stack is the data stack during compilation of a definition.
 - Digits larger than 35 are not converted and will be treated as the end of the
   number being parsed.
-- `ACCEPT` is not defined.
+- `ACCEPT` echoes the entered text. It does not put the newline character into
+  the input, but it does display a newline.
 - `ABORT` is equivalent to `QUIT`: it clears the stacks, sets the input source
   to the user input device, and continues interpreting.
 - Uses the GNU `readline` library for reading input, so line endings are
