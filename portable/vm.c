@@ -356,6 +356,17 @@ WORD(execute, "EXECUTE", 7, &header_zbranch) {
   NEXT1;
 }
 
+WORD(evaluate, "EVALUATE", 8, &header_execute) {
+  PRINT_TRACE("EVALUATE");
+  inputIndex++;
+  SRC.parseLength = sp[0];
+  strncpy(SRC.parseBuffer, (char*) sp[1], sp[0]);
+  SRC.type = -1; // EVALUATE
+  SRC.inputPtr = 0;
+  sp += 2;
+  NEXT;
+}
+
 
 // Input
 cell refill_(void) {
@@ -391,7 +402,7 @@ cell refill_(void) {
   }
 }
 
-WORD(refill, "REFILL", 6, &header_execute) {
+WORD(refill, "REFILL", 6, &header_evaluate) {
   PRINT_TRACE("REFILL");
   *(--sp) = refill_();
   NEXT;
@@ -431,7 +442,7 @@ WORD(key, "KEY", 3, &header_accept) {
 
 WORD(latest, "(LATEST)", 8, &header_key) {
   PRINT_TRACE("(LATEST)");
-  *(--sp) = (cell) dictionary;
+  *(--sp) = (cell) &dictionary;
   NEXT;
 }
 
@@ -447,9 +458,23 @@ WORD(emit, "EMIT", 4, &header_in_ptr) {
   NEXT;
 }
 
+WORD(source, "SOURCE", 6, &header_emit) {
+  PRINT_TRACE("SOURCE");
+  sp -= 2;
+  sp[0] = SRC.parseLength;
+  sp[1] = (cell) SRC.parseBuffer;
+  NEXT;
+}
+
+WORD(source_id, "SOURCE-ID", 9, &header_source) {
+  PRINT_TRACE("SOURCE-ID");
+  *(--sp) = SRC.type;
+  NEXT;
+}
+
 
 // Sizes and metadata
-WORD(size_cell, "(/CELL)", 7, &header_emit) {
+WORD(size_cell, "(/CELL)", 7, &header_source_id) {
   PRINT_TRACE("(/CELL)");
   *(--sp) = (cell) sizeof(cell);
   NEXT;

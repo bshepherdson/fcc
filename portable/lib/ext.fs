@@ -4,9 +4,10 @@
 
 : .(   [char] ) parse type ; IMMEDIATE
 
-: <> = INVERT ;
+: <> = NOT ;
 : 0<> 0 <> ;
 
+: :NONAME ( -- xt ) here   ['] (docol) @ ,   ] ;
 
 : ?DO ( limit index --   C: old-jump-addr )
   ['] 2dup compile, ['] swap compile, ['] >r dup compile, compile,
@@ -75,11 +76,64 @@
 ; IMMEDIATE
 
 
-\ Unimplemented output: .R HOLDS U.R
-\ Unimplemented double-cell: 2>R 2R> 2R@
-\ Unimplemented strings: C" S\"
-\ Unimplemented control structures: CASE ENDCASE OF ENDOF
-\ Unimplemented dictionary mangler: MARKER
-\ Unimplemented input source manglers: RESTORE-INPUT SAVE-INPUT
+\ Displays n1 in a field n2 characters wide.
+: (PAD-FIELD) ( c-addr1 real-length intended-width -- c-addr2 len )
+  2dup >= IF \ Overflowed the space.
+    drop
+  ELSE
+    dup >R
+    swap ( c-addr width len   R: width )
+    DO
+      1 chars - 32 over C!
+    LOOP ( c-addr'    R: width )
+    R> ( c-addr' width )
+  THEN
+;
+
+: .R  ( n1 n2 -- )
+  swap (#HOLD) rot ( c-addr len width )
+  (pad-field) type
+;
+: U.R ( u n -- )
+  swap (#UHOLD) rot ( c-addr len width )
+  (pad-field) type
+;
+
+: HOLDS ( c-addr u -- ) BEGIN dup WHILE 1- 2dup + c@ hold repeat 2drop ;
+
+: 2>R ( x1 x2 -- ) ( R: -- x1 x2 ) swap >R >R ;
+: 2R> ( -- x1 x2 ) ( R: x1 x2 -- ) R> R> swap ;
+: 2R@ ( -- x1 x2 ) ( R: x1 x2 -- x1 x2 ) R> R>   2dup   >R >R   swap ;
+
+: MARKER ( "<spaces>name" -- ) ( exec: -- )
+  HERE CREATE ,  DOES>  @ dup   (LATEST) !   (>HERE) ! ;
+
+\ TODO Expand to support blocks and files when those word sets are added.
+: SAVE-INPUT ( -- x1 ... xn n ) >IN @ 1 ;
+: RESTORE-INPUT ( x1 ... xn n -- error? ) drop >IN !   false ;
+
+
+: CASE ( -- ) ( C: -- depth ) 0 ; IMMEDIATE
+: OF ( x1 x2 -- | x1 ) ( C: -- of-sys )
+  ['] over compile,
+  ['] = compile,
+  postpone IF
+  ['] drop compile,
+; IMMEDIATE
+: ENDOF ( -- ) ( C: of-sys ) postpone ELSE ; IMMEDIATE
+: ENDCASE ( x -- ) ( C: jump-loc1 ... jump-locn n -- )
+  ['] drop compile,
+  BEGIN ?dup WHILE postpone THEN REPEAT
+; IMMEDIATE
+
+
+: C" ( "ccc<quote>" -- )
+  postpone S"
+  ['] drop compile,
+  ['] 1- compile,
+; IMMEDIATE
+
+
+\ Unimplemented strings: S\"
 \ Unimplemented obsolete words: [COMPILE]
 

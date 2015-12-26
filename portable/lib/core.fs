@@ -1,6 +1,6 @@
 1024 1024 4 * * (allocate) (>here) !
 
-: IMMEDIATE (LATEST) (/CELL) +   dup @ 512 or   swap ! ;
+: IMMEDIATE (LATEST) @ (/CELL) +   dup @ 512 or   swap ! ;
 
 : ( 41 parse drop drop ; IMMEDIATE
 : \ refill drop ; IMMEDIATE
@@ -59,7 +59,6 @@
 : COUNT ( c-addr -- c-addr u ) dup c@ swap 1+ swap ;
 
 : /MOD ( a b -- r q ) 2dup mod -rot / ;
-
 
 : ALLOT ( n -- ) (>HERE) +! ;
 : HERE (>HERE) @ ;
@@ -134,6 +133,7 @@
   \ Now CONSTANT will have the do-address on the stack.
   \ It should store that in the first body cell of the CREATEd word.
   ['] (latest) compile,
+  ['] @ compile,
   ['] (>does) compile,
   ['] ! ,
   ['] EXIT compile,
@@ -283,9 +283,11 @@ VARIABLE (loop-top)
   dup 0= IF 2drop 0 ELSE rot drop THEN
 ;
 
-: RECURSE (latest) (>CFA) compile, ; IMMEDIATE
+: RECURSE (latest) @ (>CFA) compile, ; IMMEDIATE
 
 : ABS ( n -- u ) dup 0< IF negate THEN ;
+
+: ?DUP ( x -- 0 | x x ) dup IF dup THEN ;
 
 
 \ Awkward double-cell calculations.
@@ -424,8 +426,12 @@ VARIABLE (picout)
 
 : S>D ( n -- d ) dup 0< IF -1 ELSE 0 THEN ;
 
-: U. <# 0 #S #> type space ;
-: .  <# dup abs S>D #S rot sign #> type space ;
+: (#UHOLD) <# 0 #S #> ;
+: U. (#UHOLD) type space ;
+
+\ Helper for picturing signed numbers.
+: (#HOLD) ( n -- c-addr len ) <# dup abs S>D #S rot sign #> ;
+: .  (#HOLD) type space ;
 
 \ Helper that compares strings.
 : (S=) ( c-addr1 u1 c-addr2 u2 -- ? )

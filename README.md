@@ -60,6 +60,16 @@ Providing `.(`, `0<>`, `<>`, `?DO`, `ACTION-OF`, `AGAIN`, `BUFFER:`, `CR`,
 `ROLL`, `TO`, `TRUE`, `TUCK`, `U>`, `UNUSED`, and `VALUE` from the Core
 Extensions word set.
 
+
+Providing `.(`, `.R`, `0<>`, `0>`, `2>R`, `2R>`, `2R@`, `:NONAME`, `<>`, `?DO`,
+`ACTION-OF`, `AGAIN`, `BUFFER:`, `C"`, `CASE`, `COMPILE,`, `DEFER`, `DEFER!`,
+`DEFER@`, `ENDCASE`, `ENDOF`, `ERASE`, `FALSE`, `HEX`, `HOLDS`, `IS`, `MARKER`,
+`NIP`, `OF`, `PAD`, `PARSE`, `PARSE-NAME`, `PICK`, `REFILL`, `RESTORE-INPUT`,
+`ROLL`, `SAVE-INPUT`, `SOURCE-ID`, `TO`, `TRUE`, `TUCK`, `U.R`, `U>`, `UNUSED`,
+`VALUE`, `WITHIN`, `\`.
+
+(Everything but `S\"` and `[COMPILE]`.)
+
 ### Implementation-defined Options
 
 As required in Section 4.1.1, and appearing in the same order.
