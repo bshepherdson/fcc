@@ -712,7 +712,33 @@ WORD(depth, "DEPTH", 5, &header_find) {
   NEXT;
 }
 
-WORD(dot_s, ".S", 2, &header_depth) {
+WORD(sp_fetch, "SP@", 3, &header_depth) {
+  PRINT_TRACE("SP@");
+  c1 = (cell) sp;
+  *(--sp) = c1;
+  NEXT;
+}
+
+WORD(sp_store, "SP!", 3, &header_sp_fetch) {
+  PRINT_TRACE("SP!");
+  c1 = sp[0];
+  sp = (cell*) c1;
+  NEXT;
+}
+
+WORD(rp_fetch, "RP@", 3, &header_sp_store) {
+  PRINT_TRACE("RP@");
+  *(--sp) = (cell) rsp;
+  NEXT;
+}
+
+WORD(rp_store, "RP!", 3, &header_rp_fetch) {
+  PRINT_TRACE("RP!");
+  rsp = (cell*) *(sp++);
+  NEXT;
+}
+
+WORD(dot_s, ".S", 2, &header_rp_store) {
   PRINT_TRACE(".S");
   printf("[%lu] ", (cell) (((char*) spTop) - ((char*) sp)) / sizeof(cell));
   for (c1 = (cell) (&spTop[-1]); c1 >= (cell) sp; c1 -= sizeof(cell*)) {
