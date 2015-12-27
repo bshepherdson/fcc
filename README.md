@@ -45,13 +45,9 @@ partial attempt to assemble this Forth for it is in `dcpu/`.
 
 This section details the compliance of FCC with the [Forth 2012 standard](http://forth-standard.org/)
 
-FCC is a **Forth-2012 System Subset**.
+FCC is a **Forth-2012 System**.
 
 All standard CORE words are implemented.
-
-Known deviations from the specification in Section 3:
-
-- Prefixed numbers are not supported (eg. `$09` for hex).
 
 ### Core Extensions
 

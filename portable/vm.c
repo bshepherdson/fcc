@@ -675,11 +675,22 @@ void parse_name_(void) {
   *(--sp) = c1;
 }
 
-// TODO: Support the fancy numeric parsing from the standard.
 void to_number_(void) {
   // sp[0] is the length, sp[1] the pointer, sp[2] the high word, sp[3] the low.
   // ( lo hi c-addr u -- lo hi c-addr u )
   str1 = (char*) sp[1];
+  tempSize = base;
+  if (*str1 == '$' || *str1 == '#' || *str1 == '%') {
+    tempSize = *str1 == '$' ? 16 : *str1 == '#' ? 10 : 2;
+    str1++;
+    sp[0]--;
+  } else if (*str1 == '\'') {
+    sp[0] -= 3;
+    sp[1] += 3;
+    sp[3] = str1[1];
+    return;
+  }
+
   while (sp[0] > 0) {
     c1 = (cell) *str1;
     if ('0' <= c1 && c1 <= '9') {
@@ -692,10 +703,10 @@ void to_number_(void) {
       break;
     }
 
-    if (c1 >= base) break;
+    if (c1 >= (cell) tempSize) break;
 
     // Otherwise, a valid character, so multiply it in.
-    sp[3] *= base;
+    sp[3] *= tempSize;
     sp[3] += c1;
     sp[0]--;
     str1++;
