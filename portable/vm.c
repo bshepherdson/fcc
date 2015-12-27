@@ -12,6 +12,49 @@
 
 #include <md.h>
 
+// Meta-macro that takes another macro and runs it for each external library.
+// To add a new external file, it should be sufficient to add it here.
+// NB: THESE ARE IN REVERSE ORDER. The bottom-most is loaded first!
+#define EXTERNAL_FILES(F) \
+  F(exception) \
+  F(ext) \
+  F(core)
+
+// How external files are imported.
+// The linker includes them as symbols like _binary_lib_exception_fs.
+// The "extern char" references here are not pointers, they're the actual
+// character at position 0. Therefore we take &_binary_lib_exception_fs and use
+// that as the input pointer.
+// In order to distinguish these pointers from the FILE* inputs used by
+// command-line arguments or INCLUDE and friends, I add EXTERN_SYMBOL_FLAG to
+// them, and use EXTERN_SYMBOL_MASK to strip it off.
+
+#define EXTERNAL_SYMBOL_FLAG (1)
+#define EXTERNAL_SYMBOL_MASK (~1)
+
+#define EXTERNAL_START(name) _binary_lib_ ## name ## _fs_start
+#define EXTERNAL_END(name) _binary_lib_ ## name ## _fs_end
+#define FORTH_EXTERN(name) \
+  extern char EXTERNAL_START(name);\
+  extern char EXTERNAL_END(name);
+
+
+#define EXTERNAL_INPUT_SOURCES(name) \
+  inputIndex++;\
+  ext = (external_source*) malloc(sizeof(external_source));\
+  ext->current = &EXTERNAL_START(name);\
+  ext->end = &EXTERNAL_END(name);\
+  SRC.type = ((cell) ext) | EXTERNAL_SYMBOL_FLAG;\
+  SRC.inputPtr = 0;\
+  SRC.parseLength = 0;
+
+EXTERNAL_FILES(FORTH_EXTERN);
+
+typedef struct {
+  char *current;
+  char *end;
+} external_source;
+
 // Sizes in address units.
 #define COMPILING (1)
 #define INTERPRETING (0)
@@ -68,7 +111,7 @@ header *dictionary;
 typedef struct {
   cell parseLength;
   cell inputPtr; // Indexes into parseBuffer.
-  cell type;     // 0 = KEYBOARD, -1 = EVALUATE, 0> fileid
+  cell type;     // 0 = KEYBOARD, -1 = EVALUATE, 0> fileid or extern symbol
   char parseBuffer[256];
 } source;
 
@@ -381,7 +424,26 @@ cell refill_(void) {
     SRC.inputPtr = 0;
     free(str1);
     return -1;
+  } else if ( (SRC.type & EXTERNAL_SYMBOL_FLAG) != 0 ) {
+    // External symbol, pseudofile.
+    external_source *ext = (external_source*) (SRC.type & EXTERNAL_SYMBOL_MASK);
+    if (ext->current >= ext->end) {
+      inputIndex--;
+      return 0;
+    }
+
+    str1 = ext->current;
+    while (str1 < ext->end && *str1 != '\n') {
+      str1++;
+    }
+    SRC.parseLength = str1 - ext->current;
+    strncpy(SRC.parseBuffer, ext->current, SRC.parseLength);
+    SRC.inputPtr = 0;
+
+    ext->current = str1 < ext->end ? str1 + 1 : ext->end;
+    return -1;
   } else {
+    // Real file.
     str1 = NULL;
     tempSize = 0;
     c1 = getline(&str1, &tempSize, (FILE*) SRC.type);
@@ -989,6 +1051,10 @@ int main(int argc, char **argv) {
     SRC.inputPtr = 0;
     SRC.parseLength = 0;
   }
+
+  // Turn the external Forth libraries into input sources.
+  external_source *ext;
+  EXTERNAL_FILES(EXTERNAL_INPUT_SOURCES)
 
   quit_();
 }
