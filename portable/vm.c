@@ -16,6 +16,7 @@
 // To add a new external file, it should be sufficient to add it here.
 // NB: THESE ARE IN REVERSE ORDER. The bottom-most is loaded first!
 #define EXTERNAL_FILES(F) \
+  F(tools) \
   F(exception) \
   F(ext) \
   F(core)
@@ -94,6 +95,7 @@ cell *rsp;
 code ***ip;
 code **cfa;
 
+bool firstQuit = 1;
 code *quitTop = NULL;
 code **quitTopPtr = &quitTop;
 
@@ -691,6 +693,14 @@ void to_number_(void) {
     return;
   }
 
+  // Usin ch1 as a negation flag.
+  ch1 = 0;
+  if (*str1 == '-') {
+    sp[0]--;
+    str1++;
+    ch1 = 1;
+  }
+
   while (sp[0] > 0) {
     c1 = (cell) *str1;
     if ('0' <= c1 && c1 <= '9') {
@@ -712,6 +722,7 @@ void to_number_(void) {
     str1++;
   }
   sp[1] = (cell) str1;
+  if (ch1) sp[3] = -sp[3];
 }
 
 // Expects c-addr u on top of the stack.
@@ -853,8 +864,13 @@ quit_top:
   sp = spTop;
   rsp = rspTop;
   state = INTERPRETING;
+
+  // If this is not the first QUIT, reset to keyboard input.
+  if (!firstQuit) {
+    inputIndex = 0;
+  }
+
   // Refill the input buffer.
-  // TODO: When different input sources are supported, reset to keyboard.
   refill_();
   // And start trying to parse things.
   while (true) {
@@ -879,22 +895,12 @@ quit_loop:
     find_(); // xt immediate (or 0 0)
     if (sp[0] == 0) { // Failed to parse. Try to parse as a number.
       // I can use the existing ( 0 0 ) as the empty number for >number
-      // TODO: Parse $ff numbers and so on. Maybe do that from Forth?
-      ch1 = 0; // ch1 = negate here.
-      if (*savedString == '-') { // Negative number.
-        ch1 = 1;
-        savedString++;
-        savedLength--;
-      }
-
       sp -= 2;
       sp[0] = savedLength;
       sp[1] = (cell) savedString; // Bring back the string and length.
 
       to_number_();
       if (sp[0] == 0) { // Successful parse, handle the number.
-        if (ch1) sp[3] = -sp[3];
-
         if (state == COMPILING) {
           *(dsp.cells++) = (cell) &(header_dolit.code_field);
           *(dsp.cells++) = sp[3]; // Compile low word as the literal.
@@ -1042,7 +1048,6 @@ WORD(semicolon, ";", 1 | IMMEDIATE, &header_see) {
 
 // NB: If anything gets added after SEMICOLON, change the dictionary below.
 
-// TODO: File input
 int main(int argc, char **argv) {
   dictionary = &header_semicolon;
   base = 10;

@@ -30,10 +30,13 @@
 : CHARS (/CHAR) * ;
 : CHAR+ 1 CHARS + ;
 
+: INVERT -1 xor ;
+: NOT 0= ;
+
 : 2! ( x1 x2 a-addr -- ) dup >r   !   r> cell+ ! ;
 : 2@ ( a-addr -- x1 x2 ) dup cell+ @ swap @ ;
 : 2* ( x -- x ) 1 LSHIFT ;
-: 2/ ( x -- x ) 2 / ;
+: 2/ ( x -- x ) -1 1 rshift invert ( x msb ) over and   swap 1 rshift  or ;
 
 : > ( a b -- ? ) swap < ;
 : <= ( a b -- ? ) 2dup = -rot   < or ;
@@ -44,9 +47,6 @@
 : 0>= 0 >= ;
 
 : NEGATE ( n -- n ) 0 swap - ;
-
-: INVERT -1 xor ;
-: NOT 0= ;
 
 : +! ( delta a-addr -- )
   dup @ ( delta a-addr value )
@@ -271,7 +271,7 @@ VARIABLE (loop-top)
 
 \ Turns a two-cell string into a counted string.
 \ The new string is in a transient region!
-: UNCOUNT ( c-addr u -- c-addr ) dup here c!   here 1+ swap move ;
+: UNCOUNT ( c-addr u -- c-addr ) dup here c!   here 1+ swap move   here ;
 
 : WORD ( char "<chars>ccc<char>" -- c-addr )
   BEGIN dup parse ( char c-addr u ) dup 0= WHILE 2drop REPEAT ( char c-addr u )
@@ -291,9 +291,14 @@ VARIABLE (loop-top)
 
 
 \ Awkward double-cell calculations.
-: (C+!) ( char c-addr -- ) swap over ( a c a ) C@ + ( a c')   255 and   swap C! ;
+: (C+!) ( char c-addr -- )
+  swap over ( a c a )
+  C@ + ( a c')
+  2dup 255 and swap c! ( a c' )
+  8 rshift dup IF swap 1+ recurse ELSE 2drop THEN
+;
 
-HERE 2 cells allot CONSTANT (M*RES)
+HERE 3 cells allot CONSTANT (M*RES)
 : UM* ( u1 u2 -- ud )
   \ First, write all 0s into the result buffer.
   2 cells 0 DO 0 (m*res) i + c! LOOP
@@ -311,7 +316,7 @@ HERE 2 cells allot CONSTANT (M*RES)
       R> -rot ( n1 n2 b1 res lo )
       i j + (m*res) + ( n1 n2 b1 res lo c-addr )
       (C+!) ( n1 n2 b1 res )
-      8 rshift 255 and ( n1 n2 b1 carry   )
+      8 rshift ( n1 n2 b1 carry )
     LOOP
     1 cells i + (m*res) + (C+!) ( n1 n2 b1 )
     drop ( n1 n2 )
@@ -324,12 +329,6 @@ HERE 2 cells allot CONSTANT (M*RES)
   0 1 cells 0 DO i 1 cells +   (m*res) + c@   i 8 * lshift   + LOOP
 ;
 
-: M* ( n1 n2 -- d )
-  over 0< over 0< xor >R
-  abs swap abs swap UM*
-  R> IF negate swap negate swap THEN
-;
-
 \ Some helpers for working with halfsize integers.
 1 cells 2 / (address-unit-bits) * CONSTANT (HALF-WIDTH)
 0 invert (half-width) rshift CONSTANT (HALF-MASK)
@@ -339,6 +338,47 @@ HERE 2 cells allot CONSTANT (M*RES)
 \ Hi on top, like a double-cell value.
 : (half-split) ( u -- uh1 uh2 ) dup (lo) swap (hi) ;
 : (half-join) ( uh1 uh2 -- u ) (half-width) lshift   or ;
+
+VARIABLE (UM-A)
+VARIABLE (UM-B)
+VARIABLE (UM-L) \ Answer, low part.
+\ High part is not needed to be stored.
+
+\ Second attempt: Long multiplication on four half-cells.
+: UM* ( u1 u2 -- ud )
+  over (UM-A) !
+  dup  (UM-B) ! ( u1 u2 )
+  (lo) swap (lo) ( 2l 1l )
+  * dup (lo) (UM-L) ! (hi) ( carry )
+
+  (UM-A) @ (lo)
+  (UM-B) @ (hi)
+  * + ( full )
+  (UM-A) @ (hi)
+  (UM-B) @ (lo)
+  * + ( full )
+  dup (lo) (half-width) lshift (UM-L) @ + ( carry lo )
+  swap (hi) ( lo carry )
+
+  (UM-A) @ (hi)
+  (UM-B) @ (hi)
+  * + ( ans )
+;
+
+
+\ Invert and add 1, but in a double-cell way.
+: DNEGATE ( d1 -- d2 )
+  invert swap invert ( hi' lo' )
+  1+ \ Now if that made the lo part 0, we need to carry.
+  swap ( lo' hi' )
+  over 0= IF 1+ THEN
+;
+
+: M* ( n1 n2 -- d )
+  over 0< over 0< xor >R
+  abs swap abs swap UM*
+  R> IF dnegate THEN
+;
 
 \ Works in half-size parts.
 : UM/MOD ( ud u1 -- u2-r u3-q )
@@ -356,14 +396,6 @@ HERE 2 cells allot CONSTANT (M*RES)
   >R (half-join) R> ( temp d   R: qh )
   /mod ( r ql  R: qh )
   R> (half-join) ( r q )
-;
-
-\ Invert and add 1, but in a double-cell way.
-: DNEGATE ( d1 -- d2 )
-  invert swap invert ( hi' lo' )
-  1+ \ Now if that made the lo part 0, we need to carry.
-  swap ( lo' hi' )
-  over 0= IF 1+ THEN
 ;
 
 : (DIV-CORE) ( d n -- u u dividend-neg? divisor-neg? differ? )
@@ -433,31 +465,38 @@ VARIABLE (picout)
 : (#HOLD) ( n -- c-addr len ) <# dup abs S>D #S rot sign #> ;
 : .  (#HOLD) type space ;
 
-\ Helper that compares strings.
-: (S=) ( c-addr1 u1 c-addr2 u2 -- ? )
-  rot 2dup = NOT IF 2drop 2drop 0 EXIT THEN
-  drop ( c-addr1 c-addr2 u )
-  0 DO
-    over i + c@
-    over i + c@
-    = NOT IF 2drop 0 UNLOOP EXIT THEN
+\ Helper that compares strings. From the STRING word list.
+: COMPARE ( c-addr1 u1 c-addr2 u2 -- n )
+  rot 2dup = >R 2dup > >R    min   ( c1 c2 min   R: same? 1smaller? )
+  0 DO ( c1 c2 )
+    over i + c@   over i + c@ ( c1 c2 b1 b2 )
+    2dup = not IF
+      > >R 2drop R>
+      IF 1 ELSE -1 THEN
+      UNLOOP R> R> 2drop EXIT
+    THEN
+    2drop
   LOOP
-  2drop -1
+  2drop ( R: same? 1smaller? )
+  R> R> ( 1smaller? same? )
+  IF drop 0 ELSE IF -1 ELSE 1 THEN THEN
 ;
 
 : ENVIRONMENT? ( c-addr u -- i*x true | false )
-  2dup S" /COUNTED-STRING" (S=) IF 2drop 255 -1 EXIT THEN
-  2dup S" /HOLD"           (S=) IF 2drop 256 -1 EXIT THEN
-  2dup S" /PAD"            (S=) IF 2drop 1024 -1 EXIT THEN
-  2dup S" ADDRESS-UNIT-BITS" (S=) IF 2drop (address-unit-bits) -1 EXIT THEN
-  2dup S" FLOORED" (S=) IF 2drop 0 -1 EXIT THEN
-  2dup S" MAX-CHAR" (S=) IF 2drop 255 -1 EXIT THEN
-  2dup S" MAX-D" (S=) IF 2drop -1 -1 1 rshift  -1 EXIT THEN
-  2dup S" MAX-N" (S=) IF 2drop -1 1 rshift   -1 EXIT THEN
-  2dup S" MAX-U" (S=) IF 2drop -1 -1 EXIT THEN
-  2dup S" MAX-UD" (S=) IF 2drop -1 -1 -1 EXIT THEN
-  2dup S" RETURN-STACK-CELLS" (S=) IF 2drop (return-stack-cells) -1 EXIT THEN
-  2dup S" STACK-CELLS" (S=) IF 2drop (stack-cells) -1 EXIT THEN
+  2dup S" /COUNTED-STRING" compare 0= IF 2drop 255 -1 EXIT THEN
+  2dup S" /HOLD"           compare 0= IF 2drop 256 -1 EXIT THEN
+  2dup S" /PAD"            compare 0= IF 2drop 1024 -1 EXIT THEN
+  2dup S" ADDRESS-UNIT-BITS" compare 0= IF
+      2drop (address-unit-bits) -1 EXIT THEN
+  2dup S" FLOORED" compare 0= IF 2drop 0 -1 EXIT THEN
+  2dup S" MAX-CHAR" compare 0= IF 2drop 255 -1 EXIT THEN
+  2dup S" MAX-D" compare 0= IF 2drop -1 -1 1 rshift  -1 EXIT THEN
+  2dup S" MAX-N" compare 0= IF 2drop -1 1 rshift   -1 EXIT THEN
+  2dup S" MAX-U" compare 0= IF 2drop -1 -1 EXIT THEN
+  2dup S" MAX-UD" compare 0= IF 2drop -1 -1 -1 EXIT THEN
+  2dup S" RETURN-STACK-CELLS" compare 0= IF
+      2drop (return-stack-cells) -1 EXIT THEN
+  2dup S" STACK-CELLS" compare 0= IF 2drop (stack-cells) -1 EXIT THEN
   2drop 0
 ;
 
