@@ -451,7 +451,7 @@ VARIABLE (picout)
   R> ( dq )
 ;
 : #S
-  2dup or 0= IF [char] 0 emit EXIT THEN \ Special case for 0.
+  2dup or 0= IF [char] 0 hold EXIT THEN \ Special case for 0.
   BEGIN 2dup or WHILE # REPEAT
 ;
 : #> 2drop (picout) @ (picout-top) over - ( c-addr len ) ;
