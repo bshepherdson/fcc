@@ -70,6 +70,8 @@ typedef unsigned char bool;
 
 typedef void code(void);
 
+// Remember to update WORDS in the tools word set if the format of the
+// dictionary or individual headers within it changes.
 typedef struct header_ {
   struct header_ *link;
   cell metadata; // See below.
