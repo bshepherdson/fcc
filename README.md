@@ -139,39 +139,68 @@ As required in Section 4.1.1, and appearing in the same order.
 
 General conditions, in the same order as Section 4.1.2.
 
-- When a name is neither a valid definition name nor a valid number, the error
-  message `*** Unrecognized word: xyz` is written to the standard error stream.
-- When a definition name is too long (more than 255 bytes) it might be
-  considered immediate or hidden wrongly. Results will be unpredictable.
-    - TODO: That could be checked.
-- Addressing outside the data space might work normally, might segfault (or
-  similar) or might do something else (bus errors, maybe).
-- Types are not checked, and most types (eg. flags) are cell-sized integers.
-  Passing wrong types therefore might result in odd behavior, but not in a
-  checked type error.
-- Asking for the `xt` of a word without interpretation semantics generally
-  will return an `xt`, but executing it will be ambiguous.
-- Dividing by zero will cause a system exception and exit FCC.
+- A *name* is neither a valid definition name nor a valid number during text
+  interpretation (3.4)
+    - The error message `*** Unrecognized word: xyz` is written to the standard
+      error stream.
+- A definition name exceeded the maximum length allowed (3.3.1.2)
+    - When a definition name is too long (more than 255 bytes) it might be
+      considered immediate or hidden wrongly. Results will be unpredictable.
+    - TODO: This error case could be checked and reported nicely.
+- Addressing a region not listed in 3.3.3 Data space
+    - Addressing outside the data space might work normally, might segfault
+      (or similar) or might do something else (bus errors, maybe).
+    - In other words, memory accesses are native system memory accesses, and
+      trigger system errors.
+- Argument type incompatible with the specified input parameter (3.1)
+    - Types are not checked, and most types (eg. flags) are cell-sized
+      integers.
+    - Passing wrong types therefore might result in odd behavior, but not in a
+      checked type error.
+- Attempting to obtain the execution token of a definition with undefined
+  interpretation semantics
+    - Asking for the `xt` of a word without interpretation semantics generally
+      will return an `xt`, but executing it will be an ambiguous condition
+      (probably a segfault).
+- Dividing by zero
+    - Dividing by zero will cause a system exception and exit FCC.
     - TODO: Catch and handle that more gracefully, probably by `QUIT`ting.
-- Stack overflows might cause a segfault (or similar) but might also overwrite
-  other memory.
-- Loop-control parameters are on the return stack, so see above.
-- The dictionary headers and data space are the same block. The portable C
-  version `malloc()`s 4 megabytes by default; overflowing it will probably cause
-  a segfault or similar.
-- Interpreting a word with undefined interpretation semantics (like `IF` or
-  `WHILE`) will usually consume and/or add junk on the stack, may read or write
-  memory unpredictably, and therefore may cause a segfault.
-- Modifying the input buffer is not formally supported, but it will work
-  as one would expect: the edited text is what gets parsed. Likewise, editing
-  string literals should work sanely, though it's not formally supported.
-- Pictured numeric output uses data space after `HERE`, so overflow is unlikely
-  (and described above).
-- Parsed strings are dynamically allocated by `readline`, so overflow there is
-  usually impossible (other than exhausting the system RAM). A maximum of 256
-  bytes of each input line are copied to the parse buffer, so no overflow is
-  possible there.
-- Out-of-range results are treated like any arithmetic overflow.
+- Insufficient data-stack space or return-stack space (stack overflow)
+    - Stack overflows might cause a segfault (or similar) but might also
+      overwrite other memory.
+- Insufficient space for loop-control parameters
+    - Loop-control parameters are on the return stack, so see above.
+- Insufficient space in the dictionary
+    - The dictionary headers and data space are the same block. The portable C
+      version `malloc()`s 4 megabytes by default; overflowing it will probably
+      cause a segfault or similar.
+    - TODO: Make `ALLOT` check this condition and allocate more space when
+      possible.
+- Interpreting a word with undefined interpretation semantics
+    - Interpreting a word with undefined interpretation semantics (like `IF` or
+      `WHILE`) will usually consume and/or add junk on the stack, and may read
+      or write memory unpredictably, and therefore may cause a segfault.
+- Modifying the contents of the input buffer or a string literal (3.3.3.4,
+  3.3.3.5)
+    - Modifying the input buffer is not formally supported, but it will work
+      as one would expect: the edited text is what gets parsed. Likewise,
+      editing string literals should work sanely, though it's not formally
+      supported.
+- Overflow of a pictured numeric output string
+    - Pictured numeric output uses data space after `HERE`, so overflow is
+      unlikely (and described above).
+- Parsed string overflow
+    - Parsed strings are dynamically allocated by `readline`, so overflow there
+      is usually impossible (other than exhausting the system RAM). A maximum
+      of 256 bytes of each input line are copied to the Forth parse buffer, so
+      no overflow is possible there.
+- Producing a result out of range
+    - Out-of-range results are treated like any arithmetic overflow. Usually
+      that means the result is truncated to fit in a cell.
+- Reading from an empty data stack or return stack (stack underflow)
+    - Not checked. Might return nonsense results, or might cause a segfault.
+
+
 - `:` checks that the definition name has nonzero length, and outputs `*** Colon
   definition with no name` to standard error if a 0 length is found. `CREATE`
   and others do not check, and will compile a word with a 0-length name, which
@@ -180,53 +209,83 @@ General conditions, in the same order as Section 4.1.2.
 
 Conditions specific to particular words, in the same order as Section 4.1.2.
 
-- `>IN` being greater than the parse length should be handled as though it were
-  equal to the parse length, ie. as an empty parse area.
-- `RECURSE` after `DOES>` is unknown.
-- `RESTORE-INPUT` is not implemented.
-- De-allocating space containing definitions will do nothing in the near term -
-  the latest-definition pointer is unchanged, and the definitions still exist.
-  However, when anything is written to data space, including a new definition,
-  the dictionary's linked list will be broken, with unpredictable results
-  (probably an infinite loop, but maybe not).
-- Reading and writing from unaligned addresses might work normally, but might
-  also cause a bus error or other system error. It depends on the platform and
-  machine.
-- A misaligned data pointer in `,`, `C,` etc. is the same as above. This
-  condition is not checked.
-- `PICK` and `ROLL` with too few stack items is likely to cause a segmentation
-  fault, but might read/write other memory at random.
-- Loop-control parameters go on the return stack at runtime. If that stack has
-  changed, then both the loop and returning will be broken unpredictably.
-- `IMMEDIATE` works whether the previous definition has a name or not.
-- `TO` without a following name will emit an error message, and continue.
-- `'`, `POSTPONE`, and `[']` all return/compile an `xt` of `0` if the word is
-  not found. `[COMPILE]` is obsolete, and not implemented.
-    - TODO: They should check that, probably.
-- Parameter mismatch to `DO`, `DO?`, and `WITHIN` is ambiguous. It's unchecked,
-  and unknown what might happen.
-- Attempting to get the `xt` of `TO` (with `'`, `POSTPONE` or `[']`) should
-  succeed silently. Executing that `xt` is ambiguous.
-- If `WORD` returns a string too long for a counted string (255 characters), the
-  length will be reduced modulo 256.
-- Shifting by more than the width of a word will probably result in 0,
-  harmlessly.
-- `>BODY` for words not defined by `CREATE` will return the address of the
-  second cell after their code field. Harmless, but not useful in general.
-  `DOES>` for words not defined by `CREATE` will overwrite the cell 2 cells
-  after the code field, which might be any other data.
-- Using the pictured numeric output words outside `<#` `#>` will cause
-  unpredictable results, and usually mangle parts of the stack and write into
-  data space after `HERE`.
-- Words defined with `DEFER` which are accessed before being assigned an `xt`
-  will attempt to `EXECUTE` with `0` as the CFA, which is a segfault.
-- Accessing a non-deferred word like a deferred word will treat it like a
-  variable; that is, the first cell after its code field will be read and
-  written.
-    - TODO This could be checked, I guess?
-- Applying `'`, `[']` or `POSTPONE` to `ACTION-OF` or `IS` will probably work
-  normally. Those words are pretty ordinary (immediate) words.
-- `S\"` is not supported.
+- `>IN` greater than size of input buffer (3.4.1)
+    - Should be handled as though it were equal to the parse length, ie. as an
+      empty parse area.
+- `RECURSE` appears after `DOES>`
+    - Unknown. Probably a segfault or infinite loop.
+- argument input source different than current input source for `RESTORE-INPUT`
+    - `RESTORE-INPUT` is not implemented.
+- Data space containing definition is de-allocated (3.3.3.2)
+    - De-allocating space containing definitions will do nothing in the near
+      term - the latest-definition pointer is unchanged, and the definitions
+      still exist.
+      However, when anything is written to data space, including a new
+      definition, the dictionary's linked list will be broken, with
+      unpredictable results (probably an infinite loop, but maybe not).
+- Data space read/write with incorrect alignment (3.3.3.1)
+    - Reading and writing from unaligned addresses might work normally, but
+      might also cause a bus error or other system error. It depends on the
+      operating system and architecture.
+- Data-space pointer not properly aligned for `C,` or `,`
+    - A misaligned data pointer in `,`, `C,` etc. is the same as above. This
+      condition is not checked.
+    - TODO: `,` could check this and give a good error message.
+- Less than u+2 stack items with `PICK` and `ROLL`
+    - `PICK` and `ROLL` with too few stack items is likely to cause a
+      segmentation fault (see stack underflow), but might read/write other
+      memory at random.
+- Loop-control parameters not available (`+LOOP`, `I`, `J`, `LEAVE`, `LOOP`,
+  `UNLOOP`)
+    - Loop-control parameters go on the return stack at runtime. If that stack
+      has changed, then both the loop and returning will be broken
+      unpredictably.
+- Most recent definition does not have a *name* (`IMMEDIATE`)
+    - `IMMEDIATE` works whether the previous definition has a name or not.
+- `TO` not followed directly by a *name* defined by a word with "`TO` *name*
+  runtime" semantics (`VALUE`, `(LOCAL)`)
+    - `TO` without a following name will emit an error message, do nothing, and
+      continue.
+- *name* not found (`'`, `POSTPONE`, `[']`, `[COMPILE]`)
+    - An `xt` of `0` is silently returned. That will segfault if passed to
+      `EXECUTE` or compiled into a definition which is later executed.
+    - (`[COMPILE]` is obsolete and not implemented.)
+    - TODO: This condition is easily checked.
+- Parameters are not of the same type (`DO`, `?DO`, `WITHIN`)
+    - Parameter mismatch to `DO`, `DO?`, and `WITHIN` is ambiguous. It's
+      unchecked, and unknown what might happen.
+- `POSTPONE`, `'` or `[']` is applied to `TO`
+    - Attempting to get the `xt` of `TO` (with `'`, `POSTPONE` or `[']`) should
+      succeed silently. Executing that `xt` is ambiguous (probably segfault).
+- String longer than a counted string returned by `WORD`
+    - Lengths longer than 255 will be reduced modulo 256.
+- *u* greater than or equal to the number of bits in a cell (`LSHIFT`, `RSHIFT`)
+    - Shifting by more than the width of a word will probably result in 0,
+      harmlessly.
+    - That might not be true on architectures that handle arithmetic overflows
+      with errors rather than truncating to fit in a cell.
+- word not defined via `CREATE` in `>BODY`, `>DOES`
+    - `>BODY` for words not defined by `CREATE` will return the address of the
+      second cell after their code field. Harmless, but not useful in general.
+    - `DOES>` for words not defined by `CREATE` will overwrite the cell 2 cells
+      after the code field, which might be any other data, like the start of the
+      next word.
+- Pictured numeric output words improperly used outside `<#` and `#>`
+    - Unpredicable in general. Usually, this will mangle the top few cells on
+      the stack, and write into data space after `HERE`.
+- Access to a deferrred word which has yet to be assigned to an *xt*
+    - Attempts to deference `0`, causing a segfault.
+- Accessing a non-deferred word like it was deferred
+    - Generally will treat the word like a variable. That is, the first cell
+      after its code field will be read and written.
+    - TODO This could be checked, probably.
+- `POSTPONE`, `'` or `[']` to `ACTION-OF` or `IS`
+    - Will probably work normally. `ACTION-OF` and `IS` are pretty ordinary
+      (immediate) words.
+- `\x` is not followed by two hexadecimal characters (`S\"`)
+    - `S\"` is not supported.
+- a `\` is placed before any character other than those defined in `S\"`
+    - `S\"` is not supported.
 
 
 ### Other Documentation
