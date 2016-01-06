@@ -824,7 +824,7 @@ WORD(rp_store, "RP!", 3, &header_rp_fetch) {
 
 WORD(dot_s, ".S", 2, &header_rp_store) {
   PRINT_TRACE(".S");
-  printf("[%lu] ", (cell) (((char*) spTop) - ((char*) sp)) / sizeof(cell));
+  printf("[%" PRIdPTR "] ", (cell) (((char*) spTop) - ((char*) sp)) / sizeof(cell));
   for (c1 = (cell) (&spTop[-1]); c1 >= (cell) sp; c1 -= sizeof(cell*)) {
     printf("%" PRIdPTR " ", *((cell*) c1));
   }
