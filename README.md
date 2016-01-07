@@ -66,7 +66,12 @@ Providing the Tools word set.
 
 Providing `AHEAD`, `SYNONYM`, `N>R`, `NR>`, `[DEFINED]`, and `[UNDEFINED]` from
 the Tools Extensions word set.
-`
+
+### Facility
+
+Providing `+FIELD`, `BEGIN-STRUCTURE`, `CFIELD:`, `END-STRUCTURE`, and `FIELD:`
+from the Facility Extensions word set.
+
 ### Implementation-defined Options
 
 As required in Section 4.1.1, and appearing in the same order.

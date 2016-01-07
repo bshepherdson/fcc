@@ -16,6 +16,7 @@
 // To add a new external file, it should be sufficient to add it here.
 // NB: THESE ARE IN REVERSE ORDER. The bottom-most is loaded first!
 #define EXTERNAL_FILES(F) \
+  F(facility) \
   F(tools) \
   F(exception) \
   F(ext) \
