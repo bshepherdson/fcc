@@ -5,7 +5,9 @@
 #include <inttypes.h>
 #include <limits.h>
 #include <unistd.h>
+#include <errno.h>
 #include <termios.h>
+#include <sys/stat.h>
 
 #include <readline/readline.h>
 //#include <readline/history.h>
@@ -16,6 +18,7 @@
 // To add a new external file, it should be sufficient to add it here.
 // NB: THESE ARE IN REVERSE ORDER. The bottom-most is loaded first!
 #define EXTERNAL_FILES(F) \
+  F(file) \
   F(facility) \
   F(tools) \
   F(exception) \
@@ -135,6 +138,7 @@ size_t tempSize;
 header* tempHeader;
 char tempBuf[256];
 FILE* tempFile;
+struct stat tempStat;
 
 struct termios old_tio, new_tio;
 
@@ -949,7 +953,184 @@ WORD(bye, "BYE", 3, &header_quit) {
   exit(0);
 }
 
-WORD(colon, ":", 1, &header_bye) {
+
+// File Access
+// Access modes are defined as in the following constants, so they can be
+// manipulated in Forth safely.
+#define FA_READ (1)
+#define FA_WRITE (2)
+#define FA_BIN (4)
+#define FA_TRUNC (8)
+
+WORD(close_file, "CLOSE-FILE", 10, &header_bye) {
+  c1 = (cell) fclose((FILE*) sp[0]);
+  sp[0] = c1 ? errno : 0;
+  NEXT;
+}
+
+char *file_modes[16] = {
+  NULL,  // 0 = none
+  "r",   // 1 = read, no-truncate
+  "r+",  // 2 = write-only, no-truncate
+  "r+",  // 3 = read/write, no-truncate
+  NULL,  // 4 = bin only, busted.
+  "rb",  // 5 = read-only, bin, no-truncate
+  "r+b", // 6 = write-only, bin, no-truncate
+  "r+b", // 7 = read/write, bin, no-truncate
+  NULL,  // 8 = truncate only, busted.
+  "w+",  // 9 = read-only, truncated
+  "w",   // 10 = write-only, truncated
+  "w+",  // 11 = read/write, truncated
+  NULL,  // 12 = bin|trunc, but no main mode
+  "w+b", // 13 = read-only, bin, truncated
+  "wb",  // 14 = write-only, bin, truncated
+  "w+b" // 15 = read/write, bin, truncated
+};
+
+WORD(create_file, "CREATE-FILE", 11, &header_close_file) {
+  strncpy(tempBuf, (char*) sp[2], sp[1]);
+  tempBuf[sp[1]] = '\0';
+  sp++;
+  sp[1] = (cell) fopen(tempBuf, file_modes[sp[0] | FA_TRUNC]);
+  sp[0] = sp[1] == 0 ? errno : 0;
+  NEXT;
+}
+
+WORD(open_file, "OPEN-FILE", 9, &header_create_file) {
+  strncpy(tempBuf, (char*) sp[1], sp[1]);
+  tempBuf[sp[1]] = '\0';
+  sp++;
+  sp[1] = (cell) fopen(tempBuf, file_modes[sp[0]]);
+  sp[0] = sp[1] == 0 ? errno : 0;
+  NEXT;
+}
+
+WORD(delete_file, "DELETE-FILE", 11, &header_open_file) {
+  strncpy(tempBuf, (char*) sp[1], sp[0]);
+  tempBuf[sp[0]] = '\0';
+  sp++;
+  sp[0] = remove(tempBuf);
+  if (sp[0] == -1) sp[0] = errno;
+  NEXT;
+}
+
+WORD(file_position, "FILE-POSITION", 13, &header_delete_file) {
+  sp -= 2;
+  sp[1] = 0;
+  sp[2] = lseek(fileno((FILE*) sp[2]), 0L, SEEK_CUR);
+  sp[0] = sp[2] == -1 ? errno : 0;
+  NEXT;
+}
+
+WORD(file_size, "FILE-SIZE", 9, &header_file_position) {
+  sp -= 2;
+  sp[1] = 0;
+  sp[0] = fstat(fileno((FILE*) sp[2]), &tempStat);
+  if (sp[0] == 0) {
+    sp[2] = tempStat.st_size;
+  } else {
+    sp[2] = 0;
+    sp[0] = errno;
+  }
+  NEXT;
+}
+
+WORD(include_file, "INCLUDE-FILE", 12, &header_file_size) {
+  inputIndex++;
+  SRC.type = *(sp++);
+  SRC.inputPtr = 0;
+  SRC.parseLength = 0;
+  NEXT;
+}
+
+WORD(included, "INCLUDED", 8, &header_include_file) {
+  strncpy(tempBuf, (char*) sp[1], sp[0]);
+  tempBuf[sp[0]] = '\0';
+  sp += 2;
+  inputIndex++;
+  SRC.type = (cell) tempBuf;
+  SRC.inputPtr = 0;
+  SRC.parseLength = 0;
+  NEXT;
+}
+
+WORD(read_file, "READ-FILE", 9, &header_included) {
+  c1 = (cell) fread((void*) sp[2], 1, sp[1], (FILE*) sp[0]);
+  if (c1 == 0) {
+    if (feof((FILE*) sp[0])) {
+      sp++;
+      sp[0] = 0;
+      sp[1] = 0;
+    } else {
+      sp[1] = ferror((FILE*) sp[0]);
+      sp[2] = 0;
+      sp++;
+    }
+  } else {
+    sp++;
+    sp[1] = c1;
+    sp[0] = 0;
+  }
+  NEXT;
+}
+
+WORD(read_line, "READ-LINE", 9, &header_read_file) {
+  str1 = NULL;
+  tempSize = 0;
+  c1 = getline(&str1, &tempSize, (FILE*) sp[0]);
+  if (c1 == -1) {
+    sp[0] = errno;
+    sp[2] = 0;
+    sp[1] = 0;
+  } else if (c1 == 0) {
+    sp[0] = 0;
+    sp[1] = 0;
+    sp[2] = 0;
+  } else {
+    strncpy((char*) sp[2], str1, c1);
+    sp[0] = 0;
+    sp[1] = true;
+    sp[2] = c1;
+  }
+
+  if (str1 != NULL) free(str1);
+  NEXT;
+}
+
+WORD(reposition_file, "REPOSITION-FILE", 15, &header_read_line) {
+  sp[2] = fseek((FILE*) sp[0], sp[2], SEEK_SET);
+  sp += 2;
+  if (sp[0] == -1) sp[0] = errno;
+  NEXT;
+}
+
+WORD(resize_file, "RESIZE-FILE", 11, &header_reposition_file) {
+  sp[2] = ftruncate(fileno((FILE*) sp[0]), sp[2]);
+  sp += 2;
+  sp[0] = sp[0] == -1 ? errno : 0;
+  NEXT;
+}
+
+WORD(write_file, "WRITE-FILE", 10, &header_resize_file) {
+  c1 = fwrite((void*) sp[2], 1, sp[1], (FILE*) sp[0]);
+  sp += 2;
+  sp[0] = 0;
+  NEXT;
+}
+
+WORD(write_line, "WRITE-LINE", 10, &header_write_file) {
+  c1 = fwrite((void*) sp[2], 1, sp[1], (FILE*) sp[0]);
+  tempBuf[0] = '\n';
+  c1 = fwrite((void*) tempBuf, 1, 1, (FILE*) sp[0]);
+  sp += 2;
+  sp[0] = 0;
+  NEXT;
+}
+
+
+// And back to core.
+
+WORD(colon, ":", 1, &header_write_line) {
   PRINT_TRACE(":");
   tempHeader = (header*) dsp.chars;
   dsp.chars += sizeof(header);

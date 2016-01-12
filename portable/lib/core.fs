@@ -255,14 +255,38 @@ VARIABLE (loop-top)
   IF literal ELSE ABORT THEN
 ; IMMEDIATE
 
+VARIABLE (string-buffer-index)
+8 CONSTANT (string-buffer-count)
+0 (string-buffer-index) !
+
+here 8 cells allot CONSTANT (string-buffer-lengths)
+here 256 8 * chars allot CONSTANT (string-buffers)
+
 : S"
-  [CHAR] " parse
-  ['] (dostring) compile, dup c, ( c-addr u )
-  here swap ( c-addr here u )
-  dup >R
-  move ( )
-  R> allot
-  align
+  [CHAR] " parse ( c-addr u )
+  state @ IF
+    ['] (dostring) compile, dup c, ( c-addr u )
+    here swap ( c-addr here u )
+    dup >R
+    move ( )
+    R> allot
+    align
+  ELSE
+    >R ( c-addr   R: u )
+    (string-buffer-index) @ ( c-addr i )
+    dup cells (string-buffer-lengths) + ( c-addr i *len )
+    R@ swap ! ( c-addr i   R: u )
+    256 * chars (string-buffers) + ( src dst   R: u )
+    R> move ( )
+
+    (string-buffer-index) @ ( i )
+    dup 256 * chars (string-buffers) + ( i c-addr )
+    swap cells (string-buffer-lengths) + @ ( c-addr u )
+
+    (string-buffer-index) @ 1 +
+    (string-buffer-count) 1- and
+    (string-buffer-index) !
+  THEN
 ; IMMEDIATE
 
 : ." postpone S" ['] type compile, ; IMMEDIATE
