@@ -363,6 +363,18 @@ HERE 3 cells allot CONSTANT (M*RES)
 : (half-split) ( u -- uh1 uh2 ) dup (lo) swap (hi) ;
 : (half-join) ( uh1 uh2 -- u ) (half-width) lshift   or ;
 
+\ Splits two single-cell numbers into half-cells, and adds them to produce a
+\ double-cell number.
+: (2+) ( a b -- lo hi )
+  over (lo) over (lo) ( a b al bl )
+  + dup (lo) >R ( a b al+bl   R: ans_lo )
+  (hi) ( a b carry )
+
+  >R (hi) swap (hi) + R> + ( ans_hi   R: ans_lo )
+  dup (lo) (half-width) lshift R> or ( ans_hi lo )
+  swap (hi) ( lo hi )
+;
+
 VARIABLE (UM-A)
 VARIABLE (UM-B)
 VARIABLE (UM-L) \ Answer, low part.
@@ -380,13 +392,15 @@ VARIABLE (UM-L) \ Answer, low part.
   * + ( full )
   (UM-A) @ (hi)
   (UM-B) @ (lo)
-  * + ( full )
-  dup (lo) (half-width) lshift (UM-L) @ + ( carry lo )
-  swap (hi) ( lo carry )
+  * (2+) ( lo hi ) \ 2-cell sum
+
+  over (lo) (half-width) lshift (um-l) @ or ( sum_lo sum_hi lo )
+  >R swap (hi) swap (half-width) lshift or R> ( carry lo )
+  swap ( lo carry )
 
   (UM-A) @ (hi)
   (UM-B) @ (hi)
-  * + ( ans )
+  * + ( ans_lo ans_hi )
 ;
 
 

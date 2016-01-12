@@ -223,16 +223,29 @@ WORD(div, "/", 1, &header_times) {
   NEXT;
 }
 
-WORD(mod, "MOD", 3, &header_div) {
+WORD(udiv, "U/", 2, &header_div) {
+  PRINT_TRACE("U/");
+  sp[1] = (cell) (((ucell) sp[1]) / ((ucell) sp[0]));
+  sp++;
+  NEXT;
+}
+
+WORD(mod, "MOD", 3, &header_udiv) {
   PRINT_TRACE("MOD");
   sp[1] = sp[1] % sp[0];
   sp++;
   NEXT;
 }
 
+WORD(umod, "UMOD", 4, &header_mod) {
+  PRINT_TRACE("UMOD");
+  sp[1] = (cell) (((ucell) sp[1]) % ((ucell) sp[0]));
+  sp++;
+  NEXT;
+}
 
 // Bitwise ops
-WORD(and, "AND", 3, &header_mod) {
+WORD(and, "AND", 3, &header_umod) {
   PRINT_TRACE("AND");
   sp[1] = sp[1] & sp[0];
   sp++;
@@ -839,10 +852,20 @@ WORD(dot_s, ".S", 2, &header_rp_store) {
   NEXT;
 }
 
+WORD(u_dot_s, "U.S", 3, &header_dot_s) {
+  PRINT_TRACE("U.S");
+  printf("[%" PRIdPTR "] ", (cell) (((char*) spTop) - ((char*) sp)) / sizeof(cell));
+  for (c1 = (cell) (&spTop[-1]); c1 >= (cell) sp; c1 -= sizeof(cell*)) {
+    printf("%" PRIxPTR " ", *((cell*) c1));
+  }
+  printf("\n");
+  NEXT;
+}
+
 // File access
 // This is a hack included to support the assemblers and such.
 // It writes a block of bytes to a binary file.
-WORD(dump_file, "(DUMP-FILE)", 11, &header_dot_s) {
+WORD(dump_file, "(DUMP-FILE)", 11, &header_u_dot_s) {
   PRINT_TRACE("(DUMP-FILE)");
   // ( c-addr1 u1 c-addr2 u2 ) String on top (2) and binary data below (1)
   // Open the named file for truncated write-only.
