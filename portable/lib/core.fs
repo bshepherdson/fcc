@@ -41,6 +41,7 @@
 : > ( a b -- ? ) swap < ;
 : <= ( a b -- ? ) 2dup = -rot   < or ;
 : >= ( a b -- ? ) swap <= ;
+: U> ( a b -- ? ) 2dup swap U< >R   =   R> or ;
 
 : 0> 0 > ;
 : 0<= 0 <= ;
@@ -418,23 +419,61 @@ VARIABLE (UM-L) \ Answer, low part.
   R> IF dnegate THEN
 ;
 
-\ Works in half-size parts.
-: UM/MOD ( ud u1 -- u2-r u3-q )
-  \ Chop up the dividend into 16-bit pieces.
-  >R >R ( lo )
-  (half-split) R> (half-split) ( ll lh hl hh   R: d )
-  R@ /mod ( ll lh hl r q  R: d )
-  \ This is the high part of the high part of the quotient; discard it.
-  drop
-  (half-join) R@ /mod ( ll lh r q ) \ Still high quotient, discard.
-  drop
-  (half-join) R@ /mod ( ll r qh  R: d )
-  \ Juggle the high quotient part onto the return stack.
-  R> swap >R ( ll r d   R: qh )
-  >R (half-join) R> ( temp d   R: qh )
-  /mod ( r ql  R: qh )
-  R> (half-join) ( r q )
+\ Returns a given bit of a double-cell value, as a flag.
+1 cells (address-unit-bits) * CONSTANT (width)
+: (DBIT) ( ud u -- mask )
+  dup (width) >= IF rot drop (width) - ELSE swap drop THEN ( u bit )
+  rshift 1 and
 ;
+
+\ Uses binary long division.
+\ Not fast, but correct.
+VARIABLE (umd-q)
+VARIABLE (umd-div)
+
+: UM/MOD ( ud u -- r q )
+  (umd-div) ! \ Set aside the divisor, we rarely need it.
+  0 (umd-q) ! \ Initialize the quotient to 0.
+  0 0 ( dn drem )
+
+  0   2 (width) * 1 - DO
+    ( dn drem )
+    \ Shift the double-cell remainder up by 1.
+    1 lshift   over (width) 1- rshift 1 and or
+    >R 1 lshift R>
+
+    \ Find the ith bit of N, the dividend.
+    i -rot >R >R >R
+    2dup R> ( dn dn bit    R: drem )
+    (dbit)  ( dn mask     R: drem )
+    \ And marge it into bit 0 of the remainder.
+    R> ( dn mask drem_lo   R: drem_hi )
+    or ( dn drem_lo'   R: drem_hi )
+    R> ( dn drem' )
+
+    \ Now if the remainder exceeds the dividend, subtract and push to quotient.
+    \ There are two cases: either the hi portion is nonzero (since the divisor
+    \ is limited to 1 cell, that makes it smaler than the two-cell remainder),
+    \ or the lo portion is larger than the divisor on its own.
+    over (umd-div) @ u< 0= ( dn drem lo-larger? )
+    over or ( dn drem larger? )
+    IF ( dn drem )
+      dup IF \ nonzero high portion
+        drop
+        (umd-div) @
+        swap - negate
+        0
+      ELSE
+        >R (umd-div) @ - R>
+      THEN
+      i (width) < IF \ Only include this bit in the quotient if it fits.
+        1 i lshift (umd-q) @ or (umd-q) ! \ Set bit i in the quotient.
+      THEN
+    THEN
+  -1 +LOOP ( dn drem )
+  drop >R 2drop R> ( rem ) (umd-q) @ ( rem quot )
+;
+
 
 : (DIV-CORE) ( d n -- u u dividend-neg? divisor-neg? differ? )
   dup 0< ( d n divisor-neg? )

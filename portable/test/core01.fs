@@ -389,7 +389,6 @@ T{        3            0        2 UM/MOD -> 1        1 }T
 T{ MAX-UINT        2 UM*        2 UM/MOD -> 0 MAX-UINT }T
 T{ MAX-UINT        2 UM* MAX-UINT UM/MOD -> 0        2 }T
 T{ MAX-UINT MAX-UINT UM* MAX-UINT UM/MOD -> 0 MAX-UINT }T
-QUIT
 
 \ FM/MOD
 T{       0 S>D              1 FM/MOD ->  0       0 }T

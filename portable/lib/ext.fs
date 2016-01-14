@@ -65,8 +65,6 @@
 \ TODO Could make this real data eventually. Fake for now.
 : UNUSED ( -- u ) 100000000 ;
 
-: U> ( a b -- ? ) 2dup U< >R   =   R> or ;
-
 : VALUE constant ;
 : TO ( i*x "<spaces>name" -- )
   bl word find ( xt ? )
