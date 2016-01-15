@@ -108,10 +108,13 @@
 ; IMMEDIATE
 
 : BEGIN ( C: -- beginloc ) here ; IMMEDIATE
-: WHILE ( ? -- C: -- whileloc ) ['] (0branch) compile, here 0 , ; IMMEDIATE
-: REPEAT ( C: beginloc whileloc -- )
+: WHILE ( ? -- C: beginloc -- whileloc beginloc )
+  ['] (0branch) compile,
+  here swap 0 ,
+; IMMEDIATE
+: REPEAT ( C: whileloc beginloc -- )
   \ First, write the unconditional jump to the begin.
-  ['] (branch) compile, swap ( whileloc beginloc )
+  ['] (branch) compile,
   here - , ( whileloc )
   \ Then fill in the end location for the whileloc
   here over - swap ! ( )
@@ -321,7 +324,11 @@ here 256 8 * chars allot CONSTANT (string-buffers)
   dup 0= IF 2drop 0 ELSE rot drop THEN
 ;
 
-: RECURSE (latest) @ (>CFA) compile, ; IMMEDIATE
+VARIABLE (last-word)
+\ Redefine : to set (last-word)
+: : : (latest) @ (>CFA) (last-word) ! ;
+
+: RECURSE (last-word) @ compile, ; IMMEDIATE
 
 : ABS ( n -- u ) dup 0< IF negate THEN ;
 

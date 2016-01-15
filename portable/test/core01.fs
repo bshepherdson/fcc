@@ -744,13 +744,56 @@ T{ 6 GI3 -> 6 }T
 T{ : GI5 BEGIN DUP 2 > WHILE
       DUP 5 < WHILE DUP 1+ REPEAT
       123 ELSE 345 THEN ; -> }T
-bye
 T{ 1 GI5 -> 1 345 }T
-bye
 T{ 2 GI5 -> 2 345 }T
 T{ 3 GI5 -> 3 4 5 123 }T
 T{ 4 GI5 -> 4 5 123 }T
 T{ 5 GI5 -> 5 123 }T
+
+\ BEGIN UNTIL
+T{ : GI4 BEGIN DUP 1+ DUP 5 > UNTIL ; -> }T
+T{ 3 GI4 -> 3 4 5 6 }T
+T{ 5 GI4 -> 5 6 }T
+T{ 6 GI4 -> 6 7 }T
+
+\ RECURSE
+T{ : GI6 ( N -- 0,1,..N )
+     DUP IF DUP >R 1- RECURSE R> THEN ; -> }T
+T{ 0 GI6 -> 0 }T
+T{ 1 GI6 -> 0 1 }T
+T{ 2 GI6 -> 0 1 2 }T
+T{ 3 GI6 -> 0 1 2 3 }T
+T{ 4 GI6 -> 0 1 2 3 4 }T
+DECIMAL
+T{ :NONAME ( n -- 0, 1, .., n )
+     DUP IF DUP >R 1- RECURSE R> THEN
+   ;
+   CONSTANT rn1 -> }T
+T{ 0 rn1 EXECUTE -> 0 }T
+T{ 4 rn1 EXECUTE -> 0 1 2 3 4 }T
+
+:NONAME ( n -- n1 )
+   1- DUP
+   CASE 0 OF EXIT ENDOF
+     1 OF 11 SWAP RECURSE ENDOF
+     2 OF 22 SWAP RECURSE ENDOF
+     3 OF 33 SWAP RECURSE ENDOF
+     DROP ABS RECURSE EXIT
+   ENDCASE
+; CONSTANT rn2
+
+T{  1 rn2 EXECUTE -> 0 }T
+T{  2 rn2 EXECUTE -> 11 0 }T
+T{  4 rn2 EXECUTE -> 33 22 11 0 }T
+T{ 25 rn2 EXECUTE -> 33 22 11 0 }T
+
+
+\ DO I LOOP
+T{ : GD1 DO I LOOP ; -> }T
+T{          4        1 GD1 ->  1 2 3   }T
+T{          2       -1 GD1 -> -1 0 1   }T
+T{ MID-UINT+1 MID-UINT GD1 -> MID-UINT }T
+
 
 
 
