@@ -672,3 +672,85 @@ T{ GC2 -> 48 }T
 T{ : GC3 [ GC1 ] LITERAL ; -> }T
 T{ GC3 -> 58 }T
 
+\ S"
+T{ : GC4 S" XY" ; ->   }T
+T{ GC4 SWAP DROP  -> 2 }T
+T{ GC4 DROP DUP C@ SWAP CHAR+ C@ -> 58 59 }T
+: GC5 S" A String"2DROP ; \ There is no space between the " and 2DROP
+T{ GC5 -> }T
+
+
+\ Dictionary
+\ '
+T{ : GT1 123 ;   ->     }T
+T{ ' GT1 EXECUTE -> 123 }T
+
+\ [']
+T{ : GT2 ['] GT1 ; IMMEDIATE -> }T
+T{ GT2 EXECUTE -> 123 }T
+
+\ FIND
+HERE 3 C, CHAR G C, CHAR T C, CHAR 1 C, CONSTANT GT1STRING
+HERE 3 C, CHAR G C, CHAR T C, CHAR 2 C, CONSTANT GT2STRING
+T{ GT1STRING FIND -> ' GT1 -1 }T
+T{ GT2STRING FIND -> ' GT2 1  }T
+( HOW TO SEARCH FOR NON-EXISTENT WORD? )
+
+\ LITERAL
+T{ : GT3 GT2 LITERAL ; -> }T
+T{ GT3 -> ' GT1 }T
+
+\ COUNT
+T{ GT1STRING COUNT -> GT1STRING CHAR+ 3 }T
+
+\ POSTPONE
+T{ : GT4 POSTPONE GT1 ; IMMEDIATE -> }T
+T{ : GT5 GT4 ; -> }T
+T{ GT5 -> 123 }T
+T{ : GT6 345 ; IMMEDIATE -> }T
+T{ : GT7 POSTPONE GT6 ; -> }T
+T{ GT7 -> 345 }T
+
+\ STATE
+T{ : GT8 STATE @ ; IMMEDIATE -> }T
+T{ GT8 -> 0 }T
+T{ : GT9 GT8 LITERAL ; -> }T
+T{ GT9 0= -> <FALSE> }T
+
+
+
+\ Control flow
+
+\ IF ELSE THEN
+T{ : GI1 IF 123 THEN ; -> }T
+T{ : GI2 IF 123 ELSE 234 THEN ; -> }T
+T{  0 GI1 ->     }T
+T{  1 GI1 -> 123 }T
+T{ -1 GI1 -> 123 }T
+T{  0 GI2 -> 234 }T
+T{  1 GI2 -> 123 }T
+T{ -1 GI1 -> 123 }T
+\ Multiple ELSEs in an IF statement
+: melse IF 1 ELSE 2 ELSE 3 ELSE 4 ELSE 5 THEN ;
+T{ <FALSE> melse -> 2 4 }T
+T{ <TRUE>  melse -> 1 3 5 }T
+
+\ BEGIN WHILE REPEAT
+T{ : GI3 BEGIN DUP 5 < WHILE DUP 1+ REPEAT ; -> }T
+T{ 0 GI3 -> 0 1 2 3 4 5 }T
+T{ 4 GI3 -> 4 5 }T
+T{ 5 GI3 -> 5 }T
+T{ 6 GI3 -> 6 }T
+T{ : GI5 BEGIN DUP 2 > WHILE
+      DUP 5 < WHILE DUP 1+ REPEAT
+      123 ELSE 345 THEN ; -> }T
+bye
+T{ 1 GI5 -> 1 345 }T
+bye
+T{ 2 GI5 -> 2 345 }T
+T{ 3 GI5 -> 3 4 5 123 }T
+T{ 4 GI5 -> 4 5 123 }T
+T{ 5 GI5 -> 5 123 }T
+
+
+

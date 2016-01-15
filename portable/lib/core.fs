@@ -89,6 +89,10 @@
   [ ' (dolit) dup compile, , ] compile, ,
 ; IMMEDIATE
 
+\ Compiling counterpart to LITERAL. Compiles a (dolit) and then the value on top
+\ of the stack.
+: [LITERAL] ['] (dolit) compile, , ;
+
 
 \ Control structures.
 : IF ( ? --   C: -- jumploc ) ['] (0branch) compile,  HERE   0 , ; IMMEDIATE
@@ -131,7 +135,10 @@
   2drop
 ;
 
-: POSTPONE ( "<spaces>name" -- ) parse-name (find) drop compile, ; IMMEDIATE
+: POSTPONE ( "<spaces>name" -- )
+  parse-name (find)
+  1 = IF compile, ELSE [literal] ['] compile, compile, THEN
+; IMMEDIATE
 
 \ DOES> is tricky. It runs during compilation of a word like CONSTANT.
 \ It compiles code into CONSTANT, which will write the HERE address of the
@@ -155,10 +162,6 @@
   create cells allot
   DOES> swap cells +
 ;
-
-\ Compiling counterpart to LITERAL. Compiles a (dolit) and then the value on top
-\ of the stack.
-: [LITERAL] ['] (dolit) compile, , ;
 
 : HEX 16 base ! ;
 : DECIMAL 10 base ! ;
