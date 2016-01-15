@@ -503,7 +503,7 @@ VARIABLE (umd-div)
 : FM/MOD ( d n -- n n )
   (div-core) ( u u dividend-neg? divisor-neg? differ? )
   -rot >R >R >R ( u u    R: divisor-neg? dividend-neg? differ? )
-  R@ IF 1+ swap 1+ swap THEN ( u' u' R: divisor-neg? dividend-neg? differ? )
+  over R@ and IF 1+ swap 1+ swap THEN ( u' u' R: divisor-neg? dividend-neg? differ? )
   R> IF negate THEN \ Negate the quotient when the signs differ.
   R> drop
   R> IF swap negate swap THEN \ Negate the remainder when the divisor is neg.
