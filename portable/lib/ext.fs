@@ -24,7 +24,7 @@
 : ACTION-OF
   BL word find ( xt ? )
   <> ABORT" *** Unknown word in ACTION-OF"
-  state @ IF LITERAL THEN
+  state @ IF [LITERAL] THEN
 ; IMMEDIATE
 
 : DEFER! ( xt2 xt1 -- ) >body ! ;
@@ -33,7 +33,7 @@
 : IS ( xt "<spaces>name" -- )
   bl word find ( xt ? )
   0= IF ." Could not find word: " count type cr EXIT THEN
-  state @ IF LITERAL ['] defer! compile, ELSE defer! THEN
+  state @ IF [LITERAL] ['] defer! compile, ELSE defer! THEN
 ; IMMEDIATE
 
 
@@ -72,7 +72,7 @@
   bl word find ( xt ? )
   0= IF ." Could not find word: " count type cr EXIT THEN
   >body ( body-addr ) \ Convert the xt to the actual data pointer.
-  state @ IF LITERAL ['] ! compile, ELSE ! THEN
+  state @ IF [LITERAL] ['] ! compile, ELSE ! THEN
 ; IMMEDIATE
 
 

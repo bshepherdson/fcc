@@ -669,6 +669,6 @@ T{ GC1 -> 58 }T
 T{ GC2 -> 48 }T
 
 \ [ ]
-quit
 T{ : GC3 [ GC1 ] LITERAL ; -> }T
 T{ GC3 -> 58 }T
+

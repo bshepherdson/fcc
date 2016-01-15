@@ -78,9 +78,16 @@
 
 \ Unsafe ['], to be replaced below with a version using IF.
 : ' ( "name" -- xt ) parse-name (find) drop ;
+
 \ Compiles a literal into the current definition.
-: LITERAL ( x -- ) ( RT: -- x ) [ ' (dolit) dup compile, , ] compile, , ;
-: ['] ( "<spaces>name<space>" -- xt ) parse-name (find) drop literal ; IMMEDIATE
+: LITERAL ( x -- ) ( RT: -- x )
+  [ ' (dolit) dup compile, , ] compile, ,
+; IMMEDIATE
+
+: ['] ( "<spaces>name<space>" -- xt )
+  parse-name (find) drop
+  [ ' (dolit) dup compile, , ] compile, ,
+; IMMEDIATE
 
 
 \ Control structures.
@@ -109,7 +116,7 @@
 
 
 : CHAR ( "<spaces>name" -- char ) parse-name drop c@ ;
-: [CHAR] char LITERAL ; IMMEDIATE
+: [CHAR] char [ ' (dolit) dup compile, , ] compile, , ; IMMEDIATE
 
 
 : SPACE bl emit ;
@@ -149,6 +156,9 @@
   DOES> swap cells +
 ;
 
+\ Compiling counterpart to LITERAL. Compiles a (dolit) and then the value on top
+\ of the stack.
+: [LITERAL] ['] (dolit) compile, , ;
 
 : HEX 16 base ! ;
 : DECIMAL 10 base ! ;
@@ -167,7 +177,7 @@ VARIABLE (loop-top)
 
 : DO ( limit index --   C: old-jump-addr )
   ['] swap compile, ['] >r dup compile, compile,
-  1 LITERAL   ['] (0branch) compile,
+  1 [literal]   ['] (0branch) compile,
   (loop-top) @    here (loop-top) ! ( C: old-jump-addr )
   0 , \ Placeholder for the jump offset to go.
 ; IMMEDIATE
@@ -216,11 +226,11 @@ VARIABLE (loop-top)
   ['] R> dup compile, compile, ['] 2drop compile,  ( )
 ; IMMEDIATE
 
-: LOOP ( --   C: jump-addr ) 1 LITERAL POSTPONE +LOOP ; IMMEDIATE
+: LOOP ( --   C: jump-addr ) 1 [LITERAL] POSTPONE +LOOP ; IMMEDIATE
 
 : LEAVE ( -- ) ( R: loop-details -- ) ( C: -- )
   (loop-top) @ 1 cells -
-  0 LITERAL \ Force a branch
+  0 [LITERAL] \ Force a branch
   ['] (branch) compile,
   here - ,
 ; IMMEDIATE
@@ -253,7 +263,7 @@ VARIABLE (loop-top)
 
 : ['] ( "<spaces>name<space>" -- xt )
   parse-name (find)
-  IF literal ELSE ABORT THEN
+  IF [literal] ELSE ABORT THEN
 ; IMMEDIATE
 
 VARIABLE (string-buffer-index)
