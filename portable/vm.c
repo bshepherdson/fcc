@@ -1253,6 +1253,7 @@ WORD(see, "SEE", 3, &header_exit) {
             c1--;
           }
           printf("\"%s\"\n", tempBuf);
+          cfa = (code**) ((ucell) (str1 + (sizeof(cell) - 1)) & ((ucell) (~(sizeof(cell) - 1))));
         } else {
           str1 = (char*) *cfa;
           tempHeader = (header*) (str1 - sizeof(cell) * 3);
