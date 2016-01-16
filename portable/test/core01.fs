@@ -878,3 +878,78 @@ T{ 2 GD6 -> 3 }T
 T{ 3 GD6 -> 4 1 2 }T
 
 
+
+\ Defining words
+\ : ;
+T{ : NOP : POSTPONE ; ; -> }T
+T{ NOP NOP1 NOP NOP2 -> }T
+T{ NOP1 -> }T
+T{ NOP2 -> }T
+\ The following tests the dictionary search order:
+T{ : GDX   123 ;    : GDX   GDX 234 ; -> }T
+T{ GDX -> 123 234 }T
+
+\ CONSTANT
+T{ 123 CONSTANT X123 -> }T
+T{ X123 -> 123 }T
+T{ : EQU CONSTANT ; -> }T
+T{ X123 EQU Y123 -> }T
+T{ Y123 -> 123 }T
+
+\ VARIABLE
+T{ VARIABLE V1 ->     }T
+T{    123 V1 ! ->     }T
+T{        V1 @ -> 123 }T
+
+\ DOES>
+T{ : DOES1 DOES> @ 1 + ; -> }T
+T{ : DOES2 DOES> @ 2 + ; -> }T
+T{ CREATE CR1 -> }T
+T{ CR1   -> HERE }T
+T{ 1 ,   ->   }T
+T{ CR1 @ -> 1 }T
+T{ DOES1 ->   }T
+T{ CR1   -> 2 }T
+T{ DOES2 ->   }T
+T{ CR1   -> 3 }T
+T{ : WEIRD: CREATE DOES> 1 + DOES> 2 + ; -> }T
+T{ WEIRD: W1 -> }T
+T{ ' W1 >BODY -> HERE }T
+T{ W1 -> HERE 1 + }T
+T{ W1 -> HERE 2 + }T
+
+\ >BODY
+T{  CREATE CR0 ->      }T
+T{ ' CR0 >BODY -> HERE }T
+
+\ EVALUATE
+: GE1 S" 123" ; IMMEDIATE
+: GE2 S" 123 1+" ; IMMEDIATE
+: GE3 S" : GE4 345 ;" ;
+: GE5 EVALUATE ; IMMEDIATE
+T{ GE1 EVALUATE -> 123 }T ( TEST EVALUATE IN INTERP. STATE )
+T{ GE2 EVALUATE -> 124 }T
+T{ GE3 EVALUATE ->     }T
+T{ GE4          -> 345 }T
+
+T{ : GE6 GE1 GE5 ; -> }T ( TEST EVALUATE IN COMPILE STATE )
+T{ GE6 -> 123 }T
+T{ : GE7 GE2 GE5 ; -> }T
+T{ GE7 -> 124 }T
+
+
+
+\ Input source control
+\ NB: THESE TESTS REQUIRE LINE BREAKS INSIDE THEM
+
+\ SOURCE
+: GS1 S" SOURCE" 2DUP EVALUATE >R SWAP >R = R> R> = ;
+T{ GS1 -> <TRUE> <TRUE> }T
+: GS4 SOURCE >IN ! DROP ;
+T{ GS4 123 456
+    -> }T
+
+
+
+
+
