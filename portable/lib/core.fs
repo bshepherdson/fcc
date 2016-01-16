@@ -127,7 +127,7 @@
 
 
 : SPACE bl emit ;
-: SPACES ( n -- ) dup 0<= IF EXIT THEN BEGIN space 1- dup 0= UNTIL drop ;
+: SPACES ( n -- ) dup 0<= IF drop EXIT THEN BEGIN space 1- dup 0= UNTIL drop ;
 
 : TYPE ( c-addr u -- )
   BEGIN dup 0> WHILE
@@ -604,7 +604,15 @@ VARIABLE (picout)
 : U. (#UHOLD) type space ;
 
 \ Helper for picturing signed numbers.
-: (#HOLD) ( n -- c-addr len ) <# dup abs S>D #S rot sign #> ;
+: (#HOLD) ( n -- c-addr len )
+  \ Build the smallest integer and check it as a special case.
+  \ It doesn't have a positive counterpart.
+  -1 1 rshift invert over = IF
+    <# 0 #S [char] - hold #>
+  ELSE
+    <# dup abs S>D #S rot sign #>
+  THEN
+;
 : .  (#HOLD) type space ;
 
 \ Helper that compares strings. From the STRING word list.
