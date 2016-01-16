@@ -171,7 +171,7 @@
 
 VARIABLE (last-word)
 \ Redefine : to set (last-word)
-: : : (latest) @ (>CFA) (last-word) ! ;
+: : align : (latest) @ (>CFA) (last-word) ! ;
 
 : RECURSE (last-word) @ compile, ; IMMEDIATE
 
@@ -543,6 +543,42 @@ VARIABLE (umd-div)
 : */MOD ( n1 n2 n3 -- remainder quotient ) >r M* r> SM/REM ;
 : */ ( n1 n2 n3 -- quotient ) */mod swap drop ;
 
+
+\ Reimplementing >NUMBER now that we have UM*.
+\ : >NUMBER ( ud1 c-addr1 u1 -- ud2 c-addr2 u2 )
+\   BEGIN dup WHILE
+\     >R >R
+\     base @ um* ( ud2   R: u c-addr )
+\     R> ( ud2 c-addr     R: u )
+\     dup c@
+\     swap >R ( ud2 char    R: u c-addr )
+\     \ Convert the digit.
+\     dup [char] 0 - dup 10 < IF ( char digit )
+\       swap drop
+\     ELSE
+\       drop
+\       dup [char] A - dup 26 < IF ( char digit )
+\         swap drop 10 +
+\       ELSE
+\         drop
+\         dup [char] a - dup 26 < IF ( char digit )
+\           swap drop 10 +
+\         ELSE
+\           2drop -1
+\         THEN
+\       THEN
+\     THEN
+\ 
+\     dup base @ < IF
+\       swap ( lo digit high )
+\       >R + R> ( lo hi    R: u c-addr )
+\       R> 1+ R> 1- ( ud2 digit c-addr' u' )
+\     ELSE
+\       drop R> R>
+\       EXIT
+\     THEN
+\   REPEAT
+\ ;
 
 \ Pictured numeric output. Uses HERE (which is not PAD).
 VARIABLE (picout)

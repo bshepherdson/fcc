@@ -133,7 +133,7 @@ cell inputIndex;
 
 // And some miscellaneous helpers. These exist because I can't use locals in
 // these C implementations without leaking stack space.
-cell c1;
+cell c1, c2, c3;
 char ch1;
 char* str1;
 char** strptr1;
@@ -717,7 +717,58 @@ void parse_name_(void) {
   *(--sp) = c1;
 }
 
+// The basic >NUMBER - unsigned values only, no magic $ff or whatever.
+// sp[0] is the length, sp[1] the pointer, sp[2] the high word, sp[3] the low.
+// ( lo hi c-addr u -- lo hi c-addr u )
+void to_number_int_(void) {
+  // Copying the numbers into the buffers.
+  for (c1 = 0; c1 < (cell) sizeof(cell); c1++) {
+    tempBuf[c1] = (char) ((sp[3] >> (c1*8)) & 0xff);
+    tempBuf[sizeof(cell) + c1] = (char) ((sp[2] >> (c1*8)) & 0xff);
+  }
+
+  while (sp[0] > 0) {
+    c1 = (cell) *str1;
+    if ('0' <= c1 && c1 <= '9') {
+      c1 -= '0';
+    } else if ('A' <= c1 && c1 <= 'Z') {
+      c1 = c1 - 'A' + 10;
+    } else if ('a' <= c1 && c1 <= 'z') {
+      c1 = c1 - 'a' + 10;
+    } else {
+      break;
+    }
+
+    if (c1 >= (cell) tempSize) break;
+
+    // Otherwise, a valid character, so multiply it in.
+    for (c3 = 0; c3 < 2 * (cell) sizeof(cell) ; c3++) {
+      c2 = ((cell) tempBuf[c3]) * tempSize + c1;
+      tempBuf[c3] = (char) (c2 & 0xff);
+      c1 = (c2 >> 8) & 0xff;
+    }
+
+    sp[0]--;
+    str1++;
+  }
+
+  sp[2] = 0;
+  sp[3] = 0;
+  for (c1 = 0; c1 < (cell) sizeof(cell); c1++) {
+    sp[3] |= tempBuf[c1] << (c1*8);
+    sp[2] |= tempBuf[sizeof(cell) + c1] << (c1*8);
+  }
+  sp[1] = (cell) str1;
+}
+
 void to_number_(void) {
+  tempSize = base;
+  str1 = (char*) sp[1];
+  to_number_int_();
+}
+
+// This is the full number parser, for use by quit_.
+void parse_number_(void) {
   // sp[0] is the length, sp[1] the pointer, sp[2] the high word, sp[3] the low.
   // ( lo hi c-addr u -- lo hi c-addr u )
   str1 = (char*) sp[1];
@@ -741,28 +792,16 @@ void to_number_(void) {
     ch1 = 1;
   }
 
-  while (sp[0] > 0) {
-    c1 = (cell) *str1;
-    if ('0' <= c1 && c1 <= '9') {
-      c1 -= '0';
-    } else if ('A' <= c1 && c1 <= 'Z') {
-      c1 = c1 - 'A' + 10;
-    } else if ('a' <= c1 && c1 <= 'z') {
-      c1 = c1 - 'a' + 10;
-    } else {
-      break;
-    }
+  // Now parse the number itself.
+  to_number_int_();
 
-    if (c1 >= (cell) tempSize) break;
-
-    // Otherwise, a valid character, so multiply it in.
-    sp[3] *= tempSize;
-    sp[3] += c1;
-    sp[0]--;
-    str1++;
+  // And negate if needed.
+  if (ch1) {
+    sp[3] = ~sp[3];
+    sp[2] = ~sp[2];
+    sp[3]++;
+    if (sp[3] == 0) sp[2]++;
   }
-  sp[1] = (cell) str1;
-  if (ch1) sp[3] = -sp[3];
 }
 
 // Expects c-addr u on top of the stack.
@@ -952,7 +991,7 @@ quit_loop:
       sp[0] = savedLength;
       sp[1] = (cell) savedString; // Bring back the string and length.
 
-      to_number_();
+      parse_number_();
       if (sp[0] == 0) { // Successful parse, handle the number.
         if (state == COMPILING) {
           *(dsp.cells++) = (cell) &(header_dolit.code_field);
