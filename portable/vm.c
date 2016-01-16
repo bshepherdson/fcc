@@ -51,7 +51,8 @@
   ext->end = &EXTERNAL_END(name);\
   SRC.type = ((cell) ext) | EXTERNAL_SYMBOL_FLAG;\
   SRC.inputPtr = 0;\
-  SRC.parseLength = 0;
+  SRC.parseLength = 0;\
+  SRC.parseBuffer = parseBuffers[inputIndex];
 
 EXTERNAL_FILES(FORTH_EXTERN);
 
@@ -116,11 +117,13 @@ cell state;
 cell base;
 header *dictionary;
 
+char parseBuffers[16][256];
+
 typedef struct {
   cell parseLength;
   cell inputPtr; // Indexes into parseBuffer.
   cell type;     // 0 = KEYBOARD, -1 = EVALUATE, 0> fileid or extern symbol
-  char parseBuffer[256];
+  char *parseBuffer;
 } source;
 
 source inputSources[16];
@@ -139,6 +142,7 @@ header* tempHeader;
 char tempBuf[256];
 FILE* tempFile;
 struct stat tempStat;
+void *quit_inner;
 
 struct termios old_tio, new_tio;
 
@@ -425,11 +429,18 @@ WORD(evaluate, "EVALUATE", 8, &header_execute) {
   PRINT_TRACE("EVALUATE");
   inputIndex++;
   SRC.parseLength = sp[0];
-  strncpy(SRC.parseBuffer, (char*) sp[1], sp[0]);
+  SRC.parseBuffer = (char*) sp[1];
   SRC.type = -1; // EVALUATE
   SRC.inputPtr = 0;
   sp += 2;
-  NEXT;
+
+  // Set up the return stack to aim at whatever we were doing when EVALUATE was
+  // called, and then jump back into interpreting.
+  // TODO: This might slowly leak stack frames? Should double-check that.
+  // That might be solved by moving this hack to be a special case where quit_
+  // calls refill_. That's actually how my ARM assembler Forth system works.
+  *(--rsp) = (cell) ip;
+  goto *quit_inner;
 }
 
 
@@ -438,6 +449,9 @@ cell refill_(void) {
   if (SRC.type == -1) { // EVALUATE
     // EVALUATE strings cannot be refilled. Pop the source.
     inputIndex--;
+    // And do an EXIT to return to executing whoever called EVALUATE.
+    ip = (code***) *(rsp++);
+    NEXT;
     return 0;
   } else if ( SRC.type == 0) { // KEYBOARD
     str1 = readline("> ");
@@ -488,7 +502,13 @@ cell refill_(void) {
 
 WORD(refill, "REFILL", 6, &header_evaluate) {
   PRINT_TRACE("REFILL");
-  *(--sp) = refill_();
+  // Special case here. When the input source is EVALUATE, return false and do
+  // nothing else. We don't want to actually call refill_ for that case.
+  if (SRC.type == -1) {
+    *(--sp) = 0;
+  } else {
+    *(--sp) = refill_();
+  }
   NEXT;
 }
 
@@ -900,6 +920,9 @@ quit_top:
     inputIndex = 0;
   }
 
+  // Save the label below for use by EVALUATE.
+  quit_inner = &&quit_loop;
+
   // Refill the input buffer.
   refill_();
   // And start trying to parse things.
@@ -1063,6 +1086,7 @@ WORD(include_file, "INCLUDE-FILE", 12, &header_file_size) {
   SRC.type = *(sp++);
   SRC.inputPtr = 0;
   SRC.parseLength = 0;
+  SRC.parseBuffer = parseBuffers[inputIndex];
   NEXT;
 }
 
@@ -1074,6 +1098,7 @@ WORD(included, "INCLUDED", 8, &header_include_file) {
   SRC.type = (cell) tempBuf;
   SRC.inputPtr = 0;
   SRC.parseLength = 0;
+  SRC.parseBuffer = parseBuffers[inputIndex];
   NEXT;
 }
 
@@ -1260,6 +1285,7 @@ int main(int argc, char **argv) {
   base = 10;
   inputIndex = 0;
   SRC.type = SRC.parseLength = SRC.inputPtr = 0;
+  SRC.parseBuffer = parseBuffers[inputIndex];
 
   // Open the input files in reverse order and push them as file inputs.
   argc--;
@@ -1273,6 +1299,7 @@ int main(int argc, char **argv) {
 
     SRC.inputPtr = 0;
     SRC.parseLength = 0;
+    SRC.parseBuffer = parseBuffers[inputIndex];
   }
 
   // Turn the external Forth libraries into input sources.
