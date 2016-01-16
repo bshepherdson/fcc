@@ -169,6 +169,12 @@
 : HEX 16 base ! ;
 : DECIMAL 10 base ! ;
 
+VARIABLE (last-word)
+\ Redefine : to set (last-word)
+: : : (latest) @ (>CFA) (last-word) ! ;
+
+: RECURSE (last-word) @ compile, ; IMMEDIATE
+
 \ DO ... LOOP design:
 \ old value of (loop-top) is pushed onto the compile-time stack.
 \ new value of the top of the loop is placed in (loop-top).
@@ -196,24 +202,34 @@ VARIABLE (loop-top)
   swap >R ( index2 )
 ;
 
-\ Implementation taken from the Forth 2012 appendix.
-\ WITHIN is actually from CORE EXT, but it's useful here.
-: WITHIN ( test lo hi -- ? ) over - >R   - R> U< ;
+\ PICK is actually from CORE EXT, but it's useful for (LOOP-END).
+: PICK ( xn ... x1 x0 u -- xn ... x1 x0 xn )
+  dup 0= IF drop dup EXIT THEN
+  1- SWAP >R recurse ( ... ret )
+  r> swap
+;
 
 \ Called at the end of a +loop, with the delta.
 \ Remember that the real return address is on the return stack.
-: (LOOP-END) ( delta -- ?   R: limit index ret -- limit index' ret )
-  R> SWAP ( ret delta )
-  R> ( ret delta index )
-  swap over + ( ret index index' )
-  R> ( ret index index' limit )
-  2dup >R >R ( ret index index' limit   R: limit index' )
-  rot ( ret index' limit index   R: limit index' )
-  2dup = >R  ( ret index' limit index   R: limit index' equal? )
-  2dup < IF swap THEN
-  within
-  R> or
-  swap >R ( ?   R: limit index' ret )
+\ Logic is that we continue when:
+\ - Delta doesn't change the sign of the distance to go (normal interval), OR
+\ - Delta has a different sign from the distance to go, meaning we need to do an
+\   overflow or underflow first.
+: (LOOP-END) ( delta -- exit?   R: limit index ret -- limit index' ret )
+  R> swap R> R> ( ret delta index limit )
+  2dup - >R ( ret delta index limit   R: index-limit )
+  2 pick ( ret delta index limit delta   R: index-limit )
+  R@ + R@ xor ( ret delta index limit delta+index-limit^index-limit    R: i-l)
+  0< 0= ( ret delta index limit before-after-match? )
+  \ That is, the flag on top means the sign doesn't change when delta is added.
+  3 pick r> xor 0< 0= ( ret delta index limit before-after-match? delta-match? )
+  \ The first flag is true when we're in a simple range (no over/underflow) and
+  \ the delta doesn't cross the limit.
+  \ The second is true when we'll need to overflow before exiting.
+  or 0= ( ret delta index limit exit? ) \ Exit when neither is true.
+  swap >R ( ret delta index exit?   R: limit )
+  -rot + >R ( ret exit?   R: limit index' )
+  swap >R   ( exit?    R: limit index' ret )
 ;
 
 
@@ -323,12 +339,6 @@ here 256 8 * chars allot CONSTANT (string-buffers)
   dup count (find) ( c-addr xt flag )
   dup 0= IF 2drop 0 ELSE rot drop THEN
 ;
-
-VARIABLE (last-word)
-\ Redefine : to set (last-word)
-: : : (latest) @ (>CFA) (last-word) ! ;
-
-: RECURSE (last-word) @ compile, ; IMMEDIATE
 
 : ABS ( n -- u ) dup 0< IF negate THEN ;
 

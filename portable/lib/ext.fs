@@ -51,11 +51,9 @@
 
 1024 BUFFER: PAD
 
-: PICK ( xn ... x1 x0 u -- xn ... x1 x0 xn )
-  dup 0= IF drop dup EXIT THEN
-  1- SWAP >R recurse ( ... ret )
-  r> swap
-;
+\ Implementation taken from the Forth 2012 appendix.
+: WITHIN ( test lo hi -- ? ) over - >R   - R> U< ;
+
 : ROLL ( xn ... x1 x0 u -- xn-1 .. x1 x0 xn )
   dup 0= IF drop EXIT THEN
   1- swap >R recurse ( ... ret )
