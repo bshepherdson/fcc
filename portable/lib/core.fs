@@ -279,7 +279,9 @@ VARIABLE (loop-top)
 
 : MOVE> ( src dst u -- ) 0 DO over i + c@   over i + c! LOOP 2drop ;
 : MOVE< ( src dst u -- ) 1- 0 swap DO over i + c@   over i + c! -1 +LOOP 2drop ;
-: MOVE ( src dst u -- ) >R 2dup <   R> swap   IF MOVE< ELSE MOVE> THEN ;
+: MOVE ( src dst u -- )
+  dup 0= IF drop 2drop EXIT THEN \ Special case for 0 length.
+  >R 2dup <   R> swap   IF MOVE< ELSE MOVE> THEN ;
 
 : ABORT quit ;
 
@@ -330,10 +332,7 @@ here 256 8 * chars allot CONSTANT (string-buffers)
 \ The new string is in a transient region!
 : UNCOUNT ( c-addr u -- c-addr ) dup here c!   here 1+ swap move   here ;
 
-: WORD ( char "<chars>ccc<char>" -- c-addr )
-  BEGIN dup parse ( char c-addr u ) dup 0= WHILE 2drop REPEAT ( char c-addr u )
-  uncount swap drop ( c-addr )
-;
+: WORD ( char "<chars>ccc<char>" -- c-addr ) parse uncount ;
 
 : FIND ( c-addr -- c-addr 0 | xt 1 | xt -1 )
   dup count (find) ( c-addr xt flag )
@@ -552,8 +551,8 @@ VARIABLE (picout)
 : HOLD ( c -- ) (picout) @ 1- dup >R c!   R> (picout) ! ;
 : SIGN ( n -- ) 0< IF [CHAR] - hold THEN ;
 : # ( ud1 -- ud2 )
-  base @ 2dup / >R ( ud1 base   R: hi-q )
-  um/mod ( r lo-q   R: hi-q )
+  dup 0 base @ um/mod >R drop ( ud1    R: hi-q )
+  base @ um/mod ( r lo-q   R: hi-q )
   swap dup 10 < IF [char] 0 ELSE 10 - [char] A THEN + HOLD ( lo-q   R: hi-q )
   R> ( dq )
 ;

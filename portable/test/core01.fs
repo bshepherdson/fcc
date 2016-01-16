@@ -949,7 +949,99 @@ T{ GS1 -> <TRUE> <TRUE> }T
 T{ GS4 123 456
     -> }T
 
+\ >IN
+VARIABLE SCANS
+: RESCAN? -1 SCANS +! SCANS @ IF 0 >IN ! THEN ;
+T{   2 SCANS !
+345 RESCAN?
+-> 345 345 }T
+
+: GS2 5 SCANS ! S" 123 RESCAN?" EVALUATE ;
+T{ GS2 -> 123 123 123 123 123 }T
+
+\ These tests must start on a new line
+DECIMAL
+T{ 123456 DEPTH OVER 9 < 35 AND + 3 + >IN !
+-> 123456 23456 3456 456 56 6 }T
+T{ 14145 8115 ?DUP 0= 34 AND >IN +! TUCK MOD 14 >IN ! GCD calculation
+-> 15 }T
+HEX
+
+\ WORD
+: GS3 WORD COUNT SWAP C@ ;
+T{ BL GS3 HELLO -> 5 CHAR H }T
+T{ CHAR " GS3 GOODBYE" -> 7 CHAR G }T
+T{ BL GS3
+   DROP -> 0 }T \ Blank lines return zero-length strings
 
 
+\ Number patterns
+: S= \ ( ADDR1 C1 ADDR2 C2 -- T/F ) Compare two strings.
+   >R SWAP R@ = IF           \ Make sure strings have same length
+     R> ?DUP IF              \ If non-empty strings
+       0 DO
+         OVER C@ OVER C@ - IF 2DROP <FALSE> UNLOOP EXIT THEN
+         SWAP CHAR+ SWAP CHAR+
+       LOOP
+     THEN
+     2DROP <TRUE>          \ If we get here, strings match
+   ELSE
+     R> DROP 2DROP <FALSE> \ Lengths mismatch
+   THEN ;
 
+
+\ <# HOLD #>
+: GP1 <# 41 HOLD 42 HOLD 0 0 #> S" BA" S= ;
+T{ GP1 -> <TRUE> }T
+
+\ <# SIGN $>
+: GP2 <# -1 SIGN 0 SIGN -1 SIGN 0 0 #> S" --" S= ;
+T{ GP2 -> <TRUE> }T
+
+\ <# # #>
+: GP3 <# 1 0 # # #> S" 01" S= ;
+T{ GP3 -> <TRUE> }T
+
+\ Before we can test #S we must find the number of bits required to store the
+\ largest double value
+24 CONSTANT MAX-BASE                  \ BASE 2 ... 36
+: COUNT-BITS
+   0 0 INVERT BEGIN DUP WHILE >R 1+ R> 2* REPEAT DROP ;
+COUNT-BITS 2* CONSTANT #BITS-UD    \ NUMBER OF BITS IN UD
+
+: GP4 <# 1 0 #S #> S" 1" S= ;
+T{ GP4 -> <TRUE> }T
+: GP5
+   BASE @ <TRUE>
+   MAX-BASE 1+ 2 DO      \ FOR EACH POSSIBLE BASE
+     I BASE !              \ TBD: ASSUMES BASE WORKS
+       I 0 <# #S #> S" 10" S= AND
+   LOOP
+   SWAP BASE ! ;
+T{ GP5 -> <TRUE> }T
+
+: GP6
+   BASE @ >R 2 BASE !
+   MAX-UINT MAX-UINT <# #S #>    \ MAXIMUM UD TO BINARY
+   R> BASE !                        \ S: C-ADDR U
+   DUP #BITS-UD = SWAP
+   0 DO                              \ S: C-ADDR FLAG
+     OVER C@ [CHAR] 1 = AND     \ ALL ONES
+     >R CHAR+ R>
+   LOOP SWAP DROP ;
+T{ GP6 -> <TRUE> }T
+
+: GP7
+   BASE @ >R MAX-BASE BASE !
+   <TRUE>
+   A 0 DO
+     I 0 <# #S #>
+     1 = SWAP C@ I 30 + = AND AND
+   LOOP
+   MAX-BASE A DO
+     I 0 <# #S #>
+     1 = SWAP C@ 41 I A - + = AND AND
+   LOOP
+   R> BASE ! ;
+T{ GP7 -> <TRUE> }T
 
