@@ -105,3 +105,4 @@ T{ ( 1 2 3
 \ SOURCE-ID extended for files
 T{ SOURCE-ID DUP -1 = SWAP 0= OR -> <FALSE> }T
 
+HEX

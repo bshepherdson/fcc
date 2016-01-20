@@ -35,3 +35,6 @@ CREATE ABUF 80 CHARS ALLOT
 
 T{ ACCEPT-TEST -> }T
 
+cr cr
+S" All tests passed!" type cr bye
+
