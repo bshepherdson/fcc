@@ -26,5 +26,19 @@ forth: vm.o $(FORTH_OBJECTS)
 
 all: forth
 
-clean:
+clean: FORCE
 	rm -f *.o lib/*.o forth
+
+test: forth FORCE
+	./forth \
+	  test/ttester.fs \
+	  test/core01.fs \
+	  test/ext.fs \
+	  test/files.fs \
+	  test/final.fs \
+	  > test.out < test/test.in
+	cmp -s test.out test/test.gold || (echo Tests failed, output does not match gold && rm -f fatest*.txt test.out && exit 1)
+	rm -f fatest*.txt test.out
+
+FORCE:
+
