@@ -23,8 +23,12 @@
 
 : ACTION-OF
   BL word find ( xt ? )
-  <> ABORT" *** Unknown word in ACTION-OF"
-  state @ IF [LITERAL] THEN
+  0= ABORT" *** Unknown word in ACTION-OF"
+  state @ IF
+    [LITERAL] ['] >body compile, ['] @ compile,
+  ELSE
+    >body @
+  THEN
 ; IMMEDIATE
 
 : DEFER! ( xt2 xt1 -- ) >body ! ;
@@ -131,6 +135,10 @@
   ['] 1- compile,
 ; IMMEDIATE
 
+
+\ These are actually from the DOUBLE word set; but the test suite uses them
+: 2VARIABLE CREATE 0 , 0 , ;
+: D= ( xd1 xd2 -- flag ) rot = >R = R> and ;
 
 \ Unimplemented strings: S\"
 \ Unimplemented obsolete words: [COMPILE]

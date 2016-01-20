@@ -1081,12 +1081,21 @@ WORD(create_file, "CREATE-FILE", 11, &header_close_file) {
   NEXT;
 }
 
+// Don't truncate files that exist. Opening a file for R/O that doesn't exist is
+// a failure, but opening a file that doesn't exist for W/O or R/W should
+// create.
+// Therefore if we try the normal open, and it fails, we should try again with
+// TRUNC enabled, IFF the FA_WRITE bit is set.
 WORD(open_file, "OPEN-FILE", 9, &header_create_file) {
-  strncpy(tempBuf, (char*) sp[1], sp[1]);
+  strncpy(tempBuf, (char*) sp[2], sp[1]);
   tempBuf[sp[1]] = '\0';
+  sp[2] = (cell) fopen(tempBuf, file_modes[sp[0]]);
+  if ((FILE*) sp[2] == NULL && (sp[0] & FA_WRITE) != 0) {
+    // Try again with TRUNC added to allow creation.
+    sp[2] = (cell) fopen(tempBuf, file_modes[sp[0] | FA_TRUNC]);
+  }
+  sp[1] = sp[2] == 0 ? errno : 0;
   sp++;
-  sp[1] = (cell) fopen(tempBuf, file_modes[sp[0]]);
-  sp[0] = sp[1] == 0 ? errno : 0;
   NEXT;
 }
 
@@ -1102,11 +1111,12 @@ WORD(delete_file, "DELETE-FILE", 11, &header_open_file) {
 WORD(file_position, "FILE-POSITION", 13, &header_delete_file) {
   sp -= 2;
   sp[1] = 0;
-  sp[2] = lseek(fileno((FILE*) sp[2]), 0L, SEEK_CUR);
+  sp[2] = (cell) ftell((FILE*) sp[2]);
   sp[0] = sp[2] == -1 ? errno : 0;
   NEXT;
 }
 
+/*
 WORD(file_size, "FILE-SIZE", 9, &header_file_position) {
   sp -= 2;
   sp[1] = 0;
@@ -1119,6 +1129,29 @@ WORD(file_size, "FILE-SIZE", 9, &header_file_position) {
   }
   NEXT;
 }
+*/
+
+WORD(file_size, "FILE-SIZE", 9, &header_file_position) {
+  sp -= 2;
+  sp[1] = 0;
+  c1 = ftell((FILE*) sp[2]); // Save the position.
+  if (c1 < 0) {
+    sp[0] = errno;
+  } else {
+    c2 = fseek((FILE*) sp[2], 0L, SEEK_END);
+    if (c2 < 0) {
+      sp[0] = errno;
+      fseek((FILE*) sp[2], (long) c1, SEEK_SET);
+    } else {
+      c2 = ftell((FILE*) sp[2]);
+      fseek((FILE*) sp[2], (long) c1, SEEK_SET);
+      sp[2] = c2;
+      sp[0] = 0;
+    }
+  }
+  NEXT;
+}
+
 
 WORD(include_file, "INCLUDE-FILE", 12, &header_file_size) {
   inputIndex++;
@@ -1161,6 +1194,10 @@ WORD(read_file, "READ-FILE", 9, &header_included) {
   NEXT;
 }
 
+// Expects a buffer and size. Reads at most that many characters, plus the
+// delimiter. Should return a size that EXCLUDES the terminator.
+// Uses getline, and if the line turns out to be longer than our buffer, the
+// file is repositioned accordingly.
 WORD(read_line, "READ-LINE", 9, &header_read_file) {
   str1 = NULL;
   tempSize = 0;
@@ -1174,10 +1211,17 @@ WORD(read_line, "READ-LINE", 9, &header_read_file) {
     sp[1] = 0;
     sp[2] = 0;
   } else {
-    strncpy((char*) sp[2], str1, c1);
+    if (c1 - 1 > sp[1]) { // Line is too long for the buffer.
+      fseek((FILE*) sp[0], c1 - sp[1], SEEK_CUR);
+      c1 = sp[1] + 1;
+    } else if (str1[c1 - 1] != '\n') { // Found EOF, not newline.
+      c1++;
+    }
+
+    strncpy((char*) sp[2], str1, c1 - 1);
     sp[0] = 0;
     sp[1] = true;
-    sp[2] = c1;
+    sp[2] = c1 - 1;
   }
 
   if (str1 != NULL) free(str1);
@@ -1199,6 +1243,7 @@ WORD(resize_file, "RESIZE-FILE", 11, &header_reposition_file) {
 }
 
 WORD(write_file, "WRITE-FILE", 10, &header_resize_file) {
+  //printf("%d\n", sp[1]);
   c1 = fwrite((void*) sp[2], 1, sp[1], (FILE*) sp[0]);
   sp += 2;
   sp[0] = 0;
@@ -1206,18 +1251,24 @@ WORD(write_file, "WRITE-FILE", 10, &header_resize_file) {
 }
 
 WORD(write_line, "WRITE-LINE", 10, &header_write_file) {
-  c1 = fwrite((void*) sp[2], 1, sp[1], (FILE*) sp[0]);
-  tempBuf[0] = '\n';
-  c1 = fwrite((void*) tempBuf, 1, 1, (FILE*) sp[0]);
+  strncpy(tempBuf, (char*) sp[2], sp[1]);
+  tempBuf[sp[1]] = '\n';
+  c1 = fwrite((void*) tempBuf, 1, sp[1] + 1, (FILE*) sp[0]);
   sp += 2;
   sp[0] = 0;
+  NEXT;
+}
+
+WORD(flush_file, "FLUSH-FILE", 10, &header_write_line) {
+  sp[0] = (cell) fsync(fileno((FILE*) sp[0]));
+  if (sp[0] == -1) sp[0] = errno;
   NEXT;
 }
 
 
 // And back to core.
 
-WORD(colon, ":", 1, &header_write_line) {
+WORD(colon, ":", 1, &header_flush_file) {
   PRINT_TRACE(":");
   tempHeader = (header*) dsp.chars;
   dsp.chars += sizeof(header);
