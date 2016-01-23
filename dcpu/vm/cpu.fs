@@ -23,7 +23,7 @@ VARIABLE PC
 8 ARRAY (regs)
 
 : r@ ( reg -- dw ) (regs) @ ;
-: r! ( dw reg -- ) swap 65535 and swap   (reg) ! ;
+: r! ( dw reg -- ) swap 65535 and swap   (regs) ! ;
 
 \ Special-purpose registers
 VARIABLE EX
@@ -76,7 +76,7 @@ END-STRUCTURE
 \ 0: Blocks until a character is received. Puts the character in C.
 \ 1: Emits the character in B.
 
-here CONSTANT dev-serial
+VALUE dev-serial here IS dev-serial
 device allot
 
 dev-serial
@@ -98,7 +98,6 @@ $12345678 over dev-id !
 $9abcdef0 over dev-manufacturer !
 
 hw-add-device \ serial is device 0
-
 
 
 \ Instruction evaluation
@@ -163,7 +162,6 @@ hw-add-device \ serial is device 0
 
 : read-b ( b -- val ) true  (read-b) ;
 : peek-b ( b -- val ) false (read-b) ;
-
 
 
 \ Instruction implementations
@@ -363,6 +361,33 @@ VARIABLE int-q-tail
 \ Runs tick repeatedly until ordered to stop. There's actually no end condition.
 : interp ( -- ) BEGIN tick AGAIN ;
 
+
+256 buffer: file-name-counted
+
+\ Loads an assembled DCPU binary from real disk into memory.
+\ Expects the DCPU binaries to be in big-endian format.
+: load-binary ( )
+  \ Get the file name from the counted string.
+  file-name-counted
+  dup c@ swap char+   r/o bin open-file   ABORT" Failed to open binary file"
+  >R
+
+  R@ file-size   ABORT" Could not check size of binary file"
+  swap $20000 >= or ABORT" Binary file larger than 64K words" ( )
+
+  \ Begin reading in the file 512 bytes at a time.
+  0 BEGIN
+    here 512 R@ read-file   ABORT" Failed reading from binary file"
+  dup WHILE
+    ( mem-index size ) 0 DO
+      here i +   dup c@ 8 lshift   swap 1+ c@   or ( mem-index word )
+      over d!   1+ ( mem-index' )
+    2 +LOOP
+  REPEAT ( mem-index 0 )
+  2drop
+;
+
+
 \ Configures the DCPU to startup state and sets it running.
 : reset ( -- )
   0 pc !
@@ -371,7 +396,15 @@ VARIABLE int-q-tail
   0 ex !
   false int-queuing !
   8 0 DO 0 i r! LOOP
+  load-binary
 ;
 
-\ START HERE: Needs disk support to read the binaries in.
-\ I'll have to add the block and file word sets to the FCC engine.
+
+\ Expects the file name of a binary, and executes it.
+: run ( c-addr u -- )
+  dup file-name-counted c!
+  file-name=counted + swap move ( )
+  reset
+  interp
+;
+
