@@ -99,8 +99,13 @@ T{ fn2 DELETE-FILE -> 0 }T
 
 \ ( extended for multiple lines
 T{ ( 1 2 3
+
       4 5 6
       7 8 9 ) 11 22 33 -> 11 22 33 }T
+
+T{ 11 ( ) 22 -> 11 22 }T
+T{ 11 ( )
+    22 -> 11 22 }T
 
 \ SOURCE-ID extended for files
 T{ SOURCE-ID DUP -1 = SWAP 0= OR -> <FALSE> }T
