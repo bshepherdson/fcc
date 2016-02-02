@@ -1162,19 +1162,7 @@ WORD(include_file, "INCLUDE-FILE", 12, &header_file_size) {
   NEXT;
 }
 
-WORD(included, "INCLUDED", 8, &header_include_file) {
-  strncpy(tempBuf, (char*) sp[1], sp[0]);
-  tempBuf[sp[0]] = '\0';
-  sp += 2;
-  inputIndex++;
-  SRC.type = (cell) tempBuf;
-  SRC.inputPtr = 0;
-  SRC.parseLength = 0;
-  SRC.parseBuffer = parseBuffers[inputIndex];
-  NEXT;
-}
-
-WORD(read_file, "READ-FILE", 9, &header_included) {
+WORD(read_file, "READ-FILE", 9, &header_include_file) {
   c1 = (cell) fread((void*) sp[2], 1, sp[1], (FILE*) sp[0]);
   if (c1 == 0) {
     if (feof((FILE*) sp[0])) {

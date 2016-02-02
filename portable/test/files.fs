@@ -111,3 +111,16 @@ T{ 11 ( )
 T{ SOURCE-ID DUP -1 = SWAP 0= OR -> <FALSE> }T
 
 HEX
+
+T{ 0
+   S" test/required-helper1.fs" REQUIRED \ Increment TOS
+   REQUIRE test/required-helper1.fs \ Ignore - already loaded
+   INCLUDE test/required-helper1.fs \ Increment TOS
+-> 2 }T
+
+T{ 0
+   INCLUDE test/required-helper2.fs \ Increment TOS
+   S" test/required-helper2.fs" REQUIRED \ Ignore - already loaded
+   REQUIRE test/required-helper2.fs \ Ignore - already loaded
+   S" test/required-helper2.fs" INCLUDED \ Increment TOS
+-> 2 }T

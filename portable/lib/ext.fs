@@ -107,8 +107,18 @@
 : 2R> ( -- x1 x2 ) ( R: x1 x2 -- ) R> R> swap ;
 : 2R@ ( -- x1 x2 ) ( R: x1 x2 -- x1 x2 ) R> R>   2dup   >R >R   swap ;
 
+\ A linked list of (link ptr, length cell, string content....) entries giving
+\ the previously required files. Defined here for MARKER's use, and set when new
+\ files get REQUIRED.
+VARIABLE (included-file-list)
+0 (included-file-list) !
+
 : MARKER ( "<spaces>name" -- ) ( exec: -- )
-  HERE CREATE ,  DOES>  @ dup   (LATEST) !   (>HERE) ! ;
+  HERE CREATE ,   (included-file-list) @ ,
+  DOES>
+    dup cell+ @   (included-file-list) !
+    @ dup   (LATEST) !   (>HERE) ! ;
+
 
 \ TODO Expand to support blocks and files when those word sets are added.
 : SAVE-INPUT ( -- x1 ... xn n ) >IN @ 1 ;

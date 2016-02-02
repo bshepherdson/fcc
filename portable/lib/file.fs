@@ -30,3 +30,32 @@
     THEN
   AGAIN
 ; IMMEDIATE
+
+
+: INCLUDED ( i*x c-addr u -- j*x )
+  2dup r/o open-file ABORT" Could not open file" >R
+  \ Record this file in the inclusion names list.
+  (included-file-list) @   here (included-file-list) !
+  ( c-addr u list-head    R: fd )
+  ,   dup ,   here swap move align ( R: fd )
+  R> include-file
+;
+
+: INCLUDE ( i*x "name" -- j*x ) parse-name included ;
+
+\ NB: REQUIRE(D) files should have no net stack impact; INCLUDE(D) ones can.
+: REQUIRED ( i*x c-addr u -- i*x )
+  \ Check if this file has been loaded before.
+  (included-file-list) @
+  BEGIN ?dup WHILE
+    >R 2dup ( c-addr u c-addr u   R: *entry )
+    R@ cell+ dup cell+ swap @ ( c-addr1 u1 c-addr1 u1 c-addr2 u2   R: *entry )
+    compare 0= IF R> drop 2drop ( ) EXIT THEN \ Already done, bail.
+    R> @ ( c-addr u *entry' )
+  REPEAT
+  ( c-addr u )
+  included
+;
+
+: REQUIRE ( i*x "name" -- i*x ) parse-name required ;
+
