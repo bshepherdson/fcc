@@ -65,7 +65,6 @@
 : HERE (>HERE) @ ;
 
 : , ( x -- ) HERE !   1 cells (>HERE) +! ;
-: COMPILE, ( xt -- ) , ;
 : C, ( c -- ) here c!   1 chars (>HERE) +! ;
 
 : ALIGNED ( addr - a-addr ) (/cell) 1-   dup >R   + R>   invert and ;
@@ -76,7 +75,6 @@
 
 : R@ ( -- x ) ( R: x -- x ) R> R> dup >R swap >R ;
 
-\ Unsafe ['], to be replaced below with a version using IF.
 : ' ( "name" -- xt ) parse-name (find) drop ;
 
 \ Compiles a literal into the current definition.
@@ -84,6 +82,7 @@
   [ ' (dolit) dup compile, , ] compile, ,
 ; IMMEDIATE
 
+\ Unsafe ['], to be replaced below with a version using IF.
 : ['] ( "<spaces>name<space>" -- xt )
   parse-name (find) drop
   [ ' (dolit) dup compile, , ] compile, ,
@@ -153,7 +152,7 @@
   ['] (latest) compile,
   ['] @ compile,
   ['] (>does) compile,
-  ['] ! ,
+  ['] ! compile,
   ['] EXIT compile,
   here swap !
 ; IMMEDIATE
@@ -169,11 +168,7 @@
 : HEX 16 base ! ;
 : DECIMAL 10 base ! ;
 
-VARIABLE (last-word)
-\ Redefine : to set (last-word)
-: : align : (latest) @ (>CFA) (last-word) ! ;
-
-: RECURSE (last-word) @ compile, ; IMMEDIATE
+: RECURSE (last-word) compile, ; IMMEDIATE
 
 \ DO ... LOOP design:
 \ old value of (loop-top) is pushed onto the compile-time stack.

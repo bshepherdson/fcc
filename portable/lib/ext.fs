@@ -7,7 +7,7 @@
 : <> = NOT ;
 : 0<> 0 <> ;
 
-: :NONAME ( -- xt ) here dup (last-word) !   ['] (docol) @ ,   ] ;
+\ : :NONAME ( -- xt ) here dup (last-word) !   ['] (docol) @ ,   ] ;
 
 : ?DO ( limit index --   C: old-jump-addr )
   ['] 2dup compile, ['] swap compile, ['] >r dup compile, compile,

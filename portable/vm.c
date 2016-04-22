@@ -99,8 +99,13 @@ cell _stack_return[RETURN_STACK_SIZE];
 cell *rspTop = &(_stack_return[RETURN_STACK_SIZE]);
 cell *rsp;
 
-code ***ip;
+code **ip;
+
+// Only used for "heavy" calls - EXECUTE, etc.
+// Most calls are direct threaded and don't need this pointer,
+// or they use the (call) primitive rather than (docol).
 code **cfa;
+code *ca;
 
 bool firstQuit = 1;
 code *quitTop = NULL;
@@ -116,6 +121,7 @@ union {
 cell state;
 cell base;
 header *dictionary;
+code **lastWord;
 
 char parseBuffers[16][256];
 
@@ -140,6 +146,7 @@ char** strptr1;
 size_t tempSize;
 header* tempHeader;
 char tempBuf[256];
+unsigned char numBuf[sizeof(cell) * 2];
 FILE* tempFile;
 struct stat tempStat;
 void *quit_inner;
@@ -154,8 +161,8 @@ struct termios old_tio, new_tio;
 #define NEXT1 __junk: do { goto __junk; } while(0)
 #define NEXT __junk: do { goto __junk; } while(0)
 #else
-#define NEXT1 do { goto **cfa; } while(0)
-#define NEXT do { cfa = *ip++; goto **cfa; } while(0)
+#define NEXT1 do { goto *ca; } while(0)
+#define NEXT do { goto **ip++; } while(0)
 #endif
 
 // Implementations of the VM primitives.
@@ -403,7 +410,7 @@ WORD(branch, "(BRANCH)", 8, &header_state) {
   PRINT_TRACE("(BRANCH)");
   str1 = (char*) ip;
   str1 += (cell) *ip;
-  ip = (code***) str1;
+  ip = (code**) str1;
   NEXT;
 }
 
@@ -415,13 +422,16 @@ WORD(zbranch, "(0BRANCH)", 9, &header_branch) {
   c1 = *(sp++) == 0 ? (cell) *ip : (cell) sizeof(cell);
   PRINT_DEBUG("0BRANCH delta: %" PRIdPTR "\n", c1);
   str1 += c1;
-  ip = (code***) str1;
+  ip = (code**) str1;
   NEXT;
 }
 
+// In the direct-threading style, xt's are still a codeword pointer.
+// We need to doubly-indirect before setting cfa.
 WORD(execute, "EXECUTE", 7, &header_zbranch) {
   PRINT_TRACE("EXECUTE");
   cfa = (code**) *(sp++);
+  ca = *cfa;
   NEXT1;
 }
 
@@ -450,7 +460,7 @@ cell refill_(void) {
     // EVALUATE strings cannot be refilled. Pop the source.
     inputIndex--;
     // And do an EXIT to return to executing whoever called EVALUATE.
-    ip = (code***) *(rsp++);
+    ip = (code**) *(rsp++);
     NEXT;
     return 0;
   } else if ( SRC.type == 0) { // KEYBOARD
@@ -616,8 +626,7 @@ WORD(to_does, "(>DOES)", 7, &header_return_stack_cells) {
   NEXT;
 }
 
-// Converts a header* eg. from (latest) into the DOES> address, which is
-// the cell after the CFA.
+// Converts a header* eg. from (latest) into the code field address.
 WORD(to_cfa, "(>CFA)", 6, &header_to_does) {
   PRINT_TRACE("(>CFA)");
   tempHeader = (header*) sp[0];
@@ -633,14 +642,21 @@ WORD(to_body, ">BODY", 5, & header_to_cfa) {
   NEXT;
 }
 
+// Pushes the last word that was defined, whether with : or :NONAME.
+WORD(last_word, "(LAST-WORD)", 11, &header_to_body) {
+  PRINT_TRACE("(LAST-WORD)");
+  *(--sp) = (cell) lastWord;
+  NEXT;
+}
+
 
 // Compiler helpers
 
 // Pushes ip -> rsp, and puts my own data field into ip.
-WORD(docol, "(DOCOL)", 7, &header_to_body) {
+WORD(docol, "(DOCOL)", 7, &header_last_word) {
   PRINT_TRACE("(DOCOL)");
   *(--rsp) = (cell) ip;
-  ip = (code***) &(cfa[1]);
+  ip = &(cfa[1]);
   NEXT;
 }
 
@@ -661,7 +677,7 @@ WORD(dostring, "(DOSTRING)", 10, &header_dolit) {
 
   str1 += c1 + 1 + (sizeof(cell) - 1);
   str1 = (char*) (((cell) str1) & ~(sizeof(cell) - 1));
-  ip = (code***) str1;
+  ip = (code**) str1;
 
   NEXT;
 }
@@ -672,13 +688,14 @@ WORD(dostring, "(DOSTRING)", 10, &header_dolit) {
 // 0 at cfa + 1 cell. If it's 0, do nothing. Otherwise, jump to that point.
 WORD(dodoes, "(DODOES)", 8, &header_dostring) {
   PRINT_TRACE("(DODOES)");
-  *(--sp) = (cell) &(cfa[2]);
-  c1 = (cell) cfa[1];
+  str1 = (char*) cfa;
+  *(--sp) = (cell) (str1 + 2 * sizeof(cell));
+  c1 = (cell) *((code**) (str1 + sizeof(cell)));
 
   // Similar to docol, push onto the return stack and jump.
   if (c1 != 0) {
     *(--rsp) = (cell) ip;
-    ip = (code***) c1;
+    ip = (code**) c1;
   }
   NEXT;
 }
@@ -723,8 +740,8 @@ void parse_name_(void) {
 void to_number_int_(void) {
   // Copying the numbers into the buffers.
   for (c1 = 0; c1 < (cell) sizeof(cell); c1++) {
-    tempBuf[c1] = (char) ((sp[3] >> (c1*8)) & 0xff);
-    tempBuf[sizeof(cell) + c1] = (char) ((sp[2] >> (c1*8)) & 0xff);
+    numBuf[c1] = (unsigned char) ((((ucell) sp[3]) >> (c1*8)) & 0xff);
+    numBuf[sizeof(cell) + c1] = (unsigned char) ((((ucell) sp[2]) >> (c1*8)) & 0xff);
   }
 
   while (sp[0] > 0) {
@@ -743,8 +760,8 @@ void to_number_int_(void) {
 
     // Otherwise, a valid character, so multiply it in.
     for (c3 = 0; c3 < 2 * (cell) sizeof(cell) ; c3++) {
-      c2 = ((cell) tempBuf[c3]) * tempSize + c1;
-      tempBuf[c3] = (char) (c2 & 0xff);
+      c2 = ((ucell) numBuf[c3]) * tempSize + c1;
+      numBuf[c3] = (unsigned char) (c2 & 0xff);
       c1 = (c2 >> 8) & 0xff;
     }
 
@@ -755,8 +772,8 @@ void to_number_int_(void) {
   sp[2] = 0;
   sp[3] = 0;
   for (c1 = 0; c1 < (cell) sizeof(cell); c1++) {
-    sp[3] |= tempBuf[c1] << (c1*8);
-    sp[2] |= tempBuf[sizeof(cell) + c1] << (c1*8);
+    sp[3] |= (cell) (((ucell) numBuf[c1]) << (c1*8));
+    sp[2] |= (cell) (((ucell) numBuf[sizeof(cell) + c1]) << (c1*8));
   }
   sp[1] = (cell) str1;
 }
@@ -943,6 +960,47 @@ WORD(dump_file, "(DUMP-FILE)", 11, &header_u_dot_s) {
 }
 
 
+// Primitive for calling a (DOCOL) word.
+// Expects the next cell in ip-space to be the address of the code.
+// Otherwise it resembles a (DOCOL).
+void call_() {
+  ca = *(ip++);
+  *(--rsp) = (cell) ip;
+  ip = (code**) ca;
+  NEXT;
+}
+
+// This is the heart of the new superinstruction system.
+// It should build up a queue of primitives requested, until it fills up, then
+// convert into the most efficient possible superinstructions.
+// TODO: Implement this cleverly. For now it's just a placeholder that does a
+// dumb compile.
+void compile_() {
+  // Check the doer-word. If we're looking at a (DOCOL) word, compile a call_.
+  // TODO: Probably need custom handling for other stuff too: (DODOES),
+  // (DOSTRING)?
+  if (*((code**) sp[0]) == &code_docol) {
+    *(dsp.cells++) = (cell) (&call_);
+    *(dsp.cells++) = (cell) (((char*) *(sp++)) + sizeof(cell));
+  } else if (*((code**) sp[0]) == &code_dodoes) {
+    // (DODOES) pushes the data space pointer (CFA + 2 cells) onto the stack,
+    // then checks CFA[1]. If that's 0, do nothing. If it's a CFA, jump to it.
+    // Here we inline that into a literal for the data space pointer followed
+    // optionally by a call_ to the DOES> code.
+    *(dsp.cells++) = (cell) &code_dolit;
+    *(dsp.cells++) = (cell) (((ucell) sp[0]) + 2 * sizeof(cell));
+    if (*((cell*) (((ucell) sp[0]) + sizeof(cell))) != 0) {
+      *(dsp.cells++) = (cell) &call_;
+      *(dsp.cells++) = (cell) *((code**) (((ucell) sp[0]) + sizeof(cell)));
+    }
+    sp++;
+  } else {
+    *(dsp.cells++) = (cell) *((code**) *(sp++));
+  }
+}
+
+
+
 // This could easily enough be turned into a Forth word.
 char *savedString;
 cell savedLength;
@@ -994,7 +1052,7 @@ quit_loop:
       parse_number_();
       if (sp[0] == 0) { // Successful parse, handle the number.
         if (state == COMPILING) {
-          *(dsp.cells++) = (cell) &(header_dolit.code_field);
+          *(dsp.cells++) = (cell) (header_dolit.code_field);
           *(dsp.cells++) = sp[3]; // Compile low word as the literal.
           sp += 4; // And clear the stack.
         } else {
@@ -1011,15 +1069,15 @@ quit_loop:
       // Successful parse. ( xt 1 ) indicates immediate, ( xt -1 ) not.
       if (sp[0] == 1 || state == INTERPRETING) {
         quitTop = &&quit_loop;
-        ip = &quitTopPtr;
+        ip = &quitTop;
         cfa = (code**) sp[1];
         sp += 2;
         //NEXT1;
         QUIT_JUMP_IN;
         __builtin_unreachable();
       } else { // Compiling mode
-        *(dsp.cells++) = sp[1];
-        sp += 2;
+        sp++;
+        compile_();
       }
     }
   }
@@ -1038,6 +1096,15 @@ WORD(bye, "BYE", 3, &header_quit) {
   exit(0);
 }
 
+WORD(compile_comma, "COMPILE,", 8, &header_bye) {
+  compile_();
+  NEXT;
+}
+
+WORD(debug_break, "(DEBUG)", 7, &header_compile_comma) {
+  NEXT;
+}
+
 
 // File Access
 // Access modes are defined as in the following constants, so they can be
@@ -1047,7 +1114,7 @@ WORD(bye, "BYE", 3, &header_quit) {
 #define FA_BIN (4)
 #define FA_TRUNC (8)
 
-WORD(close_file, "CLOSE-FILE", 10, &header_bye) {
+WORD(close_file, "CLOSE-FILE", 10, &header_debug_break) {
   c1 = (cell) fclose((FILE*) sp[0]);
   sp[0] = c1 ? errno : 0;
   NEXT;
@@ -1258,6 +1325,8 @@ WORD(flush_file, "FLUSH-FILE", 10, &header_write_line) {
 
 WORD(colon, ":", 1, &header_flush_file) {
   PRINT_TRACE(":");
+  // Align HERE.
+  dsp.chars = (char*) ((((ucell) (dsp.chars)) + sizeof(cell) - 1) & ~(sizeof(cell) - 1));
   tempHeader = (header*) dsp.chars;
   dsp.chars += sizeof(header);
   tempHeader->link = dictionary;
@@ -1269,23 +1338,48 @@ WORD(colon, ":", 1, &header_flush_file) {
     // Never returns
   }
 
+#ifdef DEBUG
+  print((char*) sp[1], sp[0]);
+#endif
   tempHeader->name = (char*) malloc(sp[0]);
   strncpy(tempHeader->name, (char*) sp[1], sp[0]);
   tempHeader->metadata = sp[0] | HIDDEN;
   sp += 2;
   tempHeader->code_field = &code_docol;
+  lastWord = &(tempHeader->code_field);
+
+#ifdef DEBUG
+  printf(" starts at %" PRIxPTR "\n", (cell) dsp.chars);
+#endif
 
   state = COMPILING;
   NEXT;
 }
 
-WORD(exit, "EXIT", 4, &header_colon) {
-  PRINT_TRACE("EXIT");
-  // Pop the return stack and NEXT into it.
-  ip = (code***) *(rsp++);
+WORD(colon_no_name, ":NONAME", 7, &header_colon) {
+  PRINT_TRACE(":NONAME");
+
+  // Similar to : but without parsing and storing a name.
+  // Has no header, just pushes its own xt onto the stack.
+
+  // Align HERE.
+  dsp.chars = (char*) ((((ucell) (dsp.chars)) + sizeof(cell) - 1) & ~(sizeof(cell) - 1));
+  lastWord = (code**) dsp.cells;
+  *(--sp) = (cell) dsp.cells;
+  *(dsp.cells++) = (cell) &code_docol;
+
+  state = COMPILING;
   NEXT;
 }
 
+WORD(exit, "EXIT", 4, &header_colon_no_name) {
+  PRINT_TRACE("EXIT");
+  // Pop the return stack and NEXT into it.
+  ip = (code**) *(rsp++);
+  NEXT;
+}
+
+// TODO: This is broken in the new style, but I'm ignoring it.
 WORD(see, "SEE", 3, &header_exit) {
   PRINT_TRACE("SEE");
   // Parses a word and visualizes its contents.
@@ -1351,7 +1445,7 @@ WORD(semicolon, ";", 1 | IMMEDIATE, &header_see) {
   PRINT_TRACE(";");
   dictionary->metadata &= (~HIDDEN); // Clear the hidden bit.
   // Compile an EXIT
-  *(dsp.cells++) = (cell) &(header_exit.code_field);
+  *(dsp.cells++) = (cell) (header_exit.code_field);
   // And stop compiling.
   state = INTERPRETING;
   NEXT;
