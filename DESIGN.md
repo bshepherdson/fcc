@@ -1,4 +1,99 @@
-# Design Notes
+# Superinstructions Design
+
+Following Ertl01, the plan is to create an interpreter that uses a hybrid
+technique of direct and indirect threading.
+
+As of this writing the engine in `portable/` is functional and
+Standard-compliant, but not very fast. It's a fairly naive indirect-threaded
+interpreter.
+
+I want to rebuild the engine to support much faster execution at the expense of
+some memory and complexity, using an approach of primitive-centric direct
+threading, with superinstructions.
+
+## Execution Model
+
+There will be a small set of perhaps 60 "primitives". These are the basic,
+irreducible instructions. Math, comparisons, memory access, basic I/O, control
+flow, literals, etc.
+
+From those, a larger set of "superinstructions" will be constructed that combine
+several primitives into 1 jump, further accelerating performance.
+
+A compiled definition will be a direct-threaded series of code addresses.
+
+### Pros
+
+- Much faster execution: the `NEXT` at the end of each superinstruction will
+  jump straight to the address found at `ip`.
+- Combining primitives into superinstructions further reduces the number of
+  jumps and amount of memory traffic.
+- The superinstructions can be further optimized (eg. peephole optimization) to
+  reduce memory traffic and keep values in registers.
+- Easy to separate word headers from implementations.
+
+### Cons
+
+- Debuggability: This is why `gforth` and `gforth-fast` are separate binaries.
+  When the definitions are hacked up into superinstructions and inlined, there's
+  no easy way to reconstruct them anymore, or even tell which definition it is.
+- Implementation complexity, of course.
+- Memory use - the total amount of machine code to implement the
+  superinstructions goes up. Also, the primitive-centric threaded code also
+  includes a lot more inline operands, esp. for `call`.
+
+## Choosing Superinstructions
+
+There are a few obvious ones (`+ @`, `lit + @`, `lit @`) but it's not clear what
+the total set should look like, how many there should be, etc.
+
+There's some empirical evidence in Ertl's various papers that suggest that
+returns begin to diminish after a few hundred superinstructions.
+
+It seems convenient from an implementation POV to make each superinstruction's
+equivalent list of primitives reducible to a 32-bit value.
+
+Also, if the superinstructions are being hand-written or hand-optimized (see
+below) then the maximum number is obviously limited.
+
+### Dynamic Superinstructions
+
+One clever possibility is generating new superinstructions dynamically, almost
+like a JIT. That's quite a bit more complex, especially if we also want to be
+able to optimize the resulting combinations more than just by `cat`ing them
+together.
+
+On the whole, I think I'll punt on this one.
+
+### Gradual Refinement of Static Superinstructions
+
+I'll add a flag to the binary that makes it run an accounting rig dynamically at
+runtime. It'll record the number of times particular 2-, 3- and 4-primitive
+sequences appear, and how many times particular superinstructions are run.
+
+By running whatever Forth applications I want (the test suite, the Gameboy, the
+Z-machine, the DCPU interpreter) and eyeballing the accounting results, I can
+determine what sequences of primitives are most profitably turned into
+superinstructions.
+
+Eventually, the hope is that existing superinstructions will dominate the flow,
+and there will be no standouts for conversion, just a long tail of rare or
+application-specific sequences.
+
+## C Functions and Superinstructions
+
+Some of the functions are rare and complex (`:`, `compile,`, `(find)`) and I'll
+just leave them as C functions and ignore them in the accounting output.
+
+However most of the basic primitives (math, logic, memory access, etc.) are
+nicely convertible to assembly and thence into superinstructions.
+
+
+
+# Original Design Notes
+
+**The below is the original design notes for FCC. Almost no part of them ended
+up being accurate.**
 
 FCC is a Forth compiler compiler. That is, it's an interpreter and compiler for
 Forth systems that can compile itself from scratch, and compile Forth programs
