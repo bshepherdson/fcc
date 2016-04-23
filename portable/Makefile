@@ -9,6 +9,12 @@ INCLUDES=-Iinclude
 ELF_FORMAT=$(shell objcopy --info | head -n 2 | tail -n 1)
 ELF_ARCH=$(shell objcopy --info | head -n 4 | tail -n 1)
 
+# Need to have slightly different gold test output on 32- and 64-bit platforms.
+TEST_GOLD=test/test.32.gold
+ifneq ($(filter %64,$(shell uname -m)),)
+    TEST_GOLD=test/test.64.gold
+endif
+
 .PHONY: all
 
 default: all
@@ -37,7 +43,7 @@ test: forth FORCE
 	  test/files.fs \
 	  test/final.fs \
 	  > test.out < test/test.in
-	cmp -s test.out test/test.gold || (echo Tests failed, output does not match gold && rm -f fatest*.txt test.out && exit 1)
+	cmp -s test.out $(TEST_GOLD) || (echo Tests failed, output does not match gold && rm -f fatest*.txt test.out && exit 1)
 	rm -f fatest*.txt test.out
 
 FORCE:
