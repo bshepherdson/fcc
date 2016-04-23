@@ -186,6 +186,8 @@ __attribute__((__noreturn__, __used__)) void code_ ## id (void)
 // depth >= 3 ? print : depth == 2 ? print : depth == 1 ? print : print
 // Printing the top 3, or as much as there is on the stack.
 #define PRINT_TRACE(str) ((cell) (((char*) spTop) - ((char*) sp)) / sizeof(cell)) >= 3 ? printf(str "\t (%" PRIdPTR ") %" PRIdPTR " %" PRIdPTR " %" PRIdPTR "\n", ((cell) (((char*) spTop) - ((char*) sp)) / sizeof(cell)), sp[2], sp[1], sp[0]) : ((cell) (((char*) spTop) - ((char*) sp)) / sizeof(cell)) == 2 ? printf(str "\t (%" PRIdPTR ") %" PRIdPTR " %" PRIdPTR "\n", ((cell) (((char*) spTop) - ((char*) sp)) / sizeof(cell)), sp[1], sp[0]) : ((cell) (((char*) spTop) - ((char*) sp)) / sizeof(cell)) == 1 ? printf(str "\t (%" PRIdPTR ") %" PRIdPTR "\n", ((cell) (((char*) spTop) - ((char*) sp)) / sizeof(cell)), sp[0]) : printf(str "\t (%" PRIdPTR ")\n", ((cell) (((char*) spTop) - ((char*) sp)) / sizeof(cell)))
+#elif ACCOUNTING
+#define PRINT_TRACE(str) fprintf(stderr, str "\n")
 #else
 #define PRINT_TRACE(str)
 #endif

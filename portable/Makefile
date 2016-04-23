@@ -3,7 +3,7 @@ FORTH_MODULES=$(shell find $(MODULE_DIR) -name "*.fs")
 FORTH_OBJECTS := $(FORTH_MODULES:%.fs=%.o)
 
 LIBS=-lreadline
-CFLAGS=-std=c99 -Wall -Wextra -fomit-frame-pointer -O0 -g
+CFLAGS+=-std=c99 -Wall -Wextra -fomit-frame-pointer -O0 -g
 INCLUDES=-Iinclude
 
 ELF_FORMAT=$(shell objcopy --info | head -n 2 | tail -n 1)
