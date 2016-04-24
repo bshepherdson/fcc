@@ -342,7 +342,68 @@ WORD(drop, "DROP", 4, &header_swap) {
   NEXT;
 }
 
-WORD(to_r, ">R", 2, &header_drop) {
+WORD(over, "OVER", 4, &header_drop) {
+  PRINT_TRACE("OVER");
+  c1 = sp[1];
+  *(--sp) = c1;
+  NEXT;
+}
+
+WORD(rot, "ROT", 3, &header_over) {
+  PRINT_TRACE("ROT");
+  // ( c b a -- b a c )
+  c1 = sp[2];
+  sp[2] = sp[1];
+  sp[1] = sp[0];
+  sp[0] = c1;
+  NEXT;
+}
+
+WORD(neg_rot, "-ROT", 4, &header_rot) {
+  PRINT_TRACE("-ROT");
+  // ( c b a -- a c b )
+  c1 = sp[2];
+  sp[2] = sp[0];
+  sp[0] = sp[1];
+  sp[1] = c1;
+  NEXT;
+}
+
+WORD(two_drop, "2DROP", 5, &header_neg_rot) {
+  PRINT_TRACE("2DROP");
+  sp += 2;
+  NEXT;
+}
+
+WORD(two_dup, "2DUP", 4, &header_two_drop) {
+  PRINT_TRACE("2DUP");
+  sp -= 2;
+  sp[1] = sp[3];
+  sp[0] = sp[2];
+  NEXT;
+}
+
+WORD(two_swap, "2SWAP", 5, &header_two_dup) {
+  PRINT_TRACE("2SWAP");
+  c1 = sp[2];
+  sp[2] = sp[0];
+  sp[0] = c1;
+
+  c1 = sp[3];
+  sp[3] = sp[1];
+  sp[1] = c1;
+  NEXT;
+}
+
+WORD(two_over, "2OVER", 5, &header_two_swap) {
+  PRINT_TRACE("2OVER");
+  sp -= 2;
+  sp[0] = sp[4];
+  sp[1] = sp[5];
+  NEXT;
+}
+
+WORD(to_r, ">R", 2, &header_two_over) {
   PRINT_TRACE(">R");
   *(--rsp) = *(sp++);
   NEXT;
@@ -602,7 +663,19 @@ WORD(size_char, "(/CHAR)", 7, &header_size_cell) {
   NEXT;
 }
 
-WORD(unit_bits, "(ADDRESS-UNIT-BITS)", 19, &header_size_char) {
+WORD(cells, "CELLS", 5, &header_size_char) {
+  PRINT_TRACE("CELLS");
+  sp[0] *= sizeof(cell);
+  NEXT;
+}
+
+WORD(chars, "CHARS", 5, &header_cells) {
+  PRINT_TRACE("CELLS");
+  sp[0] *= sizeof(char);
+  NEXT;
+}
+
+WORD(unit_bits, "(ADDRESS-UNIT-BITS)", 19, &header_chars) {
   PRINT_TRACE("(ADDRESS-UNIT-BITS)");
   *(--sp) = (cell) (CHAR_BIT);
   NEXT;

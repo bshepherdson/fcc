@@ -12,22 +12,7 @@
 : 1+ 1 + ;
 : 1- 1 - ;
 
-: OVER ( a b -- a b a ) >R dup R> swap ;
-: ROT ( a b c -- b c a ) >R swap R> swap ;
-: -ROT ( a b c -- c a b ) swap >R swap R> ;
-
-: 2DROP drop drop ;
-: 2DUP over over ;
-: 2SWAP ( a b c d -- c d a b )
-  >R -rot ( c a b   R: d )
-  R>      ( c a b d )
-  -rot    ( c d a b )
-;
-: 2OVER ( a b c d -- a b c d a b ) >r >r 2dup r> r> ( a b a b c d ) 2swap ;
-
-: CELLS (/CELL) * ;
 : CELL+ ( a-addr -- a-addr ) 1 CELLS + ;
-: CHARS (/CHAR) * ;
 : CHAR+ 1 CHARS + ;
 
 : INVERT -1 xor ;
@@ -199,10 +184,7 @@ VARIABLE (loop-top)
 
 \ PICK is actually from CORE EXT, but it's useful for (LOOP-END).
 : PICK ( xn ... x1 x0 u -- xn ... x1 x0 xn )
-  dup 0= IF drop dup EXIT THEN
-  1- SWAP >R recurse ( ... ret )
-  r> swap
-;
+  1+ cells sp@ + @ ;
 
 \ Called at the end of a +loop, with the delta.
 \ Remember that the real return address is on the return stack.
