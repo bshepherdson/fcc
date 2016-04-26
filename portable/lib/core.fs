@@ -46,14 +46,15 @@
 
 : /MOD ( a b -- r q ) 2dup mod -rot / ;
 
-: ALLOT ( n -- ) (>HERE) +! ;
-: HERE (>HERE) @ ;
+\ Need to flush any queued primitives before touching HERE.
+: ALLOT ( n -- ) (control-flush) (>HERE) +! ;
+: HERE (control-flush) (>HERE) @ ;
 
 : , ( x -- ) HERE !   1 cells (>HERE) +! ;
 : C, ( c -- ) here c!   1 chars (>HERE) +! ;
 
 : ALIGNED ( addr - a-addr ) (/cell) 1-   dup >R   + R>   invert and ;
-: ALIGN (>here) @ aligned (>here) ! ;
+: ALIGN (control-flush) (>here) @ aligned (>here) ! ;
 
 : [ 0 state ! ; IMMEDIATE
 : ] 1 state ! ;
@@ -62,29 +63,21 @@
 
 : ' ( "name" -- xt ) parse-name (find) drop ;
 
-\ Compiles a literal into the current definition.
-: LITERAL ( x -- ) ( RT: -- x )
-  [ ' (dolit) dup compile, , ] compile, ,
-; IMMEDIATE
-
 \ Unsafe ['], to be replaced below with a version using IF.
 : ['] ( "<spaces>name<space>" -- xt )
-  parse-name (find) drop
-  [ ' (dolit) dup compile, , ] compile, ,
+  parse-name (find) drop [LITERAL]
 ; IMMEDIATE
 
-\ Compiling counterpart to LITERAL. Compiles a (dolit) and then the value on top
-\ of the stack.
-: [LITERAL] ['] (dolit) compile, , ;
 
+\ Changing the way these work. [branch] (and [0branch]) enqueues a (branch) (or
+\ (0branch)) primitive with a payload of 0. It then drains the queue and
+\ returns the address the offset was compiled at, since that's needed later.
 
 \ Control structures.
-: IF ( ? --   C: -- jumploc ) ['] (0branch) compile,  HERE   0 , ; IMMEDIATE
-: THEN ( C: jumploc -- ) here over - swap ! ; IMMEDIATE
+: IF ( ? --   C: -- jumploc ) [0branch] ; IMMEDIATE
+: THEN ( C: jumploc -- ) here ( ifloc endloc ) over - swap ! ; IMMEDIATE
 : ELSE ( C: jumploc1 -- jumploc2 )
-  ['] (branch) compile,
-  here
-  0 ,     ( ifloc endifloc )
+  [branch] ( ifloc endifloc )
   here    ( ifloc endifloc elseloc )
   rot     ( endifloc elseloc ifloc )
   dup >r - ( endifloc delta  R: ifloc )
@@ -93,26 +86,29 @@
 
 : BEGIN ( C: -- beginloc ) here ; IMMEDIATE
 : WHILE ( ? -- C: beginloc -- whileloc beginloc )
-  ['] (0branch) compile,
-  here swap 0 ,
+  [0branch] swap
 ; IMMEDIATE
 : REPEAT ( C: whileloc beginloc -- )
   \ First, write the unconditional jump to the begin.
-  ['] (branch) compile,
-  here - , ( whileloc )
+  [branch] ( whileloc beginloc endloc )
+  2dup - ( whileloc beginloc endloc delta )
+  swap ! ( whileloc beginloc )
+  drop   ( whileloc )
   \ Then fill in the end location for the whileloc
   here over - swap ! ( )
 ; IMMEDIATE
-: UNTIL ( ? --   C: beginloc -- ) ['] (0branch) compile, here - , ; IMMEDIATE
-
+: UNTIL ( ? --   C: beginloc -- )
+  [0branch] ( beginloc endloc ) dup >R - R> !
+; IMMEDIATE
 
 : CHAR ( "<spaces>name" -- char ) parse-name drop c@ ;
-: [CHAR] char [ ' (dolit) dup compile, , ] compile, , ; IMMEDIATE
+: [CHAR] char [literal] ; IMMEDIATE
 
 
 : SPACE bl emit ;
 : SPACES ( n -- ) dup 0<= IF drop EXIT THEN BEGIN space 1- dup 0= UNTIL drop ;
 
+\ This would be faster as a primitive, probably?
 : TYPE ( c-addr u -- )
   BEGIN dup 0> WHILE
     1- swap
@@ -169,9 +165,8 @@ VARIABLE (loop-top)
 
 : DO ( limit index --   C: old-jump-addr )
   ['] swap compile, ['] >r dup compile, compile,
-  1 [literal]   ['] (0branch) compile,
-  (loop-top) @    here (loop-top) ! ( C: old-jump-addr )
-  0 , \ Placeholder for the jump offset to go.
+  1 [literal]   [0branch] ( new-loop-top )
+  (loop-top) @ swap   (loop-top) ! ( C: old-jump-addr )
 ; IMMEDIATE
 
 : I ( -- index ) ['] R@ compile, ; IMMEDIATE
@@ -213,8 +208,8 @@ VARIABLE (loop-top)
 : +LOOP ( step --    C: old-jump-addr )
   \ Compute the point where the end of the loop will be.
   \ 9 cells after this point.
-  ['] (LOOP-END) compile, ['] (0branch) compile,
-  (loop-top) @ cell+   here - ,
+  ['] (LOOP-END) compile, [0branch] ( old-top bottom )
+  (loop-top) @ cell+   over - swap ! ( old-top )
 
   \ End of the loop, start of the postlude ( C: -- )
   here ( C: old-jump-addr end-addr )
@@ -229,9 +224,9 @@ VARIABLE (loop-top)
 
 : LEAVE ( -- ) ( R: loop-details -- ) ( C: -- )
   (loop-top) @ 1 cells -
-  0 [LITERAL] \ Force a branch
-  ['] (branch) compile,
-  here - ,
+  0 [LITERAL] \ Force a branch (at the top's conditional branch).
+  [branch] ( top target )
+  swap over - swap !
 ; IMMEDIATE
 
 : UNLOOP ( -- ) ( R: limit index exit -- exit )
@@ -262,6 +257,8 @@ VARIABLE (loop-top)
 
 : ABORT quit ;
 
+\ Safer ['], checks whether we found the word and ABORTs if not.
+\ TODO Do this later and use ABORT" ?
 : ['] ( "<spaces>name<space>" -- xt )
   parse-name (find)
   IF [literal] ELSE ABORT THEN
@@ -277,7 +274,7 @@ here 256 8 * chars allot CONSTANT (string-buffers)
 : S"
   [CHAR] " parse ( c-addr u )
   state @ IF
-    ['] (dostring) compile, dup c, ( c-addr u )
+    ['] (dostring) compile, (control-flush) dup c, ( c-addr u )
     here swap ( c-addr here u )
     dup >R
     move ( )

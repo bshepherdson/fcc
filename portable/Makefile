@@ -12,6 +12,10 @@ ifeq ($(ACCOUNTING), yes)
   CFLAGS+=-DACCOUNTING
 endif
 
+ifneq ($(SUPERINSTRUCTIONS), no)
+  CFLAGS+=-DENABLE_SUPERINSTRUCTIONS
+ endif
+
 
 ELF_FORMAT=$(shell objcopy --info | head -n 2 | tail -n 1)
 ELF_ARCH=$(shell objcopy --info | head -n 4 | tail -n 1)
