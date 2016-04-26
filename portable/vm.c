@@ -1128,18 +1128,21 @@ void drain_queue_(void) {
       if (superinstructions[c2].key == key1) {
         // We have a match!
         // Compile it in.
+#ifdef SUPERINSTRUCTION_DEBUG
         fprintf(stderr, "Superinstruction match! %x %" PRIuPTR " %d %" PRIuPTR "\n",
             key1, (cell) superinstructions[c2].implementation, queue->hasValue,
             queue->value);
+#endif
 
         *(dsp.cells++) = (cell) superinstructions[c2].implementation;
 
-        while (queue != tempQueue) {
+        while (c1 > 0) {
           if (queue->hasValue) {
             *(dsp.cells++) = queue->value;
           }
           queue = queue->next;
           queue_length--;
+          c1--;
         }
         if (queue == NULL) queueTail = NULL;
         return;
@@ -1147,7 +1150,7 @@ void drain_queue_(void) {
     }
     c1--;
     // Mask off another byte and try again.
-    key1 &= ((super_key_t) -1) >> ((3 - c1) * 8);
+    key1 &= ((super_key_t) -1) >> ((4 - c1) * 8);
   }
 #endif
 
@@ -1992,7 +1995,7 @@ void init_superinstructions(void) {
   ADD_SI2(from_r, dup);
   ADD_SI2(dolit, equal);
   ADD_SI2(dolit, fetch);
-  ADD_SI2(dup, to_r);
+  //ADD_SI2(dup, to_r); // TODO: Why doesn't this one work?
   ADD_SI2(dolit, dolit);
   ADD_SI2(plus, exit);
   ADD_SI2(dolit, plus);
@@ -2000,6 +2003,6 @@ void init_superinstructions(void) {
   ADD_SI2(plus, fetch);
   ADD_SI2(to_r, to_r);
 
-  ADD_SI4(to_r, swap, to_r, exit);
+  //ADD_SI4(to_r, swap, to_r, exit);
 }
 

@@ -7,14 +7,18 @@ INCLUDES=-Iinclude
 
 CC?=gcc
 
-CFLAGS+=-std=c99 -Wall -Wextra -O0 -fomit-frame-pointer
+CFLAGS+=-std=c99 -Wall -Wextra -O0 -fomit-frame-pointer -g
 ifeq ($(ACCOUNTING), yes)
   CFLAGS+=-DACCOUNTING
 endif
 
 ifneq ($(SUPERINSTRUCTIONS), no)
   CFLAGS+=-DENABLE_SUPERINSTRUCTIONS
- endif
+endif
+
+ifeq ($(SUPERINSTRUCTION_DEBUG), yes)
+  CFLAGS+=-DSUPERINSTRUCTION_DEBUG
+endif
 
 
 ELF_FORMAT=$(shell objcopy --info | head -n 2 | tail -n 1)
