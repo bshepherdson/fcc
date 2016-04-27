@@ -7,7 +7,7 @@ INCLUDES=-Iinclude
 
 CC?=gcc
 
-CFLAGS+=-std=c99 -Wall -Wextra -O0 -fomit-frame-pointer -g
+CFLAGS+=-std=c99 -Wall -Wextra -fomit-frame-pointer
 ifeq ($(ACCOUNTING), yes)
   CFLAGS+=-DACCOUNTING
 endif
@@ -18,6 +18,24 @@ endif
 
 ifeq ($(SUPERINSTRUCTION_DEBUG), yes)
   CFLAGS+=-DSUPERINSTRUCTION_DEBUG
+endif
+
+ifneq ($(OPT), no)
+  # This is all the flags mentioned on -O1. -O1 itself fails, however.
+  # TODO: Figure out why, someday. For now, these help.
+  # TODO: Actually set up benchmarks.
+  CFLAGS+=-fbranch-count-reg -fcombine-stack-adjustments -fcompare-elim \
+      -fcprop-registers -fdefer-pop -fforward-propagate \
+      -fguess-branch-probability -fif-conversion2 -fif-conversion \
+      -finline-functions-called-once -fipa-profile  -fipa-pure-const \
+      -fipa-reference -fmove-loop-invariants -fshrink-wrap -fsplit-wide-types \
+      -fssa-phiopt -ftree-bit-ccp -ftree-ccp -ftree-ch -ftree-copy-prop \
+      -ftree-copyrename -ftree-dce -ftree-dominator-opts -ftree-dse -ftree-fre \
+      -ftree-pta -ftree-sink -ftree-slsr -ftree-sra -ftree-ter
+endif
+
+ifeq ($(DEBUG), yes)
+  CFLAGS+=-g
 endif
 
 
