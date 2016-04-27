@@ -1984,6 +1984,74 @@ DEF_SI2(to_r, to_r) {
   NEXT;
 }
 
+DEF_SI3(to_r, swap, from_r) {
+  // Actually just swapping sp[1] and sp[2].
+  c1 = sp[2];
+  sp[2] = sp[1];
+  sp[1] = c1;
+  NEXT;
+}
+
+DEF_SI3(swap, to_r, exit) {
+  *(--rsp) = sp[1];
+  sp[1] = sp[0];
+  sp++;
+  EXIT_NEXT;
+}
+
+DEF_SI3(from_r, from_r, dup) {
+  sp -= 3;
+  sp[2] = rsp[0];
+  sp[0] = sp[1] = rsp[1];
+  rsp += 2;
+  NEXT;
+}
+
+DEF_SI3(dup, to_r, swap) {
+  *(--rsp) = sp[0];
+  c1 = sp[1];
+  sp[1] = sp[0];
+  sp[0] = c1;
+  NEXT;
+}
+
+// Here
+DEF_SI3(from_r, dup, to_r) {
+  *(--sp) = rsp[0];
+  NEXT;
+}
+
+DEF_SI3(dolit, fetch, exit) {
+  *(--sp) = *((cell*) *(ip++));
+  EXIT_NEXT;
+}
+
+DEF_SI3(dolit, plus, exit) {
+  sp[0] += (cell) *(ip++);
+  EXIT_NEXT;
+}
+
+DEF_SI3(dolit, less_than, exit) {
+  sp[0] = sp[0] < ((cell) *(ip++)) ? true : false;
+  EXIT_NEXT;
+}
+
+// TODO: This is a candidate for compile-time inlining, actually.
+// Probably not worth the investment.
+DEF_SI3(dolit, dolit, plus) {
+  *(--sp) = ((cell*) ip)[0] + ((cell*) ip)[1];
+  ip += 2;
+  NEXT;
+}
+
+/*
+DEF_SI3(cells, sp_fetch, plus) {
+  sp[0] = ((cell) sp) + (sp[0] * sizeof(cell));
+  NEXT;
+}
+*/
+
+
 void init_superinstructions(void) {
   nextSuperinstruction = 0;
 
@@ -2002,6 +2070,11 @@ void init_superinstructions(void) {
   ADD_SI2(dolit, less_than);
   ADD_SI2(plus, fetch);
   ADD_SI2(to_r, to_r);
+
+  ADD_SI3(to_r, swap, from_r);
+  ADD_SI3(swap, to_r, exit);
+  ADD_SI3(from_r, from_r, dup);
+  ADD_SI3(dup, to_r, swap);
 
   //ADD_SI4(to_r, swap, to_r, exit);
 }
