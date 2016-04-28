@@ -5,6 +5,8 @@ FORTH_OBJECTS := $(FORTH_MODULES:%.fs=%.o)
 LIBS=-lreadline
 INCLUDES=-Iinclude
 
+BENCHMARKS=bubble-sort fib matrix-mult mm-rtcg sieve
+
 CC?=gcc
 
 CFLAGS+=-std=c99 -Wall -Wextra -fomit-frame-pointer
@@ -79,6 +81,12 @@ test: forth FORCE
 	  > test.out < test/test.in
 	cmp -s test.out $(TEST_GOLD) || (echo Tests failed, output does not match gold && rm -f fatest*.txt test.out && exit 1)
 	rm -f fatest*.txt test.out
+
+bench: FORCE forth
+	@for a in $(BENCHMARKS); do \
+	echo =======   $$a   ======== ; \
+	time ./forth bench/$$a.fs ; \
+	done
 
 FORCE:
 
