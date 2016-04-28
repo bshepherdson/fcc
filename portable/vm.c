@@ -2009,6 +2009,12 @@ DEF_SI2(dolit, call_) {
   CALL_NEXT;
 }
 
+DEF_SI2(equal, exit) {
+  sp[1] = sp[1] == sp[0] ? true : false;
+  sp++;
+  EXIT_NEXT;
+}
+
 
 // 3-part superinstructions
 
@@ -2043,7 +2049,6 @@ DEF_SI3(dup, to_r, swap) {
   NEXT;
 }
 
-// Here
 DEF_SI3(from_r, dup, to_r) {
   *(--sp) = rsp[0];
   NEXT;
@@ -2077,6 +2082,53 @@ DEF_SI3(cells, sp_fetch, plus) {
   NEXT;
 }
 
+DEF_SI3(to_r, swap, to_r) {
+  *(--rsp) = sp[0];
+  *(--rsp) = sp[2];
+  sp[2] = sp[1];
+  sp += 2;
+  NEXT;
+}
+
+DEF_SI3(dolit, equal, exit) {
+  sp[0] = sp[0] == ((cell) *(ip++)) ? true : false;
+  EXIT_NEXT;
+}
+
+DEF_SI3(sp_fetch, plus, fetch) {
+  sp[0] = *((cell*) ((cell) sp) + sp[0]);
+  NEXT;
+}
+
+DEF_SI3(plus, fetch, exit) {
+  sp[1] = *((cell*) sp[1] + sp[0]);
+  sp++;
+  EXIT_NEXT;
+}
+
+DEF_SI3(from_r, from_r, two_dup) {
+  sp -= 4;
+  sp[3] = rsp[0];
+  sp[1] = rsp[0];
+  sp[2] = rsp[1];
+  sp[0] = rsp[1];
+  rsp += 2;
+  NEXT;
+}
+
+// ( a b c -- c a b -- c a+b -- c / a+b )
+DEF_SI3(neg_rot, plus, to_r) {
+  *(--rsp) = sp[1] + sp[2];
+  sp[2] = sp[0];
+  sp += 2;
+  NEXT;
+}
+
+DEF_SI3(two_dup, minus, to_r) {
+  *(--rsp) = sp[1] - sp[0];
+  NEXT;
+}
+
 
 // 4-part superinstructions
 
@@ -2099,7 +2151,7 @@ void init_superinstructions(void) {
   ADD_SI2(from_r, dup);
   ADD_SI2(dolit, equal);
   ADD_SI2(dolit, fetch);
-  //ADD_SI2(dup, to_r); // TODO: Why doesn't this one work?
+  ADD_SI2(dup, to_r);
   ADD_SI2(dolit, dolit);
   ADD_SI2(plus, exit);
   ADD_SI2(dolit, plus);
@@ -2107,13 +2159,37 @@ void init_superinstructions(void) {
   ADD_SI2(plus, fetch);
   ADD_SI2(to_r, to_r);
   ADD_SI2(dolit, call_);
+  ADD_SI2(equal, exit);
 
   ADD_SI3(to_r, swap, from_r);
   ADD_SI3(swap, to_r, exit);
   ADD_SI3(from_r, from_r, dup);
   ADD_SI3(dup, to_r, swap);
   ADD_SI3(cells, sp_fetch, plus);
+  ADD_SI3(to_r, swap, to_r);
+  ADD_SI3(dolit, equal, exit);
+  ADD_SI3(from_r, dup, to_r);
+  ADD_SI3(dolit, plus, exit);
+  ADD_SI3(dolit, less_than, exit);
+  ADD_SI3(sp_fetch, plus, fetch);
+  ADD_SI3(plus, fetch, exit);
+  ADD_SI3(from_r, from_r, two_dup);
+  ADD_SI3(neg_rot, plus, to_r);
+  ADD_SI3(two_dup, minus, to_r);
 
+
+  // To add:
   //ADD_SI4(to_r, swap, to_r, exit);
+  //ADD_SI4(dup, to_r, swap, to_r);
+  //ADD_SI4(from_r, dup, to_r, swap);
+  //ADD_SI4(from_r, from_r, dup, to_r);
+  //ADD_SI4(cells, sp_fetch, plus, fetch);
+  //ADD_SI4(two_dup, minus, to_r, dolit);
+  //ADD_SI4(from_r, two_dup, minus, to_r);
+  //ADD_SI4(from_r, from_r, two_dup, minus);
 }
+
+// TODO: Converting PICK into C would probably speed up loops a lot; it looks
+// like several of the hottest superinstructions are coming from (LOOP-END),
+// which uses PICK.
 
