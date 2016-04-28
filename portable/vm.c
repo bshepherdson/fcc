@@ -2139,6 +2139,57 @@ DEF_SI4(to_r, swap, to_r, exit) {
   EXIT_NEXT;
 }
 
+// ( a b -- b   R: a b )
+DEF_SI4(dup, to_r, swap, to_r) {
+  rsp -= 2;
+  rsp[1] = sp[0];
+  rsp[0] = sp[1];
+  sp[1] = sp[0];
+  sp++;
+  NEXT;
+}
+
+DEF_SI4(from_r, dup, to_r, swap) {
+  sp++;
+  sp[0] = sp[1];
+  sp[1] = rsp[0];
+  NEXT;
+}
+
+DEF_SI4(from_r, from_r, dup, to_r) {
+  sp -= 2;
+  sp[1] = rsp[0];
+  sp[0] = rsp[1];
+  rsp++;
+  NEXT;
+}
+
+DEF_SI4(cells, sp_fetch, plus, fetch) {
+  sp[0] = *((cell*) ((sp[0] * sizeof(cell)) + ((cell) sp)));
+  NEXT;
+}
+
+DEF_SI4(two_dup, minus, to_r, dolit) {
+  *(--rsp) = sp[1] - sp[0];
+  *(--sp) = (cell) *(ip++);
+  NEXT;
+}
+
+// ( a  R: b -- a b -- a b a b -- a b a-b -- a b  R: a-b )
+DEF_SI4(from_r, two_dup, minus, to_r) {
+  *(--sp) = rsp[0];
+  rsp[0] = sp[1] - sp[0];
+  NEXT;
+}
+
+DEF_SI4(from_r, from_r, two_dup, minus) {
+  sp -= 3;
+  sp[2] = rsp[0];
+  sp[1] = rsp[1];
+  sp[0] = sp[2] - sp[1];
+  rsp += 2;
+  NEXT;
+}
 
 void init_superinstructions(void) {
   nextSuperinstruction = 0;
@@ -2177,16 +2228,14 @@ void init_superinstructions(void) {
   ADD_SI3(neg_rot, plus, to_r);
   ADD_SI3(two_dup, minus, to_r);
 
-
-  // To add:
-  //ADD_SI4(to_r, swap, to_r, exit);
-  //ADD_SI4(dup, to_r, swap, to_r);
-  //ADD_SI4(from_r, dup, to_r, swap);
-  //ADD_SI4(from_r, from_r, dup, to_r);
-  //ADD_SI4(cells, sp_fetch, plus, fetch);
-  //ADD_SI4(two_dup, minus, to_r, dolit);
-  //ADD_SI4(from_r, two_dup, minus, to_r);
-  //ADD_SI4(from_r, from_r, two_dup, minus);
+  ADD_SI4(to_r, swap, to_r, exit);
+  ADD_SI4(dup, to_r, swap, to_r);
+  ADD_SI4(from_r, dup, to_r, swap);
+  ADD_SI4(from_r, from_r, dup, to_r);
+  ADD_SI4(cells, sp_fetch, plus, fetch);
+  ADD_SI4(two_dup, minus, to_r, dolit);
+  ADD_SI4(from_r, two_dup, minus, to_r);
+  ADD_SI4(from_r, from_r, two_dup, minus);
 }
 
 // TODO: Converting PICK into C would probably speed up loops a lot; it looks
