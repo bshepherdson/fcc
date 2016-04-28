@@ -10,6 +10,7 @@ CC?=gcc
 CFLAGS+=-std=c99 -Wall -Wextra -fomit-frame-pointer
 ifeq ($(ACCOUNTING), yes)
   CFLAGS+=-DACCOUNTING
+  SUPERINSTRUCTIONS=no
 endif
 
 ifneq ($(SUPERINSTRUCTIONS), no)

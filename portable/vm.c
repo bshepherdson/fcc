@@ -160,7 +160,7 @@ typedef uint32_t super_key_t;
 
 
 // Next key to use:
-int primitive_count = 105;
+int primitive_count = 106;
 
 
 typedef struct queued_primitive_ {
@@ -258,49 +258,49 @@ void print(char *str, cell len) {
 
 
 // Math operations
-WORD(plus, 0, "+", 1, NULL) {
+WORD(plus, 1, "+", 1, NULL) {
   PRINT_TRACE("+");
   sp[1] = sp[0] + sp[1];
   sp++;
   NEXT;
 }
 
-WORD(minus, 1, "-", 1, &header_plus) {
+WORD(minus, 2, "-", 1, &header_plus) {
   PRINT_TRACE("-");
   sp[1] = sp[1] - sp[0];
   sp++;
   NEXT;
 }
 
-WORD(times, 2, "*", 1, &header_minus) {
+WORD(times, 3, "*", 1, &header_minus) {
   PRINT_TRACE("*");
   sp[1] = sp[1] * sp[0];
   sp++;
   NEXT;
 }
 
-WORD(div, 3, "/", 1, &header_times) {
+WORD(div, 4, "/", 1, &header_times) {
   PRINT_TRACE("/");
   sp[1] = sp[1] / sp[0];
   sp++;
   NEXT;
 }
 
-WORD(udiv, 4, "U/", 2, &header_div) {
+WORD(udiv, 5, "U/", 2, &header_div) {
   PRINT_TRACE("U/");
   sp[1] = (cell) (((ucell) sp[1]) / ((ucell) sp[0]));
   sp++;
   NEXT;
 }
 
-WORD(mod, 5, "MOD", 3, &header_udiv) {
+WORD(mod, 6, "MOD", 3, &header_udiv) {
   PRINT_TRACE("MOD");
   sp[1] = sp[1] % sp[0];
   sp++;
   NEXT;
 }
 
-WORD(umod, 6, "UMOD", 4, &header_mod) {
+WORD(umod, 7, "UMOD", 4, &header_mod) {
   PRINT_TRACE("UMOD");
   sp[1] = (cell) (((ucell) sp[1]) % ((ucell) sp[0]));
   sp++;
@@ -308,19 +308,19 @@ WORD(umod, 6, "UMOD", 4, &header_mod) {
 }
 
 // Bitwise ops
-WORD(and, 7, "AND", 3, &header_umod) {
+WORD(and, 8, "AND", 3, &header_umod) {
   PRINT_TRACE("AND");
   sp[1] = sp[1] & sp[0];
   sp++;
   NEXT;
 }
-WORD(or, 8, "OR", 2, &header_and) {
+WORD(or, 9, "OR", 2, &header_and) {
   PRINT_TRACE("OR");
   sp[1] = sp[1] | sp[0];
   sp++;
   NEXT;
 }
-WORD(xor, 9, "XOR", 3, &header_or) {
+WORD(xor, 10, "XOR", 3, &header_or) {
   PRINT_TRACE("XOR");
   sp[1] = sp[1] ^ sp[0];
   sp++;
@@ -328,42 +328,42 @@ WORD(xor, 9, "XOR", 3, &header_or) {
 }
 
 // Shifts
-WORD(lshift, 10, "LSHIFT", 6, &header_xor) {
+WORD(lshift, 11, "LSHIFT", 6, &header_xor) {
   PRINT_TRACE("LSHIFT");
   sp[1] = ((ucell) sp[1]) << sp[0];
   sp++;
   NEXT;
 }
 
-WORD(rshift, 11, "RSHIFT", 6, &header_lshift) {
+WORD(rshift, 12, "RSHIFT", 6, &header_lshift) {
   PRINT_TRACE("RSHIFT");
   sp[1] = ((ucell) sp[1]) >> sp[0];
   sp++;
   NEXT;
 }
 
-WORD(base, 12, "BASE", 4, &header_rshift) {
+WORD(base, 13, "BASE", 4, &header_rshift) {
   PRINT_TRACE("BASE");
   *(--sp) = (cell) &base;
   NEXT;
 }
 
 // Comparison
-WORD(less_than, 13, "<", 1, &header_base) {
+WORD(less_than, 14, "<", 1, &header_base) {
   PRINT_TRACE("<");
   sp[1] = (sp[1] < sp[0]) ? -1 : 0;
   sp++;
   NEXT;
 }
 
-WORD(less_than_unsigned, 14, "U<", 2, &header_less_than) {
+WORD(less_than_unsigned, 15, "U<", 2, &header_less_than) {
   PRINT_TRACE("U<");
   sp[1] = ((ucell) sp[1]) < ((ucell) sp[0]) ? -1 : 0;
   sp++;
   NEXT;
 }
 
-WORD(equal, 15, "=", 1, &header_less_than_unsigned) {
+WORD(equal, 16, "=", 1, &header_less_than_unsigned) {
   PRINT_TRACE("=");
   sp[1] = sp[0] == sp[1] ? -1 : 0;
   sp++;
@@ -371,14 +371,14 @@ WORD(equal, 15, "=", 1, &header_less_than_unsigned) {
 }
 
 // Stack manipulation
-WORD(dup, 16, "DUP", 3, &header_equal) {
+WORD(dup, 17, "DUP", 3, &header_equal) {
   PRINT_TRACE("DUP");
   sp--;
   sp[0] = sp[1];
   NEXT;
 }
 
-WORD(swap, 17, "SWAP", 4, &header_dup) {
+WORD(swap, 18, "SWAP", 4, &header_dup) {
   PRINT_TRACE("SWAP");
   c1 = sp[0];
   sp[0] = sp[1];
@@ -386,20 +386,20 @@ WORD(swap, 17, "SWAP", 4, &header_dup) {
   NEXT;
 }
 
-WORD(drop, 18, "DROP", 4, &header_swap) {
+WORD(drop, 19, "DROP", 4, &header_swap) {
   PRINT_TRACE("DROP");
   sp++;
   NEXT;
 }
 
-WORD(over, 19, "OVER", 4, &header_drop) {
+WORD(over, 20, "OVER", 4, &header_drop) {
   PRINT_TRACE("OVER");
   c1 = sp[1];
   *(--sp) = c1;
   NEXT;
 }
 
-WORD(rot, 20, "ROT", 3, &header_over) {
+WORD(rot, 21, "ROT", 3, &header_over) {
   PRINT_TRACE("ROT");
   // ( c b a -- b a c )
   c1 = sp[2];
@@ -409,7 +409,7 @@ WORD(rot, 20, "ROT", 3, &header_over) {
   NEXT;
 }
 
-WORD(neg_rot, 21, "-ROT", 4, &header_rot) {
+WORD(neg_rot, 22, "-ROT", 4, &header_rot) {
   PRINT_TRACE("-ROT");
   // ( c b a -- a c b )
   c1 = sp[2];
@@ -419,13 +419,13 @@ WORD(neg_rot, 21, "-ROT", 4, &header_rot) {
   NEXT;
 }
 
-WORD(two_drop, 22, "2DROP", 5, &header_neg_rot) {
+WORD(two_drop, 23, "2DROP", 5, &header_neg_rot) {
   PRINT_TRACE("2DROP");
   sp += 2;
   NEXT;
 }
 
-WORD(two_dup, 23, "2DUP", 4, &header_two_drop) {
+WORD(two_dup, 24, "2DUP", 4, &header_two_drop) {
   PRINT_TRACE("2DUP");
   sp -= 2;
   sp[1] = sp[3];
@@ -433,7 +433,7 @@ WORD(two_dup, 23, "2DUP", 4, &header_two_drop) {
   NEXT;
 }
 
-WORD(two_swap, 24, "2SWAP", 5, &header_two_dup) {
+WORD(two_swap, 25, "2SWAP", 5, &header_two_dup) {
   PRINT_TRACE("2SWAP");
   c1 = sp[2];
   sp[2] = sp[0];
@@ -445,7 +445,7 @@ WORD(two_swap, 24, "2SWAP", 5, &header_two_dup) {
   NEXT;
 }
 
-WORD(two_over, 25, "2OVER", 5, &header_two_swap) {
+WORD(two_over, 26, "2OVER", 5, &header_two_swap) {
   PRINT_TRACE("2OVER");
   sp -= 2;
   sp[0] = sp[4];
@@ -453,36 +453,36 @@ WORD(two_over, 25, "2OVER", 5, &header_two_swap) {
   NEXT;
 }
 
-WORD(to_r, 26, ">R", 2, &header_two_over) {
+WORD(to_r, 27, ">R", 2, &header_two_over) {
   PRINT_TRACE(">R");
   *(--rsp) = *(sp++);
   NEXT;
 }
 
-WORD(from_r, 27, "R>", 2, &header_to_r) {
+WORD(from_r, 28, "R>", 2, &header_to_r) {
   PRINT_TRACE("R>");
   *(--sp) = *(rsp++);
   NEXT;
 }
 
 // Memory access
-WORD(fetch, 28, "@", 1, &header_from_r) {
+WORD(fetch, 29, "@", 1, &header_from_r) {
   PRINT_TRACE("@");
   sp[0] = *((cell*) sp[0]);
   NEXT;
 }
-WORD(store, 29, "!", 1, &header_fetch) {
+WORD(store, 30, "!", 1, &header_fetch) {
   PRINT_TRACE("!");
   *((cell*) sp[0]) = sp[1];
   sp += 2;
   NEXT;
 }
-WORD(cfetch, 30, "C@", 2, &header_store) {
+WORD(cfetch, 31, "C@", 2, &header_store) {
   PRINT_TRACE("C@");
   sp[0] = (cell) *((char*) sp[0]);
   NEXT;
 }
-WORD(cstore, 31, "C!", 2, &header_cfetch) {
+WORD(cstore, 32, "C!", 2, &header_cfetch) {
   PRINT_TRACE("C!");
   *((char*) sp[0]) = (char) sp[1];
   sp += 2;
@@ -492,26 +492,26 @@ WORD(cstore, 31, "C!", 2, &header_cfetch) {
 // Allocates new regions. Might use malloc, or just an advancing pointer.
 // The library calls this to acquire somewhere to put HERE.
 // ( size-in-address-units -- a-addr )
-WORD(raw_alloc, 32, "(ALLOCATE)", 10, &header_cstore) {
+WORD(raw_alloc, 33, "(ALLOCATE)", 10, &header_cstore) {
   PRINT_TRACE("(ALLOCATE)");
   sp[0] = (cell) malloc(sp[0]);
   NEXT;
 }
 
-WORD(here_ptr, 33, "(>HERE)", 7, &header_raw_alloc) {
+WORD(here_ptr, 34, "(>HERE)", 7, &header_raw_alloc) {
   PRINT_TRACE("(>HERE)");
   *(--sp) = (cell) (&dsp);
   NEXT;
 }
 
-WORD(print_internal, 34, "(PRINT)", 7, &header_here_ptr) {
+WORD(print_internal, 35, "(PRINT)", 7, &header_here_ptr) {
   PRINT_TRACE("(PRINT)");
   printf("%" PRIdPTR " ", sp[0]);
   sp++;
   NEXT;
 }
 
-WORD(state, 35, "STATE", 5, &header_print_internal) {
+WORD(state, 36, "STATE", 5, &header_print_internal) {
   PRINT_TRACE("STATE");
   *(--sp) = (cell) &state;
   NEXT;
@@ -519,7 +519,7 @@ WORD(state, 35, "STATE", 5, &header_print_internal) {
 
 // Branches
 // Jumps unconditionally by the delta (in bytes) of the next CFA.
-WORD(branch, 36, "(BRANCH)", 8, &header_state) {
+WORD(branch, 37, "(BRANCH)", 8, &header_state) {
   PRINT_TRACE("(BRANCH)");
   str1 = (char*) ip;
   str1 += (cell) *ip;
@@ -529,7 +529,7 @@ WORD(branch, 36, "(BRANCH)", 8, &header_state) {
 
 // Consumes the top argument on the stack. If it's 0, jumps over the branch
 // address. Otherwise, identical to branch above.
-WORD(zbranch, 37, "(0BRANCH)", 9, &header_branch) {
+WORD(zbranch, 38, "(0BRANCH)", 9, &header_branch) {
   PRINT_TRACE("(0BRANCH)");
   str1 = (char*) ip;
   c1 = *(sp++) == 0 ? (cell) *ip : (cell) sizeof(cell);
@@ -541,14 +541,14 @@ WORD(zbranch, 37, "(0BRANCH)", 9, &header_branch) {
 
 // In the direct-threading style, xt's are still a codeword pointer.
 // We need to doubly-indirect before setting cfa.
-WORD(execute, 38, "EXECUTE", 7, &header_zbranch) {
+WORD(execute, 39, "EXECUTE", 7, &header_zbranch) {
   PRINT_TRACE("EXECUTE");
   cfa = (code**) *(sp++);
   ca = *cfa;
   NEXT1;
 }
 
-WORD(evaluate, 39, "EVALUATE", 8, &header_execute) {
+WORD(evaluate, 40, "EVALUATE", 8, &header_execute) {
   PRINT_TRACE("EVALUATE");
   inputIndex++;
   SRC.parseLength = sp[0];
@@ -623,7 +623,7 @@ cell refill_(void) {
   }
 }
 
-WORD(refill, 40, "REFILL", 6, &header_evaluate) {
+WORD(refill, 41, "REFILL", 6, &header_evaluate) {
   PRINT_TRACE("REFILL");
   // Special case here. When the input source is EVALUATE, return false and do
   // nothing else. We don't want to actually call refill_ for that case.
@@ -635,7 +635,7 @@ WORD(refill, 40, "REFILL", 6, &header_evaluate) {
   NEXT;
 }
 
-WORD(accept, 41, "ACCEPT", 6, &header_refill) {
+WORD(accept, 42, "ACCEPT", 6, &header_refill) {
   PRINT_TRACE("ACCEPT");
   str1 = readline(NULL); // No prompt.
   c1 = strlen(str1);
@@ -647,7 +647,7 @@ WORD(accept, 41, "ACCEPT", 6, &header_refill) {
   NEXT;
 }
 
-WORD(key, 42, "KEY", 3, &header_accept) {
+WORD(key, 43, "KEY", 3, &header_accept) {
   PRINT_TRACE("KEY");
 
   // Grab the current terminal settings.
@@ -667,25 +667,25 @@ WORD(key, 42, "KEY", 3, &header_accept) {
   NEXT;
 }
 
-WORD(latest, 43, "(LATEST)", 8, &header_key) {
+WORD(latest, 44, "(LATEST)", 8, &header_key) {
   PRINT_TRACE("(LATEST)");
   *(--sp) = (cell) &dictionary;
   NEXT;
 }
 
-WORD(in_ptr, 44, ">IN", 3, &header_latest) {
+WORD(in_ptr, 45, ">IN", 3, &header_latest) {
   PRINT_TRACE(">IN");
   *(--sp) = (cell) (&SRC.inputPtr);
   NEXT;
 }
 
-WORD(emit, 45, "EMIT", 4, &header_in_ptr) {
+WORD(emit, 46, "EMIT", 4, &header_in_ptr) {
   PRINT_TRACE("EMIT");
   fputc(*(sp++), stdout);
   NEXT;
 }
 
-WORD(source, 46, "SOURCE", 6, &header_emit) {
+WORD(source, 47, "SOURCE", 6, &header_emit) {
   PRINT_TRACE("SOURCE");
   sp -= 2;
   sp[0] = SRC.parseLength;
@@ -693,7 +693,7 @@ WORD(source, 46, "SOURCE", 6, &header_emit) {
   NEXT;
 }
 
-WORD(source_id, 47, "SOURCE-ID", 9, &header_source) {
+WORD(source_id, 48, "SOURCE-ID", 9, &header_source) {
   PRINT_TRACE("SOURCE-ID");
   *(--sp) = SRC.type;
   NEXT;
@@ -701,42 +701,42 @@ WORD(source_id, 47, "SOURCE-ID", 9, &header_source) {
 
 
 // Sizes and metadata
-WORD(size_cell, 48, "(/CELL)", 7, &header_source_id) {
+WORD(size_cell, 49, "(/CELL)", 7, &header_source_id) {
   PRINT_TRACE("(/CELL)");
   *(--sp) = (cell) sizeof(cell);
   NEXT;
 }
 
-WORD(size_char, 49, "(/CHAR)", 7, &header_size_cell) {
+WORD(size_char, 50, "(/CHAR)", 7, &header_size_cell) {
   PRINT_TRACE("(/CHAR)");
   *(--sp) = (cell) sizeof(char);
   NEXT;
 }
 
-WORD(cells, 50, "CELLS", 5, &header_size_char) {
+WORD(cells, 51, "CELLS", 5, &header_size_char) {
   PRINT_TRACE("CELLS");
   sp[0] *= sizeof(cell);
   NEXT;
 }
 
-WORD(chars, 51, "CHARS", 5, &header_cells) {
+WORD(chars, 52, "CHARS", 5, &header_cells) {
   PRINT_TRACE("CELLS");
   sp[0] *= sizeof(char);
   NEXT;
 }
 
-WORD(unit_bits, 52, "(ADDRESS-UNIT-BITS)", 19, &header_chars) {
+WORD(unit_bits, 53, "(ADDRESS-UNIT-BITS)", 19, &header_chars) {
   PRINT_TRACE("(ADDRESS-UNIT-BITS)");
   *(--sp) = (cell) (CHAR_BIT);
   NEXT;
 }
 
-WORD(stack_cells, 53, "(STACK-CELLS)", 13, &header_unit_bits) {
+WORD(stack_cells, 54, "(STACK-CELLS)", 13, &header_unit_bits) {
   PRINT_TRACE("(STACK-CELLS)");
   *(--sp) = (cell) DATA_STACK_SIZE;
   NEXT;
 }
-WORD(return_stack_cells, 54, "(RETURN-STACK-CELLS)", 20, &header_stack_cells) {
+WORD(return_stack_cells, 55, "(RETURN-STACK-CELLS)", 20, &header_stack_cells) {
   PRINT_TRACE("(RETURN-STACK-CELLS)");
   *(--sp) = (cell) RETURN_STACK_SIZE;
   NEXT;
@@ -744,7 +744,7 @@ WORD(return_stack_cells, 54, "(RETURN-STACK-CELLS)", 20, &header_stack_cells) {
 
 // Converts a header* eg. from (latest) into the DOES> address, which is
 // the cell after the CFA.
-WORD(to_does, 55, "(>DOES)", 7, &header_return_stack_cells) {
+WORD(to_does, 56, "(>DOES)", 7, &header_return_stack_cells) {
   PRINT_TRACE("(>DOES)");
   tempHeader = (header*) sp[0];
   sp[0] = ((cell) &(tempHeader->code_field)) + sizeof(cell);
@@ -752,7 +752,7 @@ WORD(to_does, 55, "(>DOES)", 7, &header_return_stack_cells) {
 }
 
 // Converts a header* eg. from (latest) into the code field address.
-WORD(to_cfa, 56, "(>CFA)", 6, &header_to_does) {
+WORD(to_cfa, 57, "(>CFA)", 6, &header_to_does) {
   PRINT_TRACE("(>CFA)");
   tempHeader = (header*) sp[0];
   sp[0] = (cell) &(tempHeader->code_field);
@@ -761,14 +761,14 @@ WORD(to_cfa, 56, "(>CFA)", 6, &header_to_does) {
 
 // Advances a CFA to be the data-space pointer, which is for a CREATEd
 // definition two cells after the xt.
-WORD(to_body, 57, ">BODY", 5, & header_to_cfa) {
+WORD(to_body, 58, ">BODY", 5, & header_to_cfa) {
   PRINT_TRACE(">BODY");
   sp[0] += (cell) (2 * sizeof(cell));
   NEXT;
 }
 
 // Pushes the last word that was defined, whether with : or :NONAME.
-WORD(last_word, 58, "(LAST-WORD)", 11, &header_to_body) {
+WORD(last_word, 59, "(LAST-WORD)", 11, &header_to_body) {
   PRINT_TRACE("(LAST-WORD)");
   *(--sp) = (cell) lastWord;
   NEXT;
@@ -778,7 +778,7 @@ WORD(last_word, 58, "(LAST-WORD)", 11, &header_to_body) {
 // Compiler helpers
 
 // Pushes ip -> rsp, and puts my own data field into ip.
-WORD(docol, 59, "(DOCOL)", 7, &header_last_word) {
+WORD(docol, 60, "(DOCOL)", 7, &header_last_word) {
   PRINT_TRACE("(DOCOL)");
   *(--rsp) = (cell) ip;
   ip = &(cfa[1]);
@@ -786,13 +786,13 @@ WORD(docol, 59, "(DOCOL)", 7, &header_last_word) {
 }
 
 // Pushes its data field onto the stack.
-WORD(dolit, 60, "(DOLIT)", 7, &header_docol) {
+WORD(dolit, 61, "(DOLIT)", 7, &header_docol) {
   PRINT_TRACE("(DOLIT)");
   *(--sp) = (cell) *(ip++);
   NEXT;
 }
 
-WORD(dostring, 61, "(DOSTRING)", 10, &header_dolit) {
+WORD(dostring, 62, "(DOSTRING)", 10, &header_dolit) {
   PRINT_TRACE("(DOSTRING)");
   str1 = ((char*) ip);
   c1 = (cell) *str1;
@@ -811,7 +811,7 @@ WORD(dostring, 61, "(DOSTRING)", 10, &header_dolit) {
 // It uses (dodoes) as the doer word, not docol! That will push the address of
 // the user's data space area, as intended (cfa + 2 cells) and then check that
 // 0 at cfa + 1 cell. If it's 0, do nothing. Otherwise, jump to that point.
-WORD(dodoes, 62, "(DODOES)", 8, &header_dostring) {
+WORD(dodoes, 63, "(DODOES)", 8, &header_dostring) {
   PRINT_TRACE("(DODOES)");
   str1 = (char*) cfa;
   *(--sp) = (cell) (str1 + 2 * sizeof(cell));
@@ -964,19 +964,19 @@ void find_(void) {
   sp[0] = 0;
 }
 
-WORD(parse, 63, "PARSE", 5, &header_dodoes) {
+WORD(parse, 64, "PARSE", 5, &header_dodoes) {
   PRINT_TRACE("PARSE");
   parse_();
   NEXT;
 }
 
-WORD(parse_name, 64, "PARSE-NAME", 10, &header_parse) {
+WORD(parse_name, 65, "PARSE-NAME", 10, &header_parse) {
   PRINT_TRACE("PARSE-NAME");
   parse_name_();
   NEXT;
 }
 
-WORD(to_number, 65, ">NUMBER", 7, &header_parse_name) {
+WORD(to_number, 66, ">NUMBER", 7, &header_parse_name) {
   PRINT_TRACE(">NUMBER");
   to_number_();
   NEXT;
@@ -984,7 +984,7 @@ WORD(to_number, 65, ">NUMBER", 7, &header_parse_name) {
 
 // Parses a name, and constructs a header for it.
 // When finished, HERE is the data space properly, ready for compilation.
-WORD(create, 66, "CREATE", 6, &header_to_number) {
+WORD(create, 67, "CREATE", 6, &header_to_number) {
   PRINT_TRACE("CREATE");
   parse_name_(); // sp[0] = length, sp[1] = string
   dsp.chars = (char*) ((((cell)dsp.chars) + sizeof(cell) - 1) & ~(sizeof(cell) - 1));
@@ -1004,46 +1004,46 @@ WORD(create, 66, "CREATE", 6, &header_to_number) {
   NEXT;
 }
 
-WORD(find, 67, "(FIND)", 6, &header_create) {
+WORD(find, 68, "(FIND)", 6, &header_create) {
   PRINT_TRACE("(FIND)");
   find_();
   NEXT;
 }
 
-WORD(depth, 68, "DEPTH", 5, &header_find) {
+WORD(depth, 69, "DEPTH", 5, &header_find) {
   PRINT_TRACE("DEPTH");
   c1 = (cell) (((char*) spTop) - ((char*) sp)) / sizeof(cell);
   *(--sp) = c1;
   NEXT;
 }
 
-WORD(sp_fetch, 69, "SP@", 3, &header_depth) {
+WORD(sp_fetch, 70, "SP@", 3, &header_depth) {
   PRINT_TRACE("SP@");
   c1 = (cell) sp;
   *(--sp) = c1;
   NEXT;
 }
 
-WORD(sp_store, 70, "SP!", 3, &header_sp_fetch) {
+WORD(sp_store, 71, "SP!", 3, &header_sp_fetch) {
   PRINT_TRACE("SP!");
   c1 = sp[0];
   sp = (cell*) c1;
   NEXT;
 }
 
-WORD(rp_fetch, 71, "RP@", 3, &header_sp_store) {
+WORD(rp_fetch, 72, "RP@", 3, &header_sp_store) {
   PRINT_TRACE("RP@");
   *(--sp) = (cell) rsp;
   NEXT;
 }
 
-WORD(rp_store, 72, "RP!", 3, &header_rp_fetch) {
+WORD(rp_store, 73, "RP!", 3, &header_rp_fetch) {
   PRINT_TRACE("RP!");
   rsp = (cell*) *(sp++);
   NEXT;
 }
 
-WORD(dot_s, 73, ".S", 2, &header_rp_store) {
+WORD(dot_s, 74, ".S", 2, &header_rp_store) {
   PRINT_TRACE(".S");
   printf("[%" PRIdPTR "] ", (cell) (((char*) spTop) - ((char*) sp)) / sizeof(cell));
   for (c1 = (cell) (&spTop[-1]); c1 >= (cell) sp; c1 -= sizeof(cell*)) {
@@ -1053,7 +1053,7 @@ WORD(dot_s, 73, ".S", 2, &header_rp_store) {
   NEXT;
 }
 
-WORD(u_dot_s, 74, "U.S", 3, &header_dot_s) {
+WORD(u_dot_s, 75, "U.S", 3, &header_dot_s) {
   PRINT_TRACE("U.S");
   printf("[%" PRIdPTR "] ", (cell) (((char*) spTop) - ((char*) sp)) / sizeof(cell));
   for (c1 = (cell) (&spTop[-1]); c1 >= (cell) sp; c1 -= sizeof(cell*)) {
@@ -1066,7 +1066,7 @@ WORD(u_dot_s, 74, "U.S", 3, &header_dot_s) {
 // File access
 // This is a hack included to support the assemblers and such.
 // It writes a block of bytes to a binary file.
-WORD(dump_file, 75, "(DUMP-FILE)", 11, &header_u_dot_s) {
+WORD(dump_file, 76, "(DUMP-FILE)", 11, &header_u_dot_s) {
   PRINT_TRACE("(DUMP-FILE)");
   // ( c-addr1 u1 c-addr2 u2 ) String on top (2) and binary data below (1)
   // Open the named file for truncated write-only.
@@ -1096,7 +1096,7 @@ void call_() {
   NEXT;
 }
 
-super_key_t key_call_ = 99;
+super_key_t key_call_ = 100;
 
 // Expects c1 to be the code*.
 // Sets key1 to the associated key. Exits if not found.
@@ -1145,6 +1145,9 @@ void drain_queue_(void) {
           c1--;
         }
         if (queue == NULL) queueTail = NULL;
+#ifdef SUPERINSTRUCTION_DEBUG
+        fprintf(stderr, "\tQueue length remaining: %d\n", queue_length);
+#endif
         return;
       }
     }
@@ -1157,6 +1160,10 @@ void drain_queue_(void) {
   // If we get down here, we've failed to find any superinstruction, but still
   // need to make space in the queue. Therefore, compile the singular entry and
   // advance the queue.
+#ifdef SUPERINSTRUCTION_DEBUG
+  fprintf(stderr, "Basic dequeue, key %d. %d items remaining.\n",
+      queue->key, queue_length - 1);
+#endif
   *(dsp.cells++) = (cell) queue->target;
   if (queue->hasValue) *(dsp.cells++) = queue->value;
   queue = queue->next;
@@ -1192,6 +1199,9 @@ void compile_() {
   // TODO: Probably need custom handling for other stuff too: (DODOES),
   // (DOSTRING)?
   if (*((code**) sp[0]) == &code_docol) {
+#ifdef SUPERINSTRUCTION_DEBUG
+    fprintf(stderr, "Enqueuing a call_\n");
+#endif
     queueTail->target = &call_;
     queueTail->hasValue = 1;
     queueTail->value = (cell) (((char*) *(sp++)) + sizeof(cell));
@@ -1202,6 +1212,9 @@ void compile_() {
     // Here we inline that into a literal for the data space pointer followed
     // optionally by a call_ to the DOES> code.
 
+#ifdef SUPERINSTRUCTION_DEBUG
+    fprintf(stderr, "Enqueuing a (dodoes)\n");
+#endif
     queueTail->target = &code_dolit;
     queueTail->hasValue = 1;
     queueTail->value = (cell) (((ucell) sp[0]) + 2 * sizeof(cell));
@@ -1210,6 +1223,10 @@ void compile_() {
     if (*((cell*) (((ucell) sp[0]) + sizeof(cell))) != 0) {
       if (queue_length == 4) drain_queue_();
       bump_queue_tail_();
+
+#ifdef SUPERINSTRUCTION_DEBUG
+    fprintf(stderr, "\tWith a DOES>\n");
+#endif
 
       queueTail->target = &call_;
       queueTail->hasValue = 1;
@@ -1220,6 +1237,11 @@ void compile_() {
     // The other two branches do this in-line, but I need to do it here.
     sp++;
   } else {
+#ifdef SUPERINSTRUCTION_DEBUG
+    tempHeader = (header*) (sp[0] - 3 * sizeof(cell));
+    fprintf(stderr, "Enqueuing a primitive: %.*s\n",
+        (int) (tempHeader->metadata & LEN_MASK), tempHeader->name);
+#endif
     c1 = (cell) *((code**) *(sp++));
     lookup_primitive();
     queueTail->target = (code*) c1;
@@ -1324,35 +1346,35 @@ quit_loop:
   // Should never be reachable.
 }
 
-WORD(quit, 76, "QUIT", 4, &header_dump_file) {
+WORD(quit, 77, "QUIT", 4, &header_dump_file) {
   PRINT_TRACE("QUIT");
   inputIndex = 0;
   quit_();
   NEXT;
 }
 
-WORD(bye, 77, "BYE", 3, &header_quit) {
+WORD(bye, 78, "BYE", 3, &header_quit) {
   PRINT_TRACE("BYE");
   exit(0);
 }
 
-WORD(compile_comma, 78, "COMPILE,", 8, &header_bye) {
+WORD(compile_comma, 79, "COMPILE,", 8, &header_bye) {
   compile_();
   NEXT;
 }
 
-WORD(literal, 100, "LITERAL", 7 | IMMEDIATE, &header_compile_comma) {
+WORD(literal, 101, "LITERAL", 7 | IMMEDIATE, &header_compile_comma) {
   // Compiles the value on top of the stack into the current definition.
   compile_lit_();
   NEXT;
 }
 
-WORD(compile_literal, 101, "[LITERAL]", 9, &header_literal) {
+WORD(compile_literal, 102, "[LITERAL]", 9, &header_literal) {
   compile_lit_();
   NEXT;
 }
 
-WORD(compile_zbranch, 102, "[0BRANCH]", 9, &header_compile_literal) {
+WORD(compile_zbranch, 103, "[0BRANCH]", 9, &header_compile_literal) {
   *(--sp) = (cell) &(header_zbranch.code_field);
   compile_();
   while (queue_length > 0) drain_queue_();
@@ -1361,7 +1383,7 @@ WORD(compile_zbranch, 102, "[0BRANCH]", 9, &header_compile_literal) {
   NEXT;
 }
 
-WORD(compile_branch, 103, "[BRANCH]", 8, &header_compile_zbranch) {
+WORD(compile_branch, 104, "[BRANCH]", 8, &header_compile_zbranch) {
   *(--sp) = (cell) &(header_branch.code_field);
   compile_();
   while (queue_length > 0) drain_queue_();
@@ -1370,12 +1392,12 @@ WORD(compile_branch, 103, "[BRANCH]", 8, &header_compile_zbranch) {
   NEXT;
 }
 
-WORD(control_flush, 104, "(CONTROL-FLUSH)", 15, &header_compile_branch) {
+WORD(control_flush, 105, "(CONTROL-FLUSH)", 15, &header_compile_branch) {
   while (queue_length > 0) drain_queue_();
   NEXT;
 }
 
-WORD(debug_break, 79, "(DEBUG)", 7, &header_control_flush) {
+WORD(debug_break, 80, "(DEBUG)", 7, &header_control_flush) {
   NEXT;
 }
 
@@ -1388,7 +1410,7 @@ WORD(debug_break, 79, "(DEBUG)", 7, &header_control_flush) {
 #define FA_BIN (4)
 #define FA_TRUNC (8)
 
-WORD(close_file, 80, "CLOSE-FILE", 10, &header_debug_break) {
+WORD(close_file, 81, "CLOSE-FILE", 10, &header_debug_break) {
   c1 = (cell) fclose((FILE*) sp[0]);
   sp[0] = c1 ? errno : 0;
   NEXT;
@@ -1413,7 +1435,7 @@ char *file_modes[16] = {
   "w+b" // 15 = read/write, bin, truncated
 };
 
-WORD(create_file, 81, "CREATE-FILE", 11, &header_close_file) {
+WORD(create_file, 82, "CREATE-FILE", 11, &header_close_file) {
   strncpy(tempBuf, (char*) sp[2], sp[1]);
   tempBuf[sp[1]] = '\0';
   sp++;
@@ -1427,7 +1449,7 @@ WORD(create_file, 81, "CREATE-FILE", 11, &header_close_file) {
 // create.
 // Therefore if we try the normal open, and it fails, we should try again with
 // TRUNC enabled, IFF the FA_WRITE bit is set.
-WORD(open_file, 82, "OPEN-FILE", 9, &header_create_file) {
+WORD(open_file, 83, "OPEN-FILE", 9, &header_create_file) {
   strncpy(tempBuf, (char*) sp[2], sp[1]);
   tempBuf[sp[1]] = '\0';
   sp[2] = (cell) fopen(tempBuf, file_modes[sp[0]]);
@@ -1440,7 +1462,7 @@ WORD(open_file, 82, "OPEN-FILE", 9, &header_create_file) {
   NEXT;
 }
 
-WORD(delete_file, 83, "DELETE-FILE", 11, &header_open_file) {
+WORD(delete_file, 84, "DELETE-FILE", 11, &header_open_file) {
   strncpy(tempBuf, (char*) sp[1], sp[0]);
   tempBuf[sp[0]] = '\0';
   sp++;
@@ -1449,7 +1471,7 @@ WORD(delete_file, 83, "DELETE-FILE", 11, &header_open_file) {
   NEXT;
 }
 
-WORD(file_position, 84, "FILE-POSITION", 13, &header_delete_file) {
+WORD(file_position, 85, "FILE-POSITION", 13, &header_delete_file) {
   sp -= 2;
   sp[1] = 0;
   sp[2] = (cell) ftell((FILE*) sp[2]);
@@ -1458,7 +1480,7 @@ WORD(file_position, 84, "FILE-POSITION", 13, &header_delete_file) {
 }
 
 /*
-WORD(file_size, "FILE-SIZE", 9, &header_file_position) {
+WORD(file_size, "FILE-SIZE", 10, &header_file_position) {
   sp -= 2;
   sp[1] = 0;
   sp[0] = fstat(fileno((FILE*) sp[2]), &tempStat);
@@ -1472,7 +1494,7 @@ WORD(file_size, "FILE-SIZE", 9, &header_file_position) {
 }
 */
 
-WORD(file_size, 85, "FILE-SIZE", 9, &header_file_position) {
+WORD(file_size, 86, "FILE-SIZE", 9, &header_file_position) {
   sp -= 2;
   sp[1] = 0;
   c1 = ftell((FILE*) sp[2]); // Save the position.
@@ -1494,7 +1516,7 @@ WORD(file_size, 85, "FILE-SIZE", 9, &header_file_position) {
 }
 
 
-WORD(include_file, 86, "INCLUDE-FILE", 12, &header_file_size) {
+WORD(include_file, 87, "INCLUDE-FILE", 12, &header_file_size) {
   inputIndex++;
   SRC.type = *(sp++);
   SRC.inputPtr = 0;
@@ -1503,7 +1525,7 @@ WORD(include_file, 86, "INCLUDE-FILE", 12, &header_file_size) {
   NEXT;
 }
 
-WORD(read_file, 87, "READ-FILE", 9, &header_include_file) {
+WORD(read_file, 88, "READ-FILE", 9, &header_include_file) {
   c1 = (cell) fread((void*) sp[2], 1, sp[1], (FILE*) sp[0]);
   if (c1 == 0) {
     if (feof((FILE*) sp[0])) {
@@ -1527,7 +1549,7 @@ WORD(read_file, 87, "READ-FILE", 9, &header_include_file) {
 // delimiter. Should return a size that EXCLUDES the terminator.
 // Uses getline, and if the line turns out to be longer than our buffer, the
 // file is repositioned accordingly.
-WORD(read_line, 88, "READ-LINE", 9, &header_read_file) {
+WORD(read_line, 89, "READ-LINE", 9, &header_read_file) {
   str1 = NULL;
   tempSize = 0;
   c1 = getline(&str1, &tempSize, (FILE*) sp[0]);
@@ -1557,21 +1579,21 @@ WORD(read_line, 88, "READ-LINE", 9, &header_read_file) {
   NEXT;
 }
 
-WORD(reposition_file, 89, "REPOSITION-FILE", 15, &header_read_line) {
+WORD(reposition_file, 90, "REPOSITION-FILE", 15, &header_read_line) {
   sp[2] = fseek((FILE*) sp[0], sp[2], SEEK_SET);
   sp += 2;
   if (sp[0] == -1) sp[0] = errno;
   NEXT;
 }
 
-WORD(resize_file, 90, "RESIZE-FILE", 11, &header_reposition_file) {
+WORD(resize_file, 91, "RESIZE-FILE", 11, &header_reposition_file) {
   sp[2] = ftruncate(fileno((FILE*) sp[0]), sp[2]);
   sp += 2;
   sp[0] = sp[0] == -1 ? errno : 0;
   NEXT;
 }
 
-WORD(write_file, 91, "WRITE-FILE", 10, &header_resize_file) {
+WORD(write_file, 92, "WRITE-FILE", 10, &header_resize_file) {
   //printf("%d\n", sp[1]);
   c1 = fwrite((void*) sp[2], 1, sp[1], (FILE*) sp[0]);
   sp += 2;
@@ -1579,7 +1601,7 @@ WORD(write_file, 91, "WRITE-FILE", 10, &header_resize_file) {
   NEXT;
 }
 
-WORD(write_line, 92, "WRITE-LINE", 10, &header_write_file) {
+WORD(write_line, 93, "WRITE-LINE", 10, &header_write_file) {
   strncpy(tempBuf, (char*) sp[2], sp[1]);
   tempBuf[sp[1]] = '\n';
   c1 = fwrite((void*) tempBuf, 1, sp[1] + 1, (FILE*) sp[0]);
@@ -1588,7 +1610,7 @@ WORD(write_line, 92, "WRITE-LINE", 10, &header_write_file) {
   NEXT;
 }
 
-WORD(flush_file, 93, "FLUSH-FILE", 10, &header_write_line) {
+WORD(flush_file, 94, "FLUSH-FILE", 10, &header_write_line) {
   sp[0] = (cell) fsync(fileno((FILE*) sp[0]));
   if (sp[0] == -1) sp[0] = errno;
   NEXT;
@@ -1597,7 +1619,7 @@ WORD(flush_file, 93, "FLUSH-FILE", 10, &header_write_line) {
 
 // And back to core.
 
-WORD(colon, 94, ":", 1, &header_flush_file) {
+WORD(colon, 95, ":", 1, &header_flush_file) {
   PRINT_TRACE(":");
   // Align HERE.
   dsp.chars = (char*) ((((ucell) (dsp.chars)) + sizeof(cell) - 1) & ~(sizeof(cell) - 1));
@@ -1630,7 +1652,7 @@ WORD(colon, 94, ":", 1, &header_flush_file) {
   NEXT;
 }
 
-WORD(colon_no_name, 95, ":NONAME", 7, &header_colon) {
+WORD(colon_no_name, 96, ":NONAME", 7, &header_colon) {
   PRINT_TRACE(":NONAME");
 
   // Similar to : but without parsing and storing a name.
@@ -1650,13 +1672,18 @@ WORD(colon_no_name, 95, ":NONAME", 7, &header_colon) {
 #define EXIT_NEXT ip = (code**) *(rsp++);\
 NEXT
 
-WORD(exit, 96, "EXIT", 4, &header_colon_no_name) {
+#define CALL_NEXT ca = *(ip++);\
+  *(--rsp) = (cell) ip;\
+  ip = (code**) ca;\
+  NEXT
+
+WORD(exit, 97, "EXIT", 4, &header_colon_no_name) {
   PRINT_TRACE("EXIT");
   EXIT_NEXT;
 }
 
 // TODO: This is broken in the new style, but I'm ignoring it.
-WORD(see, 97, "SEE", 3, &header_exit) {
+WORD(see, 98, "SEE", 3, &header_exit) {
   PRINT_TRACE("SEE");
   // Parses a word and visualizes its contents.
   parse_name_();
@@ -1717,7 +1744,7 @@ WORD(see, 97, "SEE", 3, &header_exit) {
   NEXT;
 }
 
-WORD(semicolon, 98, ";", 1 | IMMEDIATE, &header_see) {
+WORD(semicolon, 99, ";", 1 | IMMEDIATE, &header_see) {
   PRINT_TRACE(";");
   dictionary->metadata &= (~HIDDEN); // Clear the hidden bit.
 
@@ -1769,7 +1796,7 @@ int main(int argc, char **argv) {
   quit_();
 }
 
-#define INIT_PRIM(id) primitives[key_ ## id] = (superinstruction) { &code_ ## id, key_ ## id }
+#define INIT_PRIM(id) primitives[key_ ## id - 1] = (superinstruction) { &code_ ## id, key_ ## id }
 void init_primitives(void) {
   INIT_PRIM(plus);
   INIT_PRIM(minus);
@@ -1880,13 +1907,6 @@ void init_primitives(void) {
 
 
 // Superinstruction implementations
-DEF_SI4(to_r, swap, to_r, exit) {
-  c1 = rsp[0];
-  rsp[0] = sp[0];
-  sp[0] = c1;
-  EXIT_NEXT;
-}
-
 DEF_SI2(from_r, from_r) {
   sp -= 2;
   sp[1] = rsp[0];
@@ -1984,6 +2004,14 @@ DEF_SI2(to_r, to_r) {
   NEXT;
 }
 
+DEF_SI2(dolit, call_) {
+  *(--sp) = (cell) *(ip++);
+  CALL_NEXT;
+}
+
+
+// 3-part superinstructions
+
 DEF_SI3(to_r, swap, from_r) {
   // Actually just swapping sp[1] and sp[2].
   c1 = sp[2];
@@ -2044,12 +2072,20 @@ DEF_SI3(dolit, dolit, plus) {
   NEXT;
 }
 
-/*
 DEF_SI3(cells, sp_fetch, plus) {
   sp[0] = ((cell) sp) + (sp[0] * sizeof(cell));
   NEXT;
 }
-*/
+
+
+// 4-part superinstructions
+
+DEF_SI4(to_r, swap, to_r, exit) {
+  c1 = rsp[0];
+  rsp[0] = sp[0];
+  sp[0] = c1;
+  EXIT_NEXT;
+}
 
 
 void init_superinstructions(void) {
@@ -2070,11 +2106,13 @@ void init_superinstructions(void) {
   ADD_SI2(dolit, less_than);
   ADD_SI2(plus, fetch);
   ADD_SI2(to_r, to_r);
+  ADD_SI2(dolit, call_);
 
   ADD_SI3(to_r, swap, from_r);
   ADD_SI3(swap, to_r, exit);
   ADD_SI3(from_r, from_r, dup);
   ADD_SI3(dup, to_r, swap);
+  ADD_SI3(cells, sp_fetch, plus);
 
   //ADD_SI4(to_r, swap, to_r, exit);
 }
