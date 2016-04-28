@@ -18,8 +18,8 @@ variable eflag
 : BENCHMARK  0 1000 0 DO  PRIMES NIP  LOOP ;
 \ SECS BENCHMARK . SECS SWAP - CR . .( secs)
 : main 
-	flags 8190 + eflag !
-	benchmark .
+flags 8190 + eflag !
+benchmark .
 ;
 
 \ HPPA/720, 50 MHz: user 3.90s

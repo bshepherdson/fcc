@@ -236,10 +236,16 @@ __attribute__((__noreturn__, __used__)) void code_ ## id (void)
 // depth >= 3 ? print : depth == 2 ? print : depth == 1 ? print : print
 // Printing the top 3, or as much as there is on the stack.
 #define PRINT_TRACE(str) ((cell) (((char*) spTop) - ((char*) sp)) / sizeof(cell)) >= 3 ? printf(str "\t (%" PRIdPTR ") %" PRIdPTR " %" PRIdPTR " %" PRIdPTR "\n", ((cell) (((char*) spTop) - ((char*) sp)) / sizeof(cell)), sp[2], sp[1], sp[0]) : ((cell) (((char*) spTop) - ((char*) sp)) / sizeof(cell)) == 2 ? printf(str "\t (%" PRIdPTR ") %" PRIdPTR " %" PRIdPTR "\n", ((cell) (((char*) spTop) - ((char*) sp)) / sizeof(cell)), sp[1], sp[0]) : ((cell) (((char*) spTop) - ((char*) sp)) / sizeof(cell)) == 1 ? printf(str "\t (%" PRIdPTR ") %" PRIdPTR "\n", ((cell) (((char*) spTop) - ((char*) sp)) / sizeof(cell)), sp[0]) : printf(str "\t (%" PRIdPTR ")\n", ((cell) (((char*) spTop) - ((char*) sp)) / sizeof(cell)))
-#elif ACCOUNTING
-#define PRINT_TRACE(str) fprintf(stderr, str "\n")
 #else
 #define PRINT_TRACE(str)
+#endif
+
+#ifdef ACCOUNTING
+unsigned char accounts[100000000];
+int accountIndex = 0;
+#define ACCOUNT(me) accounts[accountIndex++] = key_ ## me;
+#else
+#define ACCOUNT(me)
 #endif
 
 #ifdef DEBUG
@@ -259,6 +265,7 @@ void print(char *str, cell len) {
 
 // Math operations
 WORD(plus, 1, "+", 1, NULL) {
+  ACCOUNT(plus);
   PRINT_TRACE("+");
   sp[1] = sp[0] + sp[1];
   sp++;
@@ -266,6 +273,7 @@ WORD(plus, 1, "+", 1, NULL) {
 }
 
 WORD(minus, 2, "-", 1, &header_plus) {
+  ACCOUNT(minus);
   PRINT_TRACE("-");
   sp[1] = sp[1] - sp[0];
   sp++;
@@ -273,6 +281,7 @@ WORD(minus, 2, "-", 1, &header_plus) {
 }
 
 WORD(times, 3, "*", 1, &header_minus) {
+  ACCOUNT(times);
   PRINT_TRACE("*");
   sp[1] = sp[1] * sp[0];
   sp++;
@@ -280,6 +289,7 @@ WORD(times, 3, "*", 1, &header_minus) {
 }
 
 WORD(div, 4, "/", 1, &header_times) {
+  ACCOUNT(div);
   PRINT_TRACE("/");
   sp[1] = sp[1] / sp[0];
   sp++;
@@ -287,6 +297,7 @@ WORD(div, 4, "/", 1, &header_times) {
 }
 
 WORD(udiv, 5, "U/", 2, &header_div) {
+  ACCOUNT(udiv);
   PRINT_TRACE("U/");
   sp[1] = (cell) (((ucell) sp[1]) / ((ucell) sp[0]));
   sp++;
@@ -294,6 +305,7 @@ WORD(udiv, 5, "U/", 2, &header_div) {
 }
 
 WORD(mod, 6, "MOD", 3, &header_udiv) {
+  ACCOUNT(mod);
   PRINT_TRACE("MOD");
   sp[1] = sp[1] % sp[0];
   sp++;
@@ -301,6 +313,7 @@ WORD(mod, 6, "MOD", 3, &header_udiv) {
 }
 
 WORD(umod, 7, "UMOD", 4, &header_mod) {
+  ACCOUNT(umod);
   PRINT_TRACE("UMOD");
   sp[1] = (cell) (((ucell) sp[1]) % ((ucell) sp[0]));
   sp++;
@@ -309,18 +322,21 @@ WORD(umod, 7, "UMOD", 4, &header_mod) {
 
 // Bitwise ops
 WORD(and, 8, "AND", 3, &header_umod) {
+  ACCOUNT(and);
   PRINT_TRACE("AND");
   sp[1] = sp[1] & sp[0];
   sp++;
   NEXT;
 }
 WORD(or, 9, "OR", 2, &header_and) {
+  ACCOUNT(or);
   PRINT_TRACE("OR");
   sp[1] = sp[1] | sp[0];
   sp++;
   NEXT;
 }
 WORD(xor, 10, "XOR", 3, &header_or) {
+  ACCOUNT(xor);
   PRINT_TRACE("XOR");
   sp[1] = sp[1] ^ sp[0];
   sp++;
@@ -329,6 +345,7 @@ WORD(xor, 10, "XOR", 3, &header_or) {
 
 // Shifts
 WORD(lshift, 11, "LSHIFT", 6, &header_xor) {
+  ACCOUNT(lshift);
   PRINT_TRACE("LSHIFT");
   sp[1] = ((ucell) sp[1]) << sp[0];
   sp++;
@@ -336,6 +353,7 @@ WORD(lshift, 11, "LSHIFT", 6, &header_xor) {
 }
 
 WORD(rshift, 12, "RSHIFT", 6, &header_lshift) {
+  ACCOUNT(rshift);
   PRINT_TRACE("RSHIFT");
   sp[1] = ((ucell) sp[1]) >> sp[0];
   sp++;
@@ -343,6 +361,7 @@ WORD(rshift, 12, "RSHIFT", 6, &header_lshift) {
 }
 
 WORD(base, 13, "BASE", 4, &header_rshift) {
+  ACCOUNT(base);
   PRINT_TRACE("BASE");
   *(--sp) = (cell) &base;
   NEXT;
@@ -350,6 +369,7 @@ WORD(base, 13, "BASE", 4, &header_rshift) {
 
 // Comparison
 WORD(less_than, 14, "<", 1, &header_base) {
+  ACCOUNT(less_than);
   PRINT_TRACE("<");
   sp[1] = (sp[1] < sp[0]) ? -1 : 0;
   sp++;
@@ -357,6 +377,7 @@ WORD(less_than, 14, "<", 1, &header_base) {
 }
 
 WORD(less_than_unsigned, 15, "U<", 2, &header_less_than) {
+  ACCOUNT(less_than_unsigned);
   PRINT_TRACE("U<");
   sp[1] = ((ucell) sp[1]) < ((ucell) sp[0]) ? -1 : 0;
   sp++;
@@ -364,6 +385,7 @@ WORD(less_than_unsigned, 15, "U<", 2, &header_less_than) {
 }
 
 WORD(equal, 16, "=", 1, &header_less_than_unsigned) {
+  ACCOUNT(equal);
   PRINT_TRACE("=");
   sp[1] = sp[0] == sp[1] ? -1 : 0;
   sp++;
@@ -372,6 +394,7 @@ WORD(equal, 16, "=", 1, &header_less_than_unsigned) {
 
 // Stack manipulation
 WORD(dup, 17, "DUP", 3, &header_equal) {
+  ACCOUNT(dup);
   PRINT_TRACE("DUP");
   sp--;
   sp[0] = sp[1];
@@ -379,6 +402,7 @@ WORD(dup, 17, "DUP", 3, &header_equal) {
 }
 
 WORD(swap, 18, "SWAP", 4, &header_dup) {
+  ACCOUNT(swap);
   PRINT_TRACE("SWAP");
   c1 = sp[0];
   sp[0] = sp[1];
@@ -387,12 +411,14 @@ WORD(swap, 18, "SWAP", 4, &header_dup) {
 }
 
 WORD(drop, 19, "DROP", 4, &header_swap) {
+  ACCOUNT(drop);
   PRINT_TRACE("DROP");
   sp++;
   NEXT;
 }
 
 WORD(over, 20, "OVER", 4, &header_drop) {
+  ACCOUNT(over);
   PRINT_TRACE("OVER");
   c1 = sp[1];
   *(--sp) = c1;
@@ -400,6 +426,7 @@ WORD(over, 20, "OVER", 4, &header_drop) {
 }
 
 WORD(rot, 21, "ROT", 3, &header_over) {
+  ACCOUNT(rot);
   PRINT_TRACE("ROT");
   // ( c b a -- b a c )
   c1 = sp[2];
@@ -410,6 +437,7 @@ WORD(rot, 21, "ROT", 3, &header_over) {
 }
 
 WORD(neg_rot, 22, "-ROT", 4, &header_rot) {
+  ACCOUNT(neg_rot);
   PRINT_TRACE("-ROT");
   // ( c b a -- a c b )
   c1 = sp[2];
@@ -420,12 +448,14 @@ WORD(neg_rot, 22, "-ROT", 4, &header_rot) {
 }
 
 WORD(two_drop, 23, "2DROP", 5, &header_neg_rot) {
+  ACCOUNT(two_drop);
   PRINT_TRACE("2DROP");
   sp += 2;
   NEXT;
 }
 
 WORD(two_dup, 24, "2DUP", 4, &header_two_drop) {
+  ACCOUNT(two_dup);
   PRINT_TRACE("2DUP");
   sp -= 2;
   sp[1] = sp[3];
@@ -434,6 +464,7 @@ WORD(two_dup, 24, "2DUP", 4, &header_two_drop) {
 }
 
 WORD(two_swap, 25, "2SWAP", 5, &header_two_dup) {
+  ACCOUNT(two_swap);
   PRINT_TRACE("2SWAP");
   c1 = sp[2];
   sp[2] = sp[0];
@@ -446,6 +477,7 @@ WORD(two_swap, 25, "2SWAP", 5, &header_two_dup) {
 }
 
 WORD(two_over, 26, "2OVER", 5, &header_two_swap) {
+  ACCOUNT(two_over);
   PRINT_TRACE("2OVER");
   sp -= 2;
   sp[0] = sp[4];
@@ -454,12 +486,14 @@ WORD(two_over, 26, "2OVER", 5, &header_two_swap) {
 }
 
 WORD(to_r, 27, ">R", 2, &header_two_over) {
+  ACCOUNT(to_r);
   PRINT_TRACE(">R");
   *(--rsp) = *(sp++);
   NEXT;
 }
 
 WORD(from_r, 28, "R>", 2, &header_to_r) {
+  ACCOUNT(from_r);
   PRINT_TRACE("R>");
   *(--sp) = *(rsp++);
   NEXT;
@@ -467,22 +501,26 @@ WORD(from_r, 28, "R>", 2, &header_to_r) {
 
 // Memory access
 WORD(fetch, 29, "@", 1, &header_from_r) {
+  ACCOUNT(fetch);
   PRINT_TRACE("@");
   sp[0] = *((cell*) sp[0]);
   NEXT;
 }
 WORD(store, 30, "!", 1, &header_fetch) {
+  ACCOUNT(store);
   PRINT_TRACE("!");
   *((cell*) sp[0]) = sp[1];
   sp += 2;
   NEXT;
 }
 WORD(cfetch, 31, "C@", 2, &header_store) {
+  ACCOUNT(cfetch);
   PRINT_TRACE("C@");
   sp[0] = (cell) *((char*) sp[0]);
   NEXT;
 }
 WORD(cstore, 32, "C!", 2, &header_cfetch) {
+  ACCOUNT(cstore);
   PRINT_TRACE("C!");
   *((char*) sp[0]) = (char) sp[1];
   sp += 2;
@@ -493,18 +531,21 @@ WORD(cstore, 32, "C!", 2, &header_cfetch) {
 // The library calls this to acquire somewhere to put HERE.
 // ( size-in-address-units -- a-addr )
 WORD(raw_alloc, 33, "(ALLOCATE)", 10, &header_cstore) {
+  ACCOUNT(raw_alloc);
   PRINT_TRACE("(ALLOCATE)");
   sp[0] = (cell) malloc(sp[0]);
   NEXT;
 }
 
 WORD(here_ptr, 34, "(>HERE)", 7, &header_raw_alloc) {
+  ACCOUNT(here_ptr);
   PRINT_TRACE("(>HERE)");
   *(--sp) = (cell) (&dsp);
   NEXT;
 }
 
 WORD(print_internal, 35, "(PRINT)", 7, &header_here_ptr) {
+  ACCOUNT(print_internal);
   PRINT_TRACE("(PRINT)");
   printf("%" PRIdPTR " ", sp[0]);
   sp++;
@@ -512,6 +553,7 @@ WORD(print_internal, 35, "(PRINT)", 7, &header_here_ptr) {
 }
 
 WORD(state, 36, "STATE", 5, &header_print_internal) {
+  ACCOUNT(state);
   PRINT_TRACE("STATE");
   *(--sp) = (cell) &state;
   NEXT;
@@ -520,6 +562,7 @@ WORD(state, 36, "STATE", 5, &header_print_internal) {
 // Branches
 // Jumps unconditionally by the delta (in bytes) of the next CFA.
 WORD(branch, 37, "(BRANCH)", 8, &header_state) {
+  ACCOUNT(branch);
   PRINT_TRACE("(BRANCH)");
   str1 = (char*) ip;
   str1 += (cell) *ip;
@@ -530,6 +573,7 @@ WORD(branch, 37, "(BRANCH)", 8, &header_state) {
 // Consumes the top argument on the stack. If it's 0, jumps over the branch
 // address. Otherwise, identical to branch above.
 WORD(zbranch, 38, "(0BRANCH)", 9, &header_branch) {
+  ACCOUNT(zbranch);
   PRINT_TRACE("(0BRANCH)");
   str1 = (char*) ip;
   c1 = *(sp++) == 0 ? (cell) *ip : (cell) sizeof(cell);
@@ -542,6 +586,7 @@ WORD(zbranch, 38, "(0BRANCH)", 9, &header_branch) {
 // In the direct-threading style, xt's are still a codeword pointer.
 // We need to doubly-indirect before setting cfa.
 WORD(execute, 39, "EXECUTE", 7, &header_zbranch) {
+  ACCOUNT(execute);
   PRINT_TRACE("EXECUTE");
   cfa = (code**) *(sp++);
   ca = *cfa;
@@ -549,6 +594,7 @@ WORD(execute, 39, "EXECUTE", 7, &header_zbranch) {
 }
 
 WORD(evaluate, 40, "EVALUATE", 8, &header_execute) {
+  ACCOUNT(evaluate);
   PRINT_TRACE("EVALUATE");
   inputIndex++;
   SRC.parseLength = sp[0];
@@ -623,7 +669,9 @@ cell refill_(void) {
   }
 }
 
+// TODO: This one is pushing in the assembly. Triggered by calling refill_?
 WORD(refill, 41, "REFILL", 6, &header_evaluate) {
+  ACCOUNT(refill);
   PRINT_TRACE("REFILL");
   // Special case here. When the input source is EVALUATE, return false and do
   // nothing else. We don't want to actually call refill_ for that case.
@@ -636,6 +684,7 @@ WORD(refill, 41, "REFILL", 6, &header_evaluate) {
 }
 
 WORD(accept, 42, "ACCEPT", 6, &header_refill) {
+  ACCOUNT(accept);
   PRINT_TRACE("ACCEPT");
   str1 = readline(NULL); // No prompt.
   c1 = strlen(str1);
@@ -648,6 +697,7 @@ WORD(accept, 42, "ACCEPT", 6, &header_refill) {
 }
 
 WORD(key, 43, "KEY", 3, &header_accept) {
+  ACCOUNT(key);
   PRINT_TRACE("KEY");
 
   // Grab the current terminal settings.
@@ -668,24 +718,28 @@ WORD(key, 43, "KEY", 3, &header_accept) {
 }
 
 WORD(latest, 44, "(LATEST)", 8, &header_key) {
+  ACCOUNT(latest);
   PRINT_TRACE("(LATEST)");
   *(--sp) = (cell) &dictionary;
   NEXT;
 }
 
 WORD(in_ptr, 45, ">IN", 3, &header_latest) {
+  ACCOUNT(in_ptr);
   PRINT_TRACE(">IN");
   *(--sp) = (cell) (&SRC.inputPtr);
   NEXT;
 }
 
 WORD(emit, 46, "EMIT", 4, &header_in_ptr) {
+  ACCOUNT(emit);
   PRINT_TRACE("EMIT");
   fputc(*(sp++), stdout);
   NEXT;
 }
 
 WORD(source, 47, "SOURCE", 6, &header_emit) {
+  ACCOUNT(source);
   PRINT_TRACE("SOURCE");
   sp -= 2;
   sp[0] = SRC.parseLength;
@@ -694,6 +748,7 @@ WORD(source, 47, "SOURCE", 6, &header_emit) {
 }
 
 WORD(source_id, 48, "SOURCE-ID", 9, &header_source) {
+  ACCOUNT(source_id);
   PRINT_TRACE("SOURCE-ID");
   *(--sp) = SRC.type;
   NEXT;
@@ -702,41 +757,48 @@ WORD(source_id, 48, "SOURCE-ID", 9, &header_source) {
 
 // Sizes and metadata
 WORD(size_cell, 49, "(/CELL)", 7, &header_source_id) {
+  ACCOUNT(size_cell);
   PRINT_TRACE("(/CELL)");
   *(--sp) = (cell) sizeof(cell);
   NEXT;
 }
 
 WORD(size_char, 50, "(/CHAR)", 7, &header_size_cell) {
+  ACCOUNT(size_char);
   PRINT_TRACE("(/CHAR)");
   *(--sp) = (cell) sizeof(char);
   NEXT;
 }
 
 WORD(cells, 51, "CELLS", 5, &header_size_char) {
+  ACCOUNT(cells);
   PRINT_TRACE("CELLS");
   sp[0] *= sizeof(cell);
   NEXT;
 }
 
 WORD(chars, 52, "CHARS", 5, &header_cells) {
+  ACCOUNT(chars);
   PRINT_TRACE("CELLS");
   sp[0] *= sizeof(char);
   NEXT;
 }
 
 WORD(unit_bits, 53, "(ADDRESS-UNIT-BITS)", 19, &header_chars) {
+  ACCOUNT(unit_bits);
   PRINT_TRACE("(ADDRESS-UNIT-BITS)");
   *(--sp) = (cell) (CHAR_BIT);
   NEXT;
 }
 
 WORD(stack_cells, 54, "(STACK-CELLS)", 13, &header_unit_bits) {
+  ACCOUNT(stack_cells);
   PRINT_TRACE("(STACK-CELLS)");
   *(--sp) = (cell) DATA_STACK_SIZE;
   NEXT;
 }
 WORD(return_stack_cells, 55, "(RETURN-STACK-CELLS)", 20, &header_stack_cells) {
+  ACCOUNT(return_stack_cells);
   PRINT_TRACE("(RETURN-STACK-CELLS)");
   *(--sp) = (cell) RETURN_STACK_SIZE;
   NEXT;
@@ -745,6 +807,7 @@ WORD(return_stack_cells, 55, "(RETURN-STACK-CELLS)", 20, &header_stack_cells) {
 // Converts a header* eg. from (latest) into the DOES> address, which is
 // the cell after the CFA.
 WORD(to_does, 56, "(>DOES)", 7, &header_return_stack_cells) {
+  ACCOUNT(to_does);
   PRINT_TRACE("(>DOES)");
   tempHeader = (header*) sp[0];
   sp[0] = ((cell) &(tempHeader->code_field)) + sizeof(cell);
@@ -753,6 +816,7 @@ WORD(to_does, 56, "(>DOES)", 7, &header_return_stack_cells) {
 
 // Converts a header* eg. from (latest) into the code field address.
 WORD(to_cfa, 57, "(>CFA)", 6, &header_to_does) {
+  ACCOUNT(to_cfa);
   PRINT_TRACE("(>CFA)");
   tempHeader = (header*) sp[0];
   sp[0] = (cell) &(tempHeader->code_field);
@@ -762,6 +826,7 @@ WORD(to_cfa, 57, "(>CFA)", 6, &header_to_does) {
 // Advances a CFA to be the data-space pointer, which is for a CREATEd
 // definition two cells after the xt.
 WORD(to_body, 58, ">BODY", 5, & header_to_cfa) {
+  ACCOUNT(to_body);
   PRINT_TRACE(">BODY");
   sp[0] += (cell) (2 * sizeof(cell));
   NEXT;
@@ -769,6 +834,7 @@ WORD(to_body, 58, ">BODY", 5, & header_to_cfa) {
 
 // Pushes the last word that was defined, whether with : or :NONAME.
 WORD(last_word, 59, "(LAST-WORD)", 11, &header_to_body) {
+  ACCOUNT(last_word);
   PRINT_TRACE("(LAST-WORD)");
   *(--sp) = (cell) lastWord;
   NEXT;
@@ -779,6 +845,7 @@ WORD(last_word, 59, "(LAST-WORD)", 11, &header_to_body) {
 
 // Pushes ip -> rsp, and puts my own data field into ip.
 WORD(docol, 60, "(DOCOL)", 7, &header_last_word) {
+  ACCOUNT(docol);
   PRINT_TRACE("(DOCOL)");
   *(--rsp) = (cell) ip;
   ip = &(cfa[1]);
@@ -787,12 +854,14 @@ WORD(docol, 60, "(DOCOL)", 7, &header_last_word) {
 
 // Pushes its data field onto the stack.
 WORD(dolit, 61, "(DOLIT)", 7, &header_docol) {
+  ACCOUNT(dolit);
   PRINT_TRACE("(DOLIT)");
   *(--sp) = (cell) *(ip++);
   NEXT;
 }
 
 WORD(dostring, 62, "(DOSTRING)", 10, &header_dolit) {
+  ACCOUNT(dostring);
   PRINT_TRACE("(DOSTRING)");
   str1 = ((char*) ip);
   c1 = (cell) *str1;
@@ -812,6 +881,7 @@ WORD(dostring, 62, "(DOSTRING)", 10, &header_dolit) {
 // the user's data space area, as intended (cfa + 2 cells) and then check that
 // 0 at cfa + 1 cell. If it's 0, do nothing. Otherwise, jump to that point.
 WORD(dodoes, 63, "(DODOES)", 8, &header_dostring) {
+  ACCOUNT(dodoes);
   PRINT_TRACE("(DODOES)");
   str1 = (char*) cfa;
   *(--sp) = (cell) (str1 + 2 * sizeof(cell));
@@ -965,18 +1035,21 @@ void find_(void) {
 }
 
 WORD(parse, 64, "PARSE", 5, &header_dodoes) {
+  ACCOUNT(parse);
   PRINT_TRACE("PARSE");
   parse_();
   NEXT;
 }
 
 WORD(parse_name, 65, "PARSE-NAME", 10, &header_parse) {
+  ACCOUNT(parse_name);
   PRINT_TRACE("PARSE-NAME");
   parse_name_();
   NEXT;
 }
 
 WORD(to_number, 66, ">NUMBER", 7, &header_parse_name) {
+  ACCOUNT(to_number);
   PRINT_TRACE(">NUMBER");
   to_number_();
   NEXT;
@@ -984,7 +1057,10 @@ WORD(to_number, 66, ">NUMBER", 7, &header_parse_name) {
 
 // Parses a name, and constructs a header for it.
 // When finished, HERE is the data space properly, ready for compilation.
+// TODO: This function pushes %rbx. Why? Maybe branch its bits into a separate
+// function?
 WORD(create, 67, "CREATE", 6, &header_to_number) {
+  ACCOUNT(create);
   PRINT_TRACE("CREATE");
   parse_name_(); // sp[0] = length, sp[1] = string
   dsp.chars = (char*) ((((cell)dsp.chars) + sizeof(cell) - 1) & ~(sizeof(cell) - 1));
@@ -1004,13 +1080,16 @@ WORD(create, 67, "CREATE", 6, &header_to_number) {
   NEXT;
 }
 
+// TODO: This is allocating stack space - why?
 WORD(find, 68, "(FIND)", 6, &header_create) {
+  ACCOUNT(find);
   PRINT_TRACE("(FIND)");
   find_();
   NEXT;
 }
 
 WORD(depth, 69, "DEPTH", 5, &header_find) {
+  ACCOUNT(depth);
   PRINT_TRACE("DEPTH");
   c1 = (cell) (((char*) spTop) - ((char*) sp)) / sizeof(cell);
   *(--sp) = c1;
@@ -1018,6 +1097,7 @@ WORD(depth, 69, "DEPTH", 5, &header_find) {
 }
 
 WORD(sp_fetch, 70, "SP@", 3, &header_depth) {
+  ACCOUNT(sp_fetch);
   PRINT_TRACE("SP@");
   c1 = (cell) sp;
   *(--sp) = c1;
@@ -1025,6 +1105,7 @@ WORD(sp_fetch, 70, "SP@", 3, &header_depth) {
 }
 
 WORD(sp_store, 71, "SP!", 3, &header_sp_fetch) {
+  ACCOUNT(sp_store);
   PRINT_TRACE("SP!");
   c1 = sp[0];
   sp = (cell*) c1;
@@ -1032,34 +1113,46 @@ WORD(sp_store, 71, "SP!", 3, &header_sp_fetch) {
 }
 
 WORD(rp_fetch, 72, "RP@", 3, &header_sp_store) {
+  ACCOUNT(rp_fetch);
   PRINT_TRACE("RP@");
   *(--sp) = (cell) rsp;
   NEXT;
 }
 
 WORD(rp_store, 73, "RP!", 3, &header_rp_fetch) {
+  ACCOUNT(rp_store);
   PRINT_TRACE("RP!");
   rsp = (cell*) *(sp++);
   NEXT;
 }
 
-WORD(dot_s, 74, ".S", 2, &header_rp_store) {
-  PRINT_TRACE(".S");
+void dot_s_(void) {
   printf("[%" PRIdPTR "] ", (cell) (((char*) spTop) - ((char*) sp)) / sizeof(cell));
   for (c1 = (cell) (&spTop[-1]); c1 >= (cell) sp; c1 -= sizeof(cell*)) {
     printf("%" PRIdPTR " ", *((cell*) c1));
   }
   printf("\n");
+}
+
+WORD(dot_s, 74, ".S", 2, &header_rp_store) {
+  ACCOUNT(dot_s);
+  PRINT_TRACE(".S");
+  dot_s_();
   NEXT;
 }
 
-WORD(u_dot_s, 75, "U.S", 3, &header_dot_s) {
-  PRINT_TRACE("U.S");
+void u_dot_s_(void) {
   printf("[%" PRIdPTR "] ", (cell) (((char*) spTop) - ((char*) sp)) / sizeof(cell));
   for (c1 = (cell) (&spTop[-1]); c1 >= (cell) sp; c1 -= sizeof(cell*)) {
     printf("%" PRIxPTR " ", *((cell*) c1));
   }
   printf("\n");
+}
+
+WORD(u_dot_s, 75, "U.S", 3, &header_dot_s) {
+  ACCOUNT(u_dot_s);
+  PRINT_TRACE("U.S");
+  u_dot_s_();
   NEXT;
 }
 
@@ -1067,6 +1160,7 @@ WORD(u_dot_s, 75, "U.S", 3, &header_dot_s) {
 // This is a hack included to support the assemblers and such.
 // It writes a block of bytes to a binary file.
 WORD(dump_file, 76, "(DUMP-FILE)", 11, &header_u_dot_s) {
+  ACCOUNT(dump_file);
   PRINT_TRACE("(DUMP-FILE)");
   // ( c-addr1 u1 c-addr2 u2 ) String on top (2) and binary data below (1)
   // Open the named file for truncated write-only.
@@ -1088,15 +1182,16 @@ WORD(dump_file, 76, "(DUMP-FILE)", 11, &header_u_dot_s) {
 // Primitive for calling a (DOCOL) word.
 // Expects the next cell in ip-space to be the address of the code.
 // Otherwise it resembles a (DOCOL).
+super_key_t key_call_ = 100;
+
 void call_() {
+  ACCOUNT(call_);
   PRINT_TRACE("call_");
   ca = *(ip++);
   *(--rsp) = (cell) ip;
   ip = (code**) ca;
   NEXT;
 }
-
-super_key_t key_call_ = 100;
 
 // Expects c1 to be the code*.
 // Sets key1 to the associated key. Exits if not found.
@@ -1347,6 +1442,7 @@ quit_loop:
 }
 
 WORD(quit, 77, "QUIT", 4, &header_dump_file) {
+  ACCOUNT(quit);
   PRINT_TRACE("QUIT");
   inputIndex = 0;
   quit_();
@@ -1354,10 +1450,17 @@ WORD(quit, 77, "QUIT", 4, &header_dump_file) {
 }
 
 WORD(bye, 78, "BYE", 3, &header_quit) {
+  ACCOUNT(bye);
   PRINT_TRACE("BYE");
+#ifdef ACCOUNTING
+  // Dump the accounts array to stderr.
+  c1 = 0;
+  fwrite(accounts, 1, accountIndex, stderr);
+#endif
   exit(0);
 }
 
+// TODO: This is pushing onto the stack! Fix it! This one is important.
 WORD(compile_comma, 79, "COMPILE,", 8, &header_bye) {
   compile_();
   NEXT;
@@ -1410,6 +1513,7 @@ WORD(debug_break, 80, "(DEBUG)", 7, &header_control_flush) {
 #define FA_BIN (4)
 #define FA_TRUNC (8)
 
+// TODO: Most of the file access words are pushing. Fix that.
 WORD(close_file, 81, "CLOSE-FILE", 10, &header_debug_break) {
   c1 = (cell) fclose((FILE*) sp[0]);
   sp[0] = c1 ? errno : 0;
@@ -1619,7 +1723,9 @@ WORD(flush_file, 94, "FLUSH-FILE", 10, &header_write_line) {
 
 // And back to core.
 
+// TODO: This is pushing - fix it!
 WORD(colon, 95, ":", 1, &header_flush_file) {
+  ACCOUNT(colon);
   PRINT_TRACE(":");
   // Align HERE.
   dsp.chars = (char*) ((((ucell) (dsp.chars)) + sizeof(cell) - 1) & ~(sizeof(cell) - 1));
@@ -1653,6 +1759,7 @@ WORD(colon, 95, ":", 1, &header_flush_file) {
 }
 
 WORD(colon_no_name, 96, ":NONAME", 7, &header_colon) {
+  ACCOUNT(colon_no_name);
   PRINT_TRACE(":NONAME");
 
   // Similar to : but without parsing and storing a name.
@@ -1678,12 +1785,14 @@ NEXT
   NEXT
 
 WORD(exit, 97, "EXIT", 4, &header_colon_no_name) {
+  ACCOUNT(exit);
   PRINT_TRACE("EXIT");
   EXIT_NEXT;
 }
 
 // TODO: This is broken in the new style, but I'm ignoring it.
 WORD(see, 98, "SEE", 3, &header_exit) {
+  ACCOUNT(see);
   PRINT_TRACE("SEE");
   // Parses a word and visualizes its contents.
   parse_name_();
@@ -1744,7 +1853,9 @@ WORD(see, 98, "SEE", 3, &header_exit) {
   NEXT;
 }
 
+// TODO: This is pushing - fix it.
 WORD(semicolon, 99, ";", 1 | IMMEDIATE, &header_see) {
+  ACCOUNT(semicolon);
   PRINT_TRACE(";");
   dictionary->metadata &= (~HIDDEN); // Clear the hidden bit.
 
