@@ -140,6 +140,7 @@ char** strptr1;
 size_t tempSize;
 header* tempHeader;
 char tempBuf[256];
+unsigned char numBuf[sizeof(cell) * 2];
 FILE* tempFile;
 struct stat tempStat;
 void *quit_inner;
@@ -723,8 +724,8 @@ void parse_name_(void) {
 void to_number_int_(void) {
   // Copying the numbers into the buffers.
   for (c1 = 0; c1 < (cell) sizeof(cell); c1++) {
-    tempBuf[c1] = (char) ((sp[3] >> (c1*8)) & 0xff);
-    tempBuf[sizeof(cell) + c1] = (char) ((sp[2] >> (c1*8)) & 0xff);
+    numBuf[c1] = (unsigned char) ((((ucell) sp[3]) >> (c1*8)) & 0xff);
+    numBuf[sizeof(cell) + c1] = (unsigned char) ((((ucell) sp[2]) >> (c1*8)) & 0xff);
   }
 
   while (sp[0] > 0) {
@@ -743,8 +744,8 @@ void to_number_int_(void) {
 
     // Otherwise, a valid character, so multiply it in.
     for (c3 = 0; c3 < 2 * (cell) sizeof(cell) ; c3++) {
-      c2 = ((cell) tempBuf[c3]) * tempSize + c1;
-      tempBuf[c3] = (char) (c2 & 0xff);
+      c2 = ((ucell) numBuf[c3]) * tempSize + c1;
+      numBuf[c3] = (unsigned char) (c2 & 0xff);
       c1 = (c2 >> 8) & 0xff;
     }
 
@@ -755,8 +756,8 @@ void to_number_int_(void) {
   sp[2] = 0;
   sp[3] = 0;
   for (c1 = 0; c1 < (cell) sizeof(cell); c1++) {
-    sp[3] |= tempBuf[c1] << (c1*8);
-    sp[2] |= tempBuf[sizeof(cell) + c1] << (c1*8);
+    sp[3] |= (cell) (((ucell) numBuf[c1]) << (c1*8));
+    sp[2] |= (cell) (((ucell) numBuf[sizeof(cell) + c1]) << (c1*8));
   }
   sp[1] = (cell) str1;
 }
