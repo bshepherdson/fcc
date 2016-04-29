@@ -8,6 +8,7 @@
 #include <errno.h>
 #include <termios.h>
 #include <sys/stat.h>
+#include <sys/time.h>
 
 #include <readline/readline.h>
 //#include <readline/history.h>
@@ -117,13 +118,15 @@ union {
 } dsp;
 
 
+#define INPUT_SOURCE_COUNT (32)
+
 // A few more core globals.
 cell state;
 cell base;
 header *dictionary;
 code **lastWord;
 
-char parseBuffers[16][256];
+char parseBuffers[INPUT_SOURCE_COUNT][256];
 
 typedef struct {
   cell parseLength;
@@ -132,7 +135,7 @@ typedef struct {
   char *parseBuffer;
 } source;
 
-source inputSources[16];
+source inputSources[INPUT_SOURCE_COUNT];
 cell inputIndex;
 #define SRC (inputSources[inputIndex])
 
@@ -150,6 +153,8 @@ unsigned char numBuf[sizeof(cell) * 2];
 FILE* tempFile;
 struct stat tempStat;
 void *quit_inner;
+struct timeval timeVal;
+uint64_t i64;
 
 struct termios old_tio, new_tio;
 
@@ -160,7 +165,7 @@ typedef uint32_t super_key_t;
 
 
 // Next key to use:
-int primitive_count = 106;
+int primitive_count = 107;
 
 
 typedef struct queued_primitive_ {
@@ -1853,8 +1858,30 @@ WORD(see, 98, "SEE", 3, &header_exit) {
   NEXT;
 }
 
+WORD(utime, 106, "UTIME", 5, &header_see) {
+  ACCOUNT(utime);
+  PRINT_TRACE("UTIME");
+
+  // The return value here is a double-cell integer, but we need to check if
+  // time_t is smaller than a cell (64-bit) or not (32-bit).
+  gettimeofday(&timeVal, NULL);
+  sp -= 2;
+  // Microseconds are millionths of seconds. Check if we're on a 64-bit machine.
+  // If so there's enough room in the low cell of the double-cell return for the 
+  // complete time value. If on a 32-bit machine, it won't fit.
+  if (sizeof(cell) > 4) {
+    sp[1] = (cell) ((ucell) timeVal.tv_sec) * 1000000 + ((ucell) timeVal.tv_usec);
+    sp[0] = 0;
+  } else {
+    i64 = ((uint64_t) timeVal.tv_sec) * 1000000 + ((uint64_t) timeVal.tv_usec);
+    sp[1] = (i64 >> 32);
+    sp[0] = i64 & 0xffffffff;
+  }
+  NEXT;
+}
+
 // TODO: This is pushing - fix it.
-WORD(semicolon, 99, ";", 1 | IMMEDIATE, &header_see) {
+WORD(semicolon, 99, ";", 1 | IMMEDIATE, &header_utime) {
   ACCOUNT(semicolon);
   PRINT_TRACE(";");
   dictionary->metadata &= (~HIDDEN); // Clear the hidden bit.
@@ -2014,6 +2041,7 @@ void init_primitives(void) {
   INIT_PRIM(compile_zbranch);
   INIT_PRIM(compile_branch);
   INIT_PRIM(control_flush);
+  INIT_PRIM(utime);
 }
 
 
