@@ -1,6 +1,8 @@
 #ifndef COMPILER_H
 #define COMPILER_H
 
+#include <core.h>
+
 // A stacked value.
 typedef struct {
   bool isLiteral;
@@ -10,10 +12,10 @@ typedef struct {
 struct state_;
 
 typedef struct operation_ {
-  ucell (*resolve)(struct state_ *s, void* data, ucell offset);
-  void (*emit)(struct state_ *s, void* data);
+  ucell (*resolve)(struct state_ *s, void* data, ucell offset, void* target);
+  ucell (*emit)(struct state_ *s, void* data, ucell offset, void* target);
   void* data;
-};
+} operation;
 
 
 // Labels go through three phases:
@@ -24,16 +26,39 @@ typedef struct operation_ {
 //    form makes sense for the architecture.
 typedef ucell label;
 
+#define MAX_LABELS (64)
+#define MAX_STACK (32)
+#define MAX_REGS (16)
+#define MAX_LITERAL_POOL (32)
+
 typedef struct state_ {
-  stacked stack[32];
+  stacked stack[MAX_STACK];
   int depth;
 
-  label labels[64];
+  label labels[MAX_LABELS];
   int label_count;
 
-  operation *output[1024];
+  bool free_registers[MAX_REGS];
+
+  cell literal_pool[MAX_LITERAL_POOL];
+  int literal_count;
+  ucell literal_pool_offset;
+
+
+  operation output[1024];
   operation *op;
 } state;
+
+
+typedef void *primitive(void);
+
+typedef struct {
+  void (*codeword)(void);
+  void (*code)(void);
+  cell data; // Optional; omitted for eg. docol, but present for eg. dodoes.
+} nonprimitive;
+
+
 // Interface for the compiler and its runtime.
 
 // Returns a clean compiler state. Called when we enter compilation state at the
@@ -51,28 +76,22 @@ void compile_nonprimitive(nonprimitive *np);
 void compile_literal(cell value);
 
 // Called to actually emit the compiled buffer to emit machine code.
-void compile_emit(void);
+ucell compile_emit(void *target);
 
 
-// START HERE: How to handle creating labels while executing code at runtime?
-// Ah, actually: remember that, while IF, THEN and friends are IMMEDIATE, the
-// [branch-fwd] and so on are primitives that will be compiled normally into
-// those functions.
+// Labels and control flow are the tricky bit. The [0branch-fwd] et al
+// primitives actually get compiled into IF and friends, but their real work is
+// done when IF and friends run IMMEDIATEly, during the compilation of some
+// other word.
 //
-// They run during the definition of some other primitive. I need to rethink
-// this, because I was thinking of it as too simple.
+// At runtime, they should access the compile_state global and modify its label
+// set and so on. That'll mean some tricky assembly code, but it should be
+// workable.
 
-/*
+// Miscellaneous helper functions for the compiler state.
 
-: IF [0branch-fwd] ( -- label ) ; IMMEDIATE
-: ELSE ( -- end-label ) [branch-fwd] swap (resolve-label) ; IMMEDIATE
-: THEN ( if-label ) (resolve-label) ; IMMEDIATE
-
-[0branch-fwd] and (resolve-label) are going to get compiled right into IF et al.
-Then when IF et al are used in compiling someone else's definition.
-
-That means that when ... hmm.
-
-*/
+// Releases the given register.
+void free_reg(cell reg);
+cell alloc_reg();
 
 #endif
