@@ -15,7 +15,7 @@ void compile_init(void) {
   compiler_state->literal_count = 0;
 
   // Call through to the machine-specific primitive initializer.
-  primitive_compiler_init();
+  primitive_compiler_init(compiler_state);
 }
 
 // TODO: How to identify the primitives? They're functions that I call, so I
@@ -33,7 +33,7 @@ void compile_literal(cell value) {
 void compile_nonprimitive(nonprimitive *np) {
   // Actually compiles a primitive for a call to this nonprimitive, essentially
   // an execute.
-  prim_call_nonprimitive(np);
+  prim_call_nonprimitive(compiler_state, np);
 }
 
 // Takes in the target location, and returns the total size in bytes of the
@@ -68,14 +68,14 @@ ucell compile_emit(void *target) {
 }
 
 
-void free_reg(cell reg) {
-  compiler_state->free_registers[reg] = 1;
+void free_reg(state *s, cell reg) {
+  s->free_registers[reg] = 1;
 }
 
-cell alloc_reg() {
+cell alloc_reg(state *s) {
   for (cell i = 0; i < MAX_REGS; i++) {
-    if (compiler_state->free_registers[i]) {
-      compiler_state->free_registers[i] = 0;
+    if (s->free_registers[i]) {
+      s->free_registers[i] = 0;
       return i;
     }
   }

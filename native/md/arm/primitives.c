@@ -11,7 +11,14 @@
 
 #define MAX_GP_REG (11)
 
-#define COMPILE(rhs) *(compiler_state->op++) = rhs
+#define COMPILE(state, rhs) *(state->op++) = rhs
+#define WRITE(t, val) *((uint32_t*) t) = val
+
+#define RESOLVE(name) ucell _resolve_ ## name (state *s, void* data, ucell offset, void *target)
+#define EMIT(name) ucell _emit_ ## name (state *s, void* data, ucell offset, void *target)
+#define OP0(name) (operation) { &_resolve_ ## name, &_emit_ ## name, 0 }
+#define OP(name, data) (operation) { &_resolve_ ## name, &_emit_ ## name, data }
+
 
 /*
  Design for the ARM implementation.
@@ -23,25 +30,22 @@
 
 // Called during compile state initialization, to set any machine-dependent
 // things, especially the register usage.
-void primitive_compiler_init(void) {
+void primitive_compiler_init(state *s) {
   // On ARM, the PC (15) and SP (13) are always used. The rest are fair game
   // for use by the code.
   for (cell i = 0; i <= MAX_GP_REG; i++) {
-    compiler_state->free_registers[i] = 1;
+    s->free_registers[i] = 1;
   }
 
-  compiler_state->free_registers[REG_RSP] = 0;
-  compiler_state->free_registers[REG_SP]  = 0;
-  compiler_state->free_registers[REG_LR]  = 0; // Usable as general purpose?
-  compiler_state->free_registers[REG_PC]  = 0;
+  s->free_registers[REG_RSP] = 0;
+  s->free_registers[REG_SP]  = 0;
+  s->free_registers[REG_LR]  = 0; // Usable as general purpose?
+  s->free_registers[REG_PC]  = 0;
 }
 
 
 
 
-// Core machinery.
-ucell _resolve_push_lit(state *s, void* data, ucell offset) {
-}
 
 // Pushing a literal varies depending on how big the literal is and whether it
 // can be assembled as one instruction or not.
@@ -76,27 +80,19 @@ ucell primitive_emit_literal_pool(state *s, cell value, ucell offset, void *targ
 }
 
 
-
 // Save all working stack values to the real stack in memory.
 // TODO: A block of registers in ascending order (a common case) can be pushed
 // with a single STM instruction.
-void drain_stack(void) {
-  for (cell i = 0; i < compiler_state->depth; i++) {
-    if (compiler_state->stack[i].isLiteral) {
-      COMPILE(OP_PUSH_LIT(compiler_state->stack[i].value));
+void drain_stack(state *s) {
+  for (cell i = 0; i < s->depth; i++) {
+    if (s->stack[i].isLiteral) {
+      //COMPILE(s, OP_PUSH_LIT(s->stack[i].value));
     } else {
-      COMPILE(OP_PUSH_REG(compiler_state->stack[i].value));
-      free_reg(compiler_stack->stack[i].value);
+      //COMPILE(s, OP_PUSH_REG(s->stack[i].value));
+      free_reg(s, s->stack[i].value);
     }
   }
 }
-
-#define RESOLVE(name) ucell _resolve_ ## name (state *s, void* data, ucell offset, void *target)
-#define EMIT(name) ucell _emit_ ## name (state *s, void* data, ucell offset, void *target)
-#define OP0(name) { &_resolve_ ## name, &_emit_ ## name, 0 }
-#define OP(name, data) { &_resolve_ ## name, &_emit_ ## name, data }
-
-#define WRITE(t, val) *((uint32_t*) t) = val
 
 // TODO: Double-check that the PC, which is running ahead, is actually right.
 RESOLVE(push_rsp) {
@@ -154,12 +150,12 @@ EMIT(branch_abs) {
 
 // Compiles a call to the nonprimitive's code.
 // TODO: Handle codewords other than docol (eg. dodoes)
-void prim_call_nonprimitive(nonprimitive *np) {
+void prim_call_nonprimitive(state *s, nonprimitive *np) {
   // For a docol nonprimitive, we need to save our current location, and then
   // jump to the implementation.
   //
   // Need to flush the stack from registers to the real stack first.
-  drain_stack();
+  drain_stack(s);
 
   // Now push the PC to RSP.
   // ARM documentation says that the PC is usually 8 bytes ahead, but sometimes
@@ -168,13 +164,13 @@ void prim_call_nonprimitive(nonprimitive *np) {
   // 8. That means the target return address I'm pushing is exactly right:
   // While I'm executing the push instruction, the jump is next, followed by the 
   // instruction I want to be running on return.
-  COMPILE(OP0(push_rsp));
+  COMPILE(s, OP0(push_rsp));
 
   // A literal branch instruction has a range of +/- 32MB.
   // For now I assume we can reach it.
   // TODO: Handle out-of-range branching with the literal pool and BX.
   // Remember that PC is 8 bytes ahead.
-  COMPILE(OP(branch_abs, np->code));
+  COMPILE(s, OP(branch_abs, np->code));
 }
 
 #endif

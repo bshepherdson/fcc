@@ -91,7 +91,7 @@ ucell compile_emit(void *target);
 // Miscellaneous helper functions for the compiler state.
 
 // Releases the given register.
-void free_reg(cell reg);
-cell alloc_reg();
+void free_reg(state *s, cell reg);
+cell alloc_reg(state *s);
 
 #endif
