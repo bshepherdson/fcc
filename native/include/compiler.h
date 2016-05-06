@@ -5,16 +5,16 @@
 
 // A stacked value.
 typedef struct {
-  bool isLiteral;
+  bool is_literal;
   cell value; // Either a register number, or a literal value.
 } stacked;
 
 struct state_;
 
 typedef struct operation_ {
-  ucell (*resolve)(struct state_ *s, void* data, ucell offset, void* target);
-  ucell (*emit)(struct state_ *s, void* data, ucell offset, void* target);
-  void* data;
+  ucell (*resolve)(struct state_ *s, cell* data, ucell offset, void* target);
+  ucell (*emit)(struct state_ *s, cell data, ucell offset, void* target);
+  cell data;
 } operation;
 
 

@@ -26,7 +26,7 @@ void compile_primitive(primitive *p) {
 
 void compile_literal(cell value) {
   stacked *s = &(compiler_state->stack[compiler_state->depth++]);
-  s->isLiteral = 1;
+  s->is_literal = 1;
   s->value = value;
 }
 

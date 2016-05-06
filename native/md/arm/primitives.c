@@ -14,8 +14,8 @@
 #define COMPILE(state, rhs) *(state->op++) = rhs
 #define WRITE(target, val) *((uint32_t*) target) = val
 
-#define RESOLVE(name) ucell _resolve_ ## name (state *s, void* data, ucell offset, void *target)
-#define EMIT(name) ucell _emit_ ## name (state *s, void* data, ucell offset, void *target)
+#define RESOLVE(name) ucell _resolve_ ## name (state *s, cell* data, ucell offset, void *target)
+#define EMIT(name) ucell _emit_ ## name (state *s, cell data, ucell offset, void *target)
 #define OP0(name) (operation) { &_resolve_ ## name, &_emit_ ## name, 0 }
 #define OP(name, data) (operation) { &_resolve_ ## name, &_emit_ ## name, data }
 
@@ -51,7 +51,7 @@ RESOLVE(raw) {
   return 4;
 }
 EMIT(raw) {
-  WRITE(target, (uint32_t) data);
+  WRITE(target, data);
   return 4;
 }
 
@@ -107,7 +107,7 @@ EMIT(load_literal_pool_to_reg) {
   // Rn is the base register at bit 16
   op |= REG_PC << 16;
   // Rd is the destination register at bit 12; that's in the top 4 bits of data.
-  op |= (((uint32_t) data) >> 28) << 12;
+  op |= (data >> 28) << 12;
 
   // Signal a memory transfer with 01 in the type field.
   op |= 1 << 26;
@@ -136,7 +136,7 @@ EMIT(push) {
   //
   // For this load we want to store the reg at pre-decremented, write-back SP.
   // 0000 0101 0010 base src 0
-  WRITE(target, 0x05200000 | (REG_SP << 16) | (((uint32_t) data) << 12));
+  WRITE(target, 0x05200000 | (REG_SP << 16) | (data << 12));
   return 4;
 }
 
@@ -180,7 +180,7 @@ void load_literal_to_reg(state *s, cell value, int reg) {
   if ( operand == 0xffffffff ) {
     // Assemble a complete MOV instruction, which is spelled:
     // cond 00 Immediate=1 MOV=1101 S=0 Rn=ignored/0 Rd 2nd-operand
-    COMPILE(s, OP(raw, (void*) ((1 << 25) | (0xd << 21) | (reg << 12) | operand)));
+    COMPILE(s, OP(raw, (1 << 25) | (0xd << 21) | (reg << 12) | operand));
     return;
   }
 
@@ -188,14 +188,14 @@ void load_literal_to_reg(state *s, cell value, int reg) {
   if ( operand == 0xffffffff ) {
     // Assemble a complete MVN instruction, which is spelled:
     // cond 00 Immediate=1 MVN=1111 S=0 Rn=ignored/0 Rd 2nd-operand
-    COMPILE(s, OP(raw, (void*) ((1 << 25) | (0xf << 21) | (reg << 12) | operand)));
+    COMPILE(s, OP(raw, (1 << 25) | (0xf << 21) | (reg << 12) | operand));
     return;
   }
 
   // Failing those, we'll have to use the literal pool.
   uint32_t index = s->literal_count++;
   s->literal_pool[index] = value;
-  COMPILE(s, OP(load_literal_pool_to_reg, (void*) (index | (reg << 28))));
+  COMPILE(s, OP(load_literal_pool_to_reg, index | (reg << 28)));
 }
 
 
@@ -205,12 +205,12 @@ void load_literal_to_reg(state *s, cell value, int reg) {
 void drain_stack(state *s) {
   cell scratch_reg = -1;
   for (cell i = 0; i < s->depth; i++) {
-    if (s->stack[i].isLiteral) {
+    if (s->stack[i].is_literal) {
       if (scratch_reg == -1) scratch_reg = alloc_reg(s);
       load_literal_to_reg(s, s->stack[i].value, scratch_reg);
-      COMPILE(s, OP(push, (void*) scratch_reg));
+      COMPILE(s, OP(push, scratch_reg));
     } else {
-      COMPILE(s, OP(push, (void*) s->stack[i].value));
+      COMPILE(s, OP(push, s->stack[i].value));
       if (scratch_reg == -1) scratch_reg = s->stack[i].value;
       else free_reg(s, s->stack[i].value);
     }
@@ -241,7 +241,7 @@ EMIT(push_rsp) {
   //
   // For this load we want to store the reg at pre-decremented, write-back RSP.
   // 0000 0101 0010 base src 0
-  WRITE(target, 0x05200000 | (REG_RSP << 16) | (((uint32_t) data) << 12));
+  WRITE(target, 0x05200000 | (REG_RSP << 16) | (data << 12));
   return 4;
 }
 
@@ -291,13 +291,96 @@ void prim_call_nonprimitive(state *s, nonprimitive *np) {
   // 8. That means the target return address I'm pushing is exactly right:
   // While I'm executing the push instruction, the jump is next, followed by the 
   // instruction I want to be running on return.
-  COMPILE(s, OP(push_rsp, (void*) REG_PC));
+  COMPILE(s, OP(push_rsp, REG_PC));
 
   // A literal branch instruction has a range of +/- 32MB.
   // For now I assume we can reach it.
   // TODO: Handle out-of-range branching with the literal pool and BX.
   // Remember that PC is 8 bytes ahead.
-  COMPILE(s, OP(branch_abs, np->code));
+  COMPILE(s, OP(branch_abs, (cell) np->code));
+}
+
+#define DP_AND (0x0)
+#define DP_EOR (0x1)
+#define DP_SUB (0x2)
+#define DP_RSB (0x3)
+#define DP_ADD (0x4)
+#define DP_CMP (0xa)
+#define DP_CMN (0xb)
+#define DP_ORR (0xc)
+
+
+// Generic handler for "data processing" primitives, like +, AND etc.
+// These all have several cases and other tricky logic.
+// data is the opcode for this specific operation (unshifted).
+// data is -1 to signal to EMIT that it should do nothing.
+// Most of these operations (AND, EOR, ORR, ADD) are commutative.
+// SUB and RSB are a special case; we switch to RSB transparently in the case
+// where TOS is a register and the one beneath is a literal.
+
+// There are three cases here, depending on what the two operands on top are:
+// ( reg reg -- reg ) straightforward
+// ( reg lit -- reg ) check if the literal can be inlined, do so. if not, load
+//     it into a newly allocate register then do case 1.
+// ( lit reg -- reg ) same as above, with the special case of inverting SUB and
+//     CMP to RSB and CMN.
+// ( lit lit -- lit ) manipulate the literals at compile-time, no output.
+RESOLVE(data_processing_primitive) {
+  stacked* top = &(s->stack[s->depth - 1]);
+  stacked* bottom = &(s->stack[s->depth - 2]);
+  if ( top->is_literal && bottom->is_literal ) {
+    // Easy case. Run the operation now, at compile time, and emit nothing.
+    bool handled = 1;
+    switch (*data) {
+      case DP_AND: bottom->value &= top->value; break;
+      case DP_EOR: bottom->value ^= top->value; break;
+      case DP_SUB: bottom->value -= top->value; break;
+      // No RSB, it can't happen here.
+      case DP_ADD: bottom->value += top->value; break;
+      case DP_ORR: bottom->value |= top->value; break;
+      default: // If we can't handle it here, grab handled.
+        handled = 0;
+    }
+
+    if (handled) {
+      s->depth--;
+      *data = -1; // Signal EMIT phase to do nothing.
+      return 0;
+    } else {
+      // If we can't do it in-line, we'll need to convert both to registers.
+      // Thus: 
+
+
+
+      // START HERE: Damn it, the RESOLVE phase needs to be a lot stickier. It
+      // needs to (more or less) completely build the instructions, leaving the
+      // EMIT phase to really just be a fix-up for labels and the literal pool.
+      // It should be empty for almost everything. That makes sure that the
+      // stack is correct in a single pass and allows this kind of compile-time
+      // constant folding.
+
+      // Plan: Replace RESOLVE with EMIT and EMIT with FIX_LABELS. The latter
+      // only really looks at the literals list, grabs one, and does something
+      // with its value to the instruction emitted previously, which it should
+      // modify in-place, since it's already been written out.
+
+      // Actually, let me change the scheme altogether. We can write the
+      // instructions out on the first pass, since we know how wide everything
+      // needs to be and nothing is moving after the first pass.
+
+      // Or is it better to have a more C-friendly data structure that describes
+      // operations of various types, and construct those for later munging and
+      // address-fiddling. How would a more conventional AST compiler do things?
+
+      // Builds the AST, walks it in one or more passes adding extra information
+      // at various nodes, then a final pass to construct assembler output.
+
+      // But that hands off the final, assembly-generation step to the actual
+      // assembler, which is not available here. That file can write itself into
+      // the 
+  }
+
+  // If we're still here, we need to go through the usual flow.
 }
 
 #endif
