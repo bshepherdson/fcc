@@ -12,7 +12,7 @@
 #define MAX_GP_REG (11)
 
 #define COMPILE(state, rhs) *(state->op++) = rhs
-#define WRITE(t, val) *((uint32_t*) t) = val
+#define WRITE(target, val) *((uint32_t*) target) = val
 
 #define RESOLVE(name) ucell _resolve_ ## name (state *s, void* data, ucell offset, void *target)
 #define EMIT(name) ucell _emit_ ## name (state *s, void* data, ucell offset, void *target)
@@ -45,31 +45,33 @@ void primitive_compiler_init(state *s) {
 
 
 
+// This is a miscellaneous helper: it can be passed to COMPILE, and its payload
+// is the actual instruction, already encoded.
+RESOLVE(raw) {
+  return 4;
+}
+EMIT(raw) {
+  WRITE(target, (uint32_t) data);
+  return 4;
+}
 
 
-// Pushing a literal varies depending on how big the literal is and whether it
-// can be assembled as one instruction or not.
-// START HERE: Look up immediate MOV operands. Even rotations and so on.
-// Can assemble with a few instructions if necessary.
-// We're going to duplicate that logic for both of these functions, but that's
-// okay, this is compile-time code.
-//
-// The plan: we have a 4-bit shift and 8-bit immediate. The shift is actually by
-// multiples of 2, from 0 to 30. So at compile time while pushing a literal, we
-// fiddle with the literal to see if it can be expressed as a literal or negated
-// literal. If so, we assemble it with a literal MOV or MVN.
-//
-// Failing that, append it to the literal pool (which needs to be added to the
-// compiler state) and replaced with:
-//   add $target, pc, offset
-//   ldr $target, $target
-// TODO: Literal pools are a standard part of the assembler, so presumably their
-// cache behavior is not terrible? Double-check that.
-//
-// Literals will probably go at the end - then the literal offset can be
-// computed between resolving and emitting.
-//
-// I've added code for that to compile_emit. It will set literal_pool_offset.
+// Turning compile-time literals into real values is a little tricky.
+// - In the best case, they can be inlined as literals to the "flexible second
+//   operand" that ARM supports for the data processing instructions, or into a
+//   literal load.
+// - Even if we need to load the literal into a register on its own, it can
+//   often still be inlined as the flexible second operand to MOV or MVN.
+// - Failing that, we push it onto the "literal pool", part of the compiler
+//   state. These 32-bit values are emitted after the end of the word.
+//   PC-relative loads can be used to get those values into registers.
+
+// To make this easier, there's a few helper functions.
+// - try_pack_literal_as_operand attempts to turn a literal into a ready-to-use
+//   flexible-second-operand value.
+// - load_literal_to_reg is a helper that will COMPILE code for loading a
+//   literal into a register, and will either use MOV, MVN or the literal pool.
+
 
 ucell primitive_emit_literal_pool(state *s, cell value, ucell offset, void *target) {
   // Just write the value out as a 32-bit integer.
@@ -79,22 +81,147 @@ ucell primitive_emit_literal_pool(state *s, cell value, ucell offset, void *targ
   return 4;
 }
 
+// The top four bits of data are the register. The lower 28 are the index into
+// the literal pool.
+RESOLVE(load_literal_pool_to_reg) {
+  return 4;
+}
+EMIT(load_literal_pool_to_reg) {
+  // Now s->literal_pool_offset is the offset of the literal pool from the start
+  // of the compiled code. offset is my own location. PC is 8 bytes after my
+  // offset (probably).
+  // A LDR instruction takes a base register and a 12-byte unsigned offset.
+  // That gives me a range of 1K instructions from here, which is probably
+  // enough to be getting on with.
+  // Our offset should be: literal_pool_offset - offset - 8, base register is
+  // PC. If our offset above calls for more than 4096 bytes, we currently error
+  // out.
+  // TODO: Use a more flexible scheme.
+  uint32_t op = s->literal_pool_offset - offset - 8;
+  // Bit P=24 signals pre-indexing, [pc+offset], not [pc]+offset.
+  op |= 1 << 24;
+  // Bit U=23 signals adding
+  op |= 1 << 23;
+  // Bit L=20 signals load
+  op |= 1 << 20;
+  // Rn is the base register at bit 16
+  op |= REG_PC << 16;
+  // Rd is the destination register at bit 12; that's in the top 4 bits of data.
+  op |= (((uint32_t) data) >> 28) << 12;
+
+  // Signal a memory transfer with 01 in the type field.
+  op |= 1 << 26;
+
+  WRITE(target, op);
+  return 4;
+}
+
+// data is the register number to push.
+RESOLVE(push) {
+  return 4;
+}
+EMIT(push) {
+  // STR is encoded like this:
+  // 31-28 = cond (all 0s)
+  // 27-26 = 01
+  // 25 = immediate is offset if 0, shifted register if 1.
+  // 24 = 0 for post-index, 1 for pre-index
+  // 23 = 0 for decrement, 1 for increment
+  // 22 = 0 for words, 1 for bytes
+  // 21 = 0 for no writeback, 1 for writeback
+  // 20 = 0 for store, 1 for load
+  // 19-16 = base register for address
+  // 15-12 = source/destination value
+  // 11-0 = immediate offset or 4+8 shift/reg
+  //
+  // For this load we want to store the reg at pre-decremented, write-back SP.
+  // 0000 0101 0010 base src 0
+  WRITE(target, 0x05200000 | (REG_SP << 16) | (((uint32_t) data) << 12));
+  return 4;
+}
+
+
+// Returns either a ready-to-use flexible second operand field, or -1.
+// Note that it doesn't try the negated value - that's specific to MOV/MVN, and
+// this generic helper function is called by the implementations of + and so on.
+uint32_t try_pack_literal_as_operand(cell data) {
+  // The flexible second operand is an 8-bit value that can be rotated by any
+  // even amount.
+  // The plan:
+  // - Loop over all 31 possible rotations of the input.
+  // - Check if that rotated value masks with 0xff.
+  uint32_t value = (uint32_t) data;
+  uint32_t temp;
+  uint32_t rot;
+  bool fits = 0;
+  for (rot = 0; rot <= 30; rot += 2) {
+    // Rotate our value /left/ into temp.
+    temp = (value >> (32 - rot)) | (value << rot);
+    if ( (temp & 0xff) == temp ) {
+      fits = 1;
+      break;
+    }
+  }
+
+  if (fits) {
+    // Our 8-bit literal is temp & 0xff, rot >> 1 is the rotation.
+    // The binary format for the second operand wants rrrrllllllll.
+    return (temp & 0xff) | ((rot >> 1) << 8);
+  }
+
+  return -1;
+}
+
+// Loads a real literal from the compile-time stack into an actual register.
+void load_literal_to_reg(state *s, cell value, int reg) {
+  // Check if our literal can be packed into the second operand, or if its
+  // negation can.
+  uint32_t operand = try_pack_literal_as_operand(value);
+  if ( operand == 0xffffffff ) {
+    // Assemble a complete MOV instruction, which is spelled:
+    // cond 00 Immediate=1 MOV=1101 S=0 Rn=ignored/0 Rd 2nd-operand
+    COMPILE(s, OP(raw, (void*) ((1 << 25) | (0xd << 21) | (reg << 12) | operand)));
+    return;
+  }
+
+  operand = try_pack_literal_as_operand(~value);
+  if ( operand == 0xffffffff ) {
+    // Assemble a complete MVN instruction, which is spelled:
+    // cond 00 Immediate=1 MVN=1111 S=0 Rn=ignored/0 Rd 2nd-operand
+    COMPILE(s, OP(raw, (void*) ((1 << 25) | (0xf << 21) | (reg << 12) | operand)));
+    return;
+  }
+
+  // Failing those, we'll have to use the literal pool.
+  uint32_t index = s->literal_count++;
+  s->literal_pool[index] = value;
+  COMPILE(s, OP(load_literal_pool_to_reg, (void*) (index | (reg << 28))));
+}
+
 
 // Save all working stack values to the real stack in memory.
 // TODO: A block of registers in ascending order (a common case) can be pushed
 // with a single STM instruction.
 void drain_stack(state *s) {
+  cell scratch_reg = -1;
   for (cell i = 0; i < s->depth; i++) {
     if (s->stack[i].isLiteral) {
-      //COMPILE(s, OP_PUSH_LIT(s->stack[i].value));
+      if (scratch_reg == -1) scratch_reg = alloc_reg(s);
+      load_literal_to_reg(s, s->stack[i].value, scratch_reg);
+      COMPILE(s, OP(push, (void*) scratch_reg));
     } else {
-      //COMPILE(s, OP_PUSH_REG(s->stack[i].value));
-      free_reg(s, s->stack[i].value);
+      COMPILE(s, OP(push, (void*) s->stack[i].value));
+      if (scratch_reg == -1) scratch_reg = s->stack[i].value;
+      else free_reg(s, s->stack[i].value);
     }
   }
+
+  if (scratch_reg != -1) free_reg(s, scratch_reg);
+  s->depth = 0;
 }
 
 // TODO: Double-check that the PC, which is running ahead, is actually right.
+// data is the source register we're pushing; usually PC but not always.
 RESOLVE(push_rsp) {
   return 4;
 }
@@ -112,9 +239,9 @@ EMIT(push_rsp) {
   // 15-12 = source/destination value
   // 11-0 = immediate offset or 4+8 shift/reg
   //
-  // For this load we want to store the PC at pre-decremented, write-back RSP.
+  // For this load we want to store the reg at pre-decremented, write-back RSP.
   // 0000 0101 0010 base src 0
-  WRITE(target, 0x05200000 | (REG_RSP << 16) | (REG_PC << 12));
+  WRITE(target, 0x05200000 | (REG_RSP << 16) | (((uint32_t) data) << 12));
   return 4;
 }
 
@@ -164,7 +291,7 @@ void prim_call_nonprimitive(state *s, nonprimitive *np) {
   // 8. That means the target return address I'm pushing is exactly right:
   // While I'm executing the push instruction, the jump is next, followed by the 
   // instruction I want to be running on return.
-  COMPILE(s, OP0(push_rsp));
+  COMPILE(s, OP(push_rsp, (void*) REG_PC));
 
   // A literal branch instruction has a range of +/- 32MB.
   // For now I assume we can reach it.
