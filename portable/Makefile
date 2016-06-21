@@ -51,12 +51,14 @@ ifneq ($(filter %64,$(shell uname -m)),)
     TEST_GOLD=test/test.64.gold
 endif
 
+ARCH=$(shell uname -m)
+
 .PHONY: all
 
 default: all
 
-vm.o: vm.c
-	$(CC) $(CFLAGS) $(INCLUDES) -c vm.c $(LIBS)
+vm.o: asm/$(ARCH)/vm.s
+	$(CC) $(CFLAGS) $(INCLUDES) -c asm/$(ARCH)/vm.s $(LIBS)
 
 $(MODULE_DIR)/%.o: $(MODULE_DIR)/%.fs
 	objcopy --input binary --output $(ELF_FORMAT) \
@@ -87,6 +89,9 @@ bench: FORCE forth
 	echo =======   $$a   ======== ; \
 	time ./forth bench/$$a.fs ; \
 	done
+
+asm: FORCE vm.c
+	$(CC) $(CFLAGS) $(INCLUDES) -S vm.c -o vm_raw.s
 
 FORCE:
 
