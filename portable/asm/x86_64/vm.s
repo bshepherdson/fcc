@@ -1415,7 +1415,7 @@ code_cfetch:
 	movq	sp(%rip), %rdx
 	movq	(%rdx), %rdx
 	movzbl	(%rdx), %edx
-	movsbq	%dl, %rdx
+	movzbl	%dl, %edx
 	movq	%rdx, (%rax)
 	movq	ip(%rip), %rax
 	leaq	8(%rax), %rdx

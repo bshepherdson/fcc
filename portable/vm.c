@@ -521,13 +521,13 @@ WORD(store, 30, "!", 1, &header_fetch) {
 WORD(cfetch, 31, "C@", 2, &header_store) {
   ACCOUNT(cfetch);
   PRINT_TRACE("C@");
-  sp[0] = (cell) *((char*) sp[0]);
+  sp[0] = (cell) *((unsigned char*) sp[0]);
   NEXT;
 }
 WORD(cstore, 32, "C!", 2, &header_cfetch) {
   ACCOUNT(cstore);
   PRINT_TRACE("C!");
-  *((char*) sp[0]) = (char) sp[1];
+  *((unsigned char*) sp[0]) = (unsigned char) sp[1];
   sp += 2;
   NEXT;
 }
