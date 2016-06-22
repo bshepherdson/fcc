@@ -186,11 +186,11 @@ code_plus:
 .LFB3:
 	.cfi_startproc
 	movq    sp(%rip), %rax
-	movq    (%rax), %rbx
+	movq    (%rax), %rdx
 	addq    $8, %rax
 	movq    (%rax), %rcx
-	addq    %rcx, %rbx
-	movq    %rbx, (%rax)
+	addq    %rcx, %rdx
+	movq    %rdx, (%rax)
 	addq    $8, sp(%rip)
 	NEXT
 	.cfi_endproc
@@ -222,10 +222,10 @@ code_minus:
 .LFB4:
 	.cfi_startproc
 	movq	sp(%rip), %rdx
-        movq    (%rdx), %rbx
+        movq    (%rdx), %rcx
 	addq	$8, %rdx
 	movq	(%rdx), %rax
-	subq	%rbx, %rax
+	subq	%rcx, %rax
 	movq	%rax, (%rdx)
 	addq	$8, sp(%rip)
 	NEXT
@@ -258,11 +258,11 @@ code_times:
 .LFB5:
 	.cfi_startproc
 	movq	sp(%rip), %rax
-        movq    (%rax), %rbx
+        movq    (%rax), %rdx
 	addq	$8, %rax
 	movq	(%rax), %rcx
-	imulq	%rcx, %rbx
-	movq	%rbx, (%rax)
+	imulq	%rcx, %rdx
+	movq	%rdx, (%rax)
 	addq	$8, sp(%rip)
 	NEXT
 	.cfi_endproc
@@ -462,11 +462,11 @@ code_and:
 .LFB10:
 	.cfi_startproc
 	movq	sp(%rip), %rax
-	movq	(%rax), %rbx
+	movq	(%rax), %rdx
 	addq	$8, %rax
 	movq	(%rax), %rcx
-	andq	%rcx, %rbx
-	movq	%rbx, (%rax)
+	andq	%rcx, %rdx
+	movq	%rdx, (%rax)
 	addq	$8, sp(%rip)
 	NEXT
 	.cfi_endproc
@@ -498,11 +498,11 @@ code_or:
 .LFB11:
 	.cfi_startproc
 	movq	sp(%rip), %rax
-	movq	(%rax), %rbx
+	movq	(%rax), %rdx
 	addq	$8, %rax
 	movq	(%rax), %rcx
-	orq	%rcx, %rbx
-	movq	%rbx, (%rax)
+	orq	%rcx, %rdx
+	movq	%rdx, (%rax)
 	addq	$8, sp(%rip)
 	NEXT
 	.cfi_endproc
@@ -534,11 +534,11 @@ code_xor:
 .LFB12:
 	.cfi_startproc
 	movq	sp(%rip), %rax
-	movq	(%rax), %rbx
+	movq	(%rax), %rdx
 	addq	$8, %rax
 	movq	(%rax), %rcx
-	xorq	%rcx, %rbx
-	movq	%rbx, (%rax)
+	xorq	%rcx, %rdx
+	movq	%rdx, (%rax)
 	addq	$8, sp(%rip)
 	NEXT
 	.cfi_endproc
@@ -858,9 +858,9 @@ code_swap:
 .LFB20:
 	.cfi_startproc
 	movq	sp(%rip), %rax
-	movq	(%rax), %rbx
+	movq	(%rax), %rdx
 	movq	8(%rax), %rcx
-	movq	%rbx, 8(%rax)
+	movq	%rdx, 8(%rax)
 	movq	%rcx, (%rax)
 	NEXT
 	.cfi_endproc
@@ -922,10 +922,10 @@ code_over:
 .LFB22:
 	.cfi_startproc
 	movq	sp(%rip), %rax
-	movq	8(%rax), %rbx
+	movq	8(%rax), %rdx
 	subq	$8, %rax
 	movq	%rax, sp(%rip)
-	movq	%rbx, (%rax)
+	movq	%rdx, (%rax)
 	NEXT
 	.cfi_endproc
 .LFE22:
@@ -956,12 +956,12 @@ code_rot:
 .LFB23:
 	.cfi_startproc
 	movq	sp(%rip), %rax # ( b c d -- c d b )
-	movq	16(%rax), %rbx
+	movq	16(%rax), %r12
 	movq	8(%rax), %rcx
 	movq	(%rax), %rdx
         movq    %rcx, 16(%rax)
         movq    %rdx, 8(%rax)
-        movq    %rbx, (%rax)
+        movq    %r12, (%rax)
 	NEXT
 	.cfi_endproc
 .LFE23:
@@ -992,11 +992,11 @@ code_neg_rot:
 .LFB24:
 	.cfi_startproc
 	movq	sp(%rip), %rax # ( b c d -- d b c )
-	movq	16(%rax), %rbx
+	movq	16(%rax), %r12
 	movq	8(%rax), %rcx
 	movq	(%rax), %rdx
 	movq	%rdx, 16(%rax)
-	movq	%rbx, 8(%rax)
+	movq	%r12, 8(%rax)
 	movq	%rcx, (%rax)
 	NEXT
 	.cfi_endproc
@@ -1059,10 +1059,10 @@ code_two_dup:
 	.cfi_startproc
 	subq	$16, sp(%rip)
 	movq	sp(%rip), %rax
-        movq    16(%rax), %rbx
-        movq    %rbx, (%rax)
-        movq    24(%rax), %rbx
-        movq    %rbx, 8(%rax)
+        movq    16(%rax), %rdx
+        movq    %rdx, (%rax)
+        movq    24(%rax), %rdx
+        movq    %rdx, 8(%rax)
 	NEXT
 	.cfi_endproc
 .LFE26:
@@ -1094,15 +1094,15 @@ code_two_swap:
 	.cfi_startproc
 	movq	sp(%rip), %rax # swap in pairs: 0/16, 8/24
         # First pair, 0/16
-	movq	16(%rax), %rbx
+	movq	16(%rax), %rdx
 	movq	(%rax), %rcx
         movq    %rcx, 16(%rax)
-        movq    %rbx, (%rax)
+        movq    %rdx, (%rax)
         # Second pair, 8/24
-	movq	24(%rax), %rbx
+	movq	24(%rax), %rdx
 	movq	8(%rax), %rcx
         movq    %rcx, 24(%rax)
-        movq    %rbx, 8(%rax)
+        movq    %rdx, 8(%rax)
 	NEXT
 	.cfi_endproc
 .LFE27:
@@ -1134,10 +1134,10 @@ code_two_over:
 	.cfi_startproc
 	subq	$16, sp(%rip)
 	movq	sp(%rip), %rax
-	movq	32(%rax), %rbx
-        movq    %rbx, (%rax)
-	movq	40(%rax), %rbx
-        movq    %rbx, 8(%rax)
+	movq	32(%rax), %rdx
+        movq    %rdx, (%rax)
+	movq	40(%rax), %rdx
+        movq    %rdx, 8(%rax)
 	NEXT
 	.cfi_endproc
 .LFE28:
@@ -1170,8 +1170,8 @@ code_to_r:
 	movq	rsp(%rip), %rax
 	subq	$8, %rax
 	movq	%rax, rsp(%rip)
-	movq	sp(%rip), %rbx
-        movq    (%rbx), %rcx
+	movq	sp(%rip), %rdx
+        movq    (%rdx), %rcx
         movq    %rcx, (%rax)
         addq    $8, sp(%rip)
 	NEXT
@@ -1206,9 +1206,9 @@ code_from_r:
 	movq	sp(%rip), %rax
 	subq	$8, %rax
 	movq	%rax, sp(%rip)
-	movq	rsp(%rip), %rbx
-        movq    (%rbx), %rbx
-	movq	%rbx, (%rax)
+	movq	rsp(%rip), %rdx
+        movq    (%rdx), %rdx
+	movq	%rdx, (%rax)
         addq    $8, rsp(%rip)
 	NEXT
 	.cfi_endproc
@@ -1273,9 +1273,9 @@ code_store:
 .LFB32:
 	.cfi_startproc
 	movq	sp(%rip), %rax
-	movq	(%rax), %rbx
+	movq	(%rax), %rdx
 	movq	8(%rax), %rcx
-	movq	%rcx, (%rbx)
+	movq	%rcx, (%rdx)
 	addq	$16, sp(%rip)
 	NEXT
 	.cfi_endproc
@@ -1378,12 +1378,12 @@ key_raw_alloc:
 code_raw_alloc:
 .LFB35:
 	.cfi_startproc
-	movq	sp(%rip), %rbx
+	movq	sp(%rip), %r12
 	movq	sp(%rip), %rax
 	movq	(%rax), %rax
 	movq	%rax, %rdi
 	call	malloc
-	movq	%rax, (%rbx)
+	movq	%rax, (%r12)
 	NEXT
 	.cfi_endproc
 .LFE35:
@@ -1550,10 +1550,10 @@ key_zbranch:
 code_zbranch:
 .LFB40:
 	.cfi_startproc
-	movq	sp(%rip), %rbx
-        movq    (%rbx), %rbx   # rbx = TOS
+	movq	sp(%rip), %rdx
+        movq    (%rdx), %rdx   # rdx = TOS
         addq    $8, sp(%rip)
-	testq	%rbx, %rbx
+	testq	%rdx, %rdx
 	jne	.L49
         movq    (%rbp), %rax
 	jmp	.L50
@@ -1682,7 +1682,7 @@ refill_:
 	movq	(%rax), %rbp
 	NEXT
 .L54:
-	pushq	%rbx
+	pushq	%r12
 	.cfi_def_cfa_offset 16
 	.cfi_offset 3, -16
 	subq	$16, %rsp
@@ -1696,11 +1696,11 @@ refill_:
 	movl	$.LC42, %edi
 	call	readline
 	movq	%rax, str1(%rip)
-	movq	inputIndex(%rip), %rbx
+	movq	inputIndex(%rip), %r12
 	movq	str1(%rip), %rdi
 	call	strlen
 	movq	%rax, %rdx
-	movq	%rbx, %rax
+	movq	%r12, %rax
 	salq	$5, %rax
 	addq	$inputSources, %rax
 	movq	%rdx, (%rax)
@@ -1855,7 +1855,7 @@ refill_:
 .L56:
 	addq	$16, %rsp
 	.cfi_def_cfa_offset 16
-	popq	%rbx
+	popq	%r12
 	.cfi_restore 3
 	.cfi_def_cfa_offset 8
 	ret
@@ -1903,9 +1903,9 @@ code_refill:
 	movq	sp(%rip), %rax
 	subq	$8, %rax
 	movq	%rax, sp(%rip)
-	movq	sp(%rip), %rbx
+	movq	sp(%rip), %r12
 	call	refill_
-	movq	%rax, (%rbx)
+	movq	%rax, (%r12)
 .L70:
 	NEXT
 	.cfi_endproc
@@ -2021,10 +2021,10 @@ code_key:
 	movq	sp(%rip), %rax
 	subq	$8, %rax
 	movq	%rax, sp(%rip)
-	movq	sp(%rip), %rbx
+	movq	sp(%rip), %r12
 	call	getchar
 	cltq
-	movq	%rax, (%rbx)
+	movq	%rax, (%r12)
 	movl	$old_tio, %edx
 	movl	$0, %esi
 	movl	$0, %edi
@@ -3524,12 +3524,12 @@ code_create:
 	movq	sp(%rip), %rdx
 	movq	(%rdx), %rdx
 	movq	%rdx, 8(%rax)
-	movq	tempHeader(%rip), %rbx
+	movq	tempHeader(%rip), %r12
 	movq	sp(%rip), %rax
 	movq	(%rax), %rax
 	movq	%rax, %rdi
 	call	malloc
-	movq	%rax, 16(%rbx)
+	movq	%rax, 16(%r12)
 	movq	sp(%rip), %rax
 	movq	(%rax), %rdx
 	movq	sp(%rip), %rax
@@ -3646,10 +3646,10 @@ code_sp_fetch:
 .LFB79:
 	.cfi_startproc
 	movq	sp(%rip), %rax
-	movq	%rax, %rbx
+	movq	%rax, %r12
 	subq	$8, %rax
 	movq	%rax, sp(%rip)
-	movq	%rbx, (%rax)
+	movq	%r12, (%rax)
 	NEXT
 	.cfi_endproc
 .LFE79:
@@ -4001,10 +4001,10 @@ call_:
 	.cfi_startproc
 	movq	(%rbp), %rax
         addq    $8, %rbp
-	movq	rsp(%rip), %rbx
-	subq	$8, %rbx
-	movq	%rbx, rsp(%rip)
-	movq	%rbp, (%rbx)
+	movq	rsp(%rip), %r12
+	subq	$8, %r12
+	movq	%r12, rsp(%rip)
+	movq	%rbp, (%r12)
 	movq	%rax, %rbp
 	NEXT
 	.cfi_endproc
@@ -4846,7 +4846,7 @@ code_close_file:
 	call	fclose
 	cltq
 	movq	%rax, c1(%rip)
-	movq	sp(%rip), %rbx
+	movq	sp(%rip), %r12
 	movq	c1(%rip), %rax
 	testq	%rax, %rax
 	je	.L256
@@ -4857,7 +4857,7 @@ code_close_file:
 .L256:
 	movl	$0, %eax
 .L257:
-	movq	%rax, (%rbx)
+	movq	%rax, (%r12)
 	NEXT
 	.cfi_endproc
 .LFE104:
@@ -4939,7 +4939,7 @@ code_create_file:
 	movb	$0, tempBuf(%rax)
 	addq	$8, sp(%rip)
 	movq	sp(%rip), %rax
-	leaq	8(%rax), %rbx
+	leaq	8(%rax), %r12
 	movq	sp(%rip), %rax
 	movq	(%rax), %rax
 	orq	$8, %rax
@@ -4947,8 +4947,8 @@ code_create_file:
 	movq	%rax, %rsi
 	movl	$tempBuf, %edi
 	call	fopen
-	movq	%rax, (%rbx)
-	movq	sp(%rip), %rbx
+	movq	%rax, (%r12)
+	movq	sp(%rip), %r12
 	movq	sp(%rip), %rax
 	addq	$8, %rax
 	movq	(%rax), %rax
@@ -4961,7 +4961,7 @@ code_create_file:
 .L260:
 	movl	$0, %eax
 .L261:
-	movq	%rax, (%rbx)
+	movq	%rax, (%r12)
 	NEXT
 	.cfi_endproc
 .LFE105:
@@ -5005,14 +5005,14 @@ code_open_file:
 	movq	(%rax), %rax
 	movb	$0, tempBuf(%rax)
 	movq	sp(%rip), %rax
-	leaq	16(%rax), %rbx
+	leaq	16(%rax), %r12
 	movq	sp(%rip), %rax
 	movq	(%rax), %rax
 	movq	file_modes(,%rax,8), %rax
 	movq	%rax, %rsi
 	movl	$tempBuf, %edi
 	call	fopen
-	movq	%rax, (%rbx)
+	movq	%rax, (%r12)
 	movq	sp(%rip), %rax
 	addq	$16, %rax
 	movq	(%rax), %rax
@@ -5024,7 +5024,7 @@ code_open_file:
 	testq	%rax, %rax
 	je	.L264
 	movq	sp(%rip), %rax
-	leaq	16(%rax), %rbx
+	leaq	16(%rax), %r12
 	movq	sp(%rip), %rax
 	movq	(%rax), %rax
 	orq	$8, %rax
@@ -5032,10 +5032,10 @@ code_open_file:
 	movq	%rax, %rsi
 	movl	$tempBuf, %edi
 	call	fopen
-	movq	%rax, (%rbx)
+	movq	%rax, (%r12)
 .L264:
 	movq	sp(%rip), %rax
-	leaq	8(%rax), %rbx
+	leaq	8(%rax), %r12
 	movq	sp(%rip), %rax
 	addq	$16, %rax
 	movq	(%rax), %rax
@@ -5048,7 +5048,7 @@ code_open_file:
 .L265:
 	movl	$0, %eax
 .L266:
-	movq	%rax, (%rbx)
+	movq	%rax, (%r12)
 	addq	$8, sp(%rip)
 	NEXT
 	.cfi_endproc
@@ -5091,20 +5091,20 @@ code_delete_file:
 	movq	(%rax), %rax
 	movb	$0, tempBuf(%rax)
 	addq	$8, sp(%rip)
-	movq	sp(%rip), %rbx
+	movq	sp(%rip), %r12
 	movl	$tempBuf, %edi
 	call	remove
 	cltq
-	movq	%rax, (%rbx)
+	movq	%rax, (%r12)
 	movq	sp(%rip), %rax
 	movq	(%rax), %rax
 	cmpq	$-1, %rax
 	jne	.L269
-	movq	sp(%rip), %rbx
+	movq	sp(%rip), %r12
 	call	__errno_location
 	movl	(%rax), %eax
 	cltq
-	movq	%rax, (%rbx)
+	movq	%rax, (%r12)
 .L269:
 	NEXT
 	.cfi_endproc
@@ -5140,14 +5140,14 @@ code_file_position:
 	addq	$8, %rax
 	movq	$0, (%rax)
 	movq	sp(%rip), %rax
-	leaq	16(%rax), %rbx
+	leaq	16(%rax), %r12
 	movq	sp(%rip), %rax
 	addq	$16, %rax
 	movq	(%rax), %rax
 	movq	%rax, %rdi
 	call	ftell
-	movq	%rax, (%rbx)
-	movq	sp(%rip), %rbx
+	movq	%rax, (%r12)
+	movq	sp(%rip), %r12
 	movq	sp(%rip), %rax
 	addq	$16, %rax
 	movq	(%rax), %rax
@@ -5160,7 +5160,7 @@ code_file_position:
 .L272:
 	movl	$0, %eax
 .L273:
-	movq	%rax, (%rbx)
+	movq	%rax, (%r12)
 	NEXT
 	.cfi_endproc
 .LFE108:
@@ -5203,11 +5203,11 @@ code_file_size:
 	movq	c1(%rip), %rax
 	testq	%rax, %rax
 	jns	.L276
-	movq	sp(%rip), %rbx
+	movq	sp(%rip), %r12
 	call	__errno_location
 	movl	(%rax), %eax
 	cltq
-	movq	%rax, (%rbx)
+	movq	%rax, (%r12)
 	jmp	.L277
 .L276:
 	movq	sp(%rip), %rax
@@ -5222,11 +5222,11 @@ code_file_size:
 	movq	c2(%rip), %rax
 	testq	%rax, %rax
 	jns	.L278
-	movq	sp(%rip), %rbx
+	movq	sp(%rip), %r12
 	call	__errno_location
 	movl	(%rax), %eax
 	cltq
-	movq	%rax, (%rbx)
+	movq	%rax, (%r12)
 	movq	sp(%rip), %rax
 	addq	$16, %rax
 	movq	(%rax), %rax
@@ -5369,13 +5369,13 @@ code_read_file:
 	jmp	.L285
 .L283:
 	movq	sp(%rip), %rax
-	leaq	8(%rax), %rbx
+	leaq	8(%rax), %r12
 	movq	sp(%rip), %rax
 	movq	(%rax), %rax
 	movq	%rax, %rdi
 	call	ferror
 	cltq
-	movq	%rax, (%rbx)
+	movq	%rax, (%r12)
 	movq	sp(%rip), %rax
 	addq	$16, %rax
 	movq	$0, (%rax)
@@ -5431,11 +5431,11 @@ code_read_line:
 	movq	c1(%rip), %rax
 	cmpq	$-1, %rax
 	jne	.L288
-	movq	sp(%rip), %rbx
+	movq	sp(%rip), %r12
 	call	__errno_location
 	movl	(%rax), %eax
 	cltq
-	movq	%rax, (%rbx)
+	movq	%rax, (%r12)
 	movq	sp(%rip), %rax
 	addq	$16, %rax
 	movq	$0, (%rax)
@@ -5546,7 +5546,7 @@ code_reposition_file:
 .LFB113:
 	.cfi_startproc
 	movq	sp(%rip), %rax
-	leaq	16(%rax), %rbx
+	leaq	16(%rax), %r12
 	movq	sp(%rip), %rax
 	leaq	16(%rax), %rcx
 	movq	sp(%rip), %rax
@@ -5556,17 +5556,17 @@ code_reposition_file:
 	movq	%rax, %rdi
 	call	fseek
 	cltq
-	movq	%rax, (%rbx)
+	movq	%rax, (%r12)
 	addq	$16, sp(%rip)
 	movq	sp(%rip), %rax
 	movq	(%rax), %rax
 	cmpq	$-1, %rax
 	jne	.L296
-	movq	sp(%rip), %rbx
+	movq	sp(%rip), %r12
 	call	__errno_location
 	movl	(%rax), %eax
 	cltq
-	movq	%rax, (%rbx)
+	movq	%rax, (%r12)
 .L296:
 	NEXT
 	.cfi_endproc
@@ -5601,20 +5601,20 @@ code_resize_file:
 	leaq	16(%rax), %rcx
 	movq	sp(%rip), %rax
 	addq	$16, %rax
-	movq	(%rax), %rbx
+	movq	(%rax), %r12
 	movq	sp(%rip), %rax
 	movq	(%rax), %rax
 	movq	%rax, %rdi
         push    %rcx
 	call	fileno
-	movq	%rbx, %rsi
+	movq	%r12, %rsi
 	movl	%eax, %edi
 	call	ftruncate
 	cltq
         pop     %rcx
 	movq	%rax, 0(%rcx)
 	addq	$16, sp(%rip)
-	movq	sp(%rip), %rbx
+	movq	sp(%rip), %r12
 	movq	sp(%rip), %rax
 	movq	(%rax), %rax
 	cmpq	$-1, %rax
@@ -5626,7 +5626,7 @@ code_resize_file:
 .L299:
 	movl	$0, %eax
 .L300:
-	movq	%rax, (%rbx)
+	movq	%rax, (%r12)
 	NEXT
 	.cfi_endproc
 .LFE114:
@@ -5756,7 +5756,7 @@ key_flush_file:
 code_flush_file:
 .LFB117:
 	.cfi_startproc
-	movq	sp(%rip), %rbx
+	movq	sp(%rip), %r12
 	movq	sp(%rip), %rax
 	movq	(%rax), %rax
 	movq	%rax, %rdi
@@ -5764,16 +5764,16 @@ code_flush_file:
 	movl	%eax, %edi
 	call	fsync
 	cltq
-	movq	%rax, (%rbx)
+	movq	%rax, (%r12)
 	movq	sp(%rip), %rax
 	movq	(%rax), %rax
 	cmpq	$-1, %rax
 	jne	.L307
-	movq	sp(%rip), %rbx
+	movq	sp(%rip), %r12
 	call	__errno_location
 	movl	(%rax), %eax
 	cltq
-	movq	%rax, (%rbx)
+	movq	%rax, (%r12)
 .L307:
 	NEXT
 	.cfi_endproc
@@ -5832,12 +5832,12 @@ code_colon:
 	call	fwrite
 	call	code_quit
 .L310:
-	movq	tempHeader(%rip), %rbx
+	movq	tempHeader(%rip), %r12
 	movq	sp(%rip), %rax
 	movq	(%rax), %rax
 	movq	%rax, %rdi
 	call	malloc
-	movq	%rax, 16(%rbx)
+	movq	%rax, 16(%r12)
 	movq	sp(%rip), %rax
 	movq	(%rax), %rdx
 	movq	sp(%rip), %rax
