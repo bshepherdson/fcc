@@ -9,37 +9,99 @@ There is of course an associated library written in Forth itself. It is intended
 that this library use words hiding the system details (eg. `>CODE`, `CELLS`) so
 that it is portable across machines.
 
+## Problems with the C stack
+
+In using the portable C engine, it was discovered that certain words, especially
+those calling other library functions, were allocating space on the C stack
+(either to save registers, or apparently without need). Since the words don't
+return normally, the C stack was never getting cleaned up.
+
+### Portably Fixing this Problem
+
+I tried to find GCC flags or function attributes that would fix this problem, or
+a way to force GCC to include the usual function epilogue code at the start of
+`NEXT`.
+
+I could not find such a way that works cross-platform. On ARM, GCC supports the
+`naked` attribute, which would probably work. No prologue or epilogue is
+necessary, and `naked` tells GCC not to include it.
+
+Clang supports `naked` on all platforms, so I tried that. Clang is too much of a
+nanny, and I would need to find a way to override two of its unsuppressable
+errors:
+- Computed GOTOs leaving the function inside `NEXT`. (Whether `naked` or not.)
+- Only inline `asm` statements are "safe" inside a `naked` function. I know
+  that, and I'm prepared to take the risk since this isn't normal C code.
+
+Neither of those errors can be disabled in current Clang, so it's off the table
+too.
+
+### Solution: Hand-optimized Assembly Code
+
+Instead, I took the generated assembly output (on `x86_64` only so far) and
+optimized it by hand, removing the code that allocates C stack space
+incorrectly.
+
+In doing so, I also noticed that the generated code was often much less
+efficient than it could have been. In particular, I was armed with the extra
+information that the `c1`, `str1` and other global variables are actually
+scratch space, and writing them can be optimized away most of the time.
+
+### Problems with That
+
+Of course, now the engine is only portable-ish. The pure C version should work
+passably, but eventually it will leak enough C stack space to overflow and
+crash.
+
+`make` (defaults to `make forth`) uses the assembly code from
+`asm/$PLATFORM/vm.s` and ignores `vm.c`.
+
+To port to a new platform:
+
+```
+$ make asm    # Creates vm_raw.s
+$ mkdir asm/`uname -m`
+$ mv vm_raw.s asm/`uname -m`
+$ make
+```
+
+That will work, but it's got the memory leaks and inefficiencies discussed
+above. I recommend hand-optimizing the assembly to
+
+1. Remove the needless stack allocations. There's no caller to return to, so no
+   registers need to be saved. And there's usually no need for scratch space or
+   using the stack for calls to other functions, but if there is, clean it up
+   before the `NEXT` part begins.
+2. Optimize generally. Writing to the global scratch variables can be avoided,
+   and there's often just useless write-then-read fiddling that can be removed.
+
 ## Engine Design
 
-The engine's execution model is indirect threading. Execution tokens (`xt`s) and
-threaded code have the same form: a "code field address".
+The engine was originally indirect threaded, but that is long gone.
 
-That is, a pointer to a pointer to the machine code to execute a definition.
-The code field is part of the header for each word.
+The current model is direct threading, where some primitives have a following
+value and some do not. Branches, literals and others have data following, as do
+`dodoes` words, but primitive invocations don't.
 
-With this indirect threading, the code and data can be completely separated;
-this is good for cache performance on most machines. It's harmless on machines
-without caches, and only a slight cost on machines with fully unified caches.
+As words are `compile,`'d (usually inside a colon definition), they're actually
+enqueued with their data, and only when the queue is full (or we reach a control
+flow checkpoint like a branch or semicolon) do real operations get emitted.
 
-The header of a word looks like this:
+The purpose of this complexity is to allow matching against "superinstructions".
+These are essentially 2, 3 or 4 primitives commonly executed in sequence, which
+have been inlined into a single primitive. (A few examples help: `R> DUP >R`,
+`+ @`, `DUP >R`.)
 
-```
-link word - pointer to the previous definition in the dictionary
-metadata word - see below, includes length, immediate bit, hidden bit, etc.
-name pointer - pointer to a raw (non-terminated) string
-code field - pointer to where its code lives
-```
+### Performance
 
-and what gets compiled into definitions is the **address** of the code field.
-The contents of the code field is what should be loaded into the PC.
+The move to direct threading brought a roughly 2x speedup over the indirect
+threading version.
 
-### `NEXT` behavior
+Adding a solid set of superinstructions brought another 2x speedup, and the
+hand-optimization of the assembly has so far brought a further 10% or so.
 
-`NEXT` is the fundamental operation of the engine (called the "inner
-interpreter" in Gforth parlance). It reads the next CFA from the
-next-instruction pointer (probably pinned to a register, but that's the engine
-implementer's problem), reads the value stored there, and loads the value stored
-*there* into the `PC`.
+However, for most workloads FCC is still 8-12 times slower than Gforth (on
+`x86_64` Linux; haven't tried elsewhere).
 
 
 ## Engine words
@@ -50,20 +112,25 @@ by any compatible runtimes.
 It is not a minimal set; some more operations could be extracted. All operations
 in `(...)` are internal, nonstandard words.
 
-- Math: `+`, `-`, `*`, `/`, `MOD`
+- Math: `+`, `-`, `*`, `U/`, `/`, `MOD`, `UMOD`
 - Bitwise: `AND`, `OR`, `XOR`
 - Shifts: `LSHIFT`, `RSHIFT`
 - Comparison: `<`, `U<`, `=`
-- Stack: `DUP`, `SWAP`, `DROP`, `>R`, `R>`, `DEPTH`
+- Stack: `DUP`, `SWAP`, `DROP`, `OVER`, `ROT`, `-ROT`, `2DROP`, `2DUP`, `2SWAP`,
+  `2OVER`, `>R`, `R>`, `DEPTH`, `SP@`, `SP!`, `RP@`, `RP!`
 - Variables: `BASE`, `STATE`
 - Memory: `@`, `!`, `C@`, `C!`, `(ALLOCATE)`, `(>HERE)`, `EXECUTE`
-- Control flow: `(BRANCH)`, `(0BRANCH)`, `QUIT`, `EXIT`
-- Input: `REFILL`, `>IN`
-- Output: `EMIT`
-- Words: `(LATEST)`, `(>CODE)`, `>BODY`
+- Control flow: `(BRANCH)`, `(0BRANCH)`, `QUIT`, `EXIT`, `BYE`
+- Input: `REFILL`, `>IN`, `ACCEPT`, `KEY`, `SOURCE`, `SOURCE-ID`
+- Output: `EMIT`, `.S`, `U.S`
+- Words: `(LATEST)`, `(>CODE)`, `>BODY`, `(LAST-WORD)`
 - Doers: `(DOCOL)`, `(DOLIT)`, `(DOSTRING)`, `(DODOES)`
-- Parsing: `PARSE`, `PARSE-NAME`, `>NUMBER`, `CREATE`, `(FIND)`
-- Defining: `:`, `;`
+- Parsing: `PARSE`, `PARSE-NAME`, `>NUMBER`, `CREATE`, `(FIND)`, `EVALUATE`
+- Defining: `:`, `:NONAME`, `;`, `COMPILE,`, `LITERAL`, `[LITERAL]`,
+  `[0BRANCH]`, `[BRANCH]`, `(CONTROL-FLUSH)`, `(DEBUG)`
+- Portability: `CELLS`, `CHARS`
+- Internals: `(/CELL)`, `(/CHAR)`, `(ADDRESS-UNIT-BITS)`, `(STACK-CELLS)`,
+  `(RETURN-STACK-CELLS)`, `(>DOES)`, `(>CFA)`
 - Debugging: `SEE` (optional)
 
 ### Nonstandard words:
