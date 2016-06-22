@@ -9087,7 +9087,7 @@ code_superinstruction_dup_to_r_swap_to_r:
 code_superinstruction_from_r_dup_to_r_swap:
 .LFB162:
 	.cfi_startproc
-	addq	$8, sp(%rip)
+	subq	$8, sp(%rip)
 	movq	sp(%rip), %rax
 	movq	sp(%rip), %rdx
 	movq	8(%rdx), %rdx

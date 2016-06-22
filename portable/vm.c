@@ -2289,7 +2289,7 @@ DEF_SI4(dup, to_r, swap, to_r) {
 }
 
 DEF_SI4(from_r, dup, to_r, swap) {
-  sp++;
+  sp--;
   sp[0] = sp[1];
   sp[1] = rsp[0];
   NEXT;
