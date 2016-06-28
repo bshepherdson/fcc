@@ -37,7 +37,7 @@
   \ Record this file in the inclusion names list.
   (included-file-list) @   here (included-file-list) !
   ( c-addr u list-head    R: fd )
-  ,   dup ,   here swap move align ( R: fd )
+  ,   dup ,   here swap    dup allot    move align ( R: fd )
   R> include-file
 ;
 
