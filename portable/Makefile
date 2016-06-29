@@ -2,7 +2,7 @@ MODULE_DIR=lib
 FORTH_MODULES=$(shell find $(MODULE_DIR) -name "*.fs")
 FORTH_OBJECTS := $(FORTH_MODULES:%.fs=%.o)
 
-LIBS=-lreadline
+LIBS=-lreadline -ldl
 INCLUDES=-Iinclude
 
 BENCHMARKS=bubble-sort fib matrix-mult mm-rtcg sieve

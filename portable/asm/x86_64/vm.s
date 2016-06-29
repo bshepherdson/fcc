@@ -101,7 +101,7 @@ quitTopPtr:
 	.type	primitive_count, @object
 	.size	primitive_count, 4
 primitive_count:
-	.long	108
+	.long	115
 	.globl	queue
 	.bss
 	.align 8
@@ -5756,6 +5756,229 @@ code_loop_end:
         movq    %rcx, (%r9)
 	NEXT
 	.cfi_endproc
+
+# Adding native words for calling C with return values.
+# The no-return versions of these are written in Forth, they just drop the nonce
+# return value.
+
+.BSS0101:
+        .string "CCALL0"
+        .data
+        .align 32
+        .type   header_ccall_0, @object
+        .size   header_ccall_0, 32
+header_ccall_0:
+        .quad   header_loop_end
+        .quad   6
+        .quad   .BSS0101
+        .quad   code_ccall_0
+        .globl  key_ccall_0
+        .align  4
+        .type   key_ccall_0, @object
+        .size   key_ccall_0, 4
+key_ccall_0:
+        .long   108
+        .text
+        .globl  code_ccall_0
+        .type   code_ccall_0, @function
+code_ccall_0:
+        .cfi_startproc
+        movq    (%rbx), %rax  # Only argument is the C function address.
+        call    *%rax
+        movq    %rax, (%rbx)
+        NEXT
+        .cfi_endproc
+
+.BSS0201:
+        .string "CCALL1"
+        .data
+        .align 32
+        .type   header_ccall_1, @object
+        .size   header_ccall_1, 32
+header_ccall_1:
+        .quad   header_ccall_0
+        .quad   6
+        .quad   .BSS0201
+        .quad   code_ccall_1
+        .globl  key_ccall_1
+        .align  4
+        .type   key_ccall_1, @object
+        .size   key_ccall_1, 4
+key_ccall_1:
+        .long   109
+        .text
+        .globl  code_ccall_1
+        .type   code_ccall_1, @function
+code_ccall_1:
+        .cfi_startproc
+        movq    8(%rbx), %rdi # TOS = first argument
+        movq    (%rbx), %rax
+        call    *%rax
+        addq    $8, %rbx
+        movq    %rax, (%rbx)
+        NEXT
+        .cfi_endproc
+
+.BSS0301:
+        .string "CCALL2"
+        .data
+        .align 32
+        .type   header_ccall_2, @object
+        .size   header_ccall_2, 32
+header_ccall_2:
+        .quad   header_ccall_1
+        .quad   6
+        .quad   .BSS0301
+        .quad   code_ccall_2
+        .globl  key_ccall_2
+        .align  4
+        .type   key_ccall_2, @object
+        .size   key_ccall_2, 4
+key_ccall_2:
+        .long   110
+        .text
+        .globl  code_ccall_2
+        .type   code_ccall_2, @function
+code_ccall_2:
+        .cfi_startproc
+        movq    16(%rbx), %rdi # sp[2] = first argument
+        movq    8(%rbx), %rsi # TOS = second argument
+        movq    (%rbx), %rax
+        call    *%rax
+        addq    $16, %rbx
+        movq    %rax, (%rbx)
+        NEXT
+        .cfi_endproc
+
+.BSS0401:
+        .string "CCALL3"
+        .data
+        .align 32
+        .type   header_ccall_3, @object
+        .size   header_ccall_3, 32
+header_ccall_3:
+        .quad   header_ccall_2
+        .quad   6
+        .quad   .BSS0401
+        .quad   code_ccall_3
+        .globl  key_ccall_3
+        .align  4
+        .type   key_ccall_3, @object
+        .size   key_ccall_3, 4
+key_ccall_3:
+        .long   111
+        .text
+        .globl  code_ccall_3
+        .type   code_ccall_3, @function
+code_ccall_3:
+        .cfi_startproc
+        movq    24(%rbx), %rdi # sp[3] = first argument
+        movq    16(%rbx), %rsi # sp[2] = second argument
+        movq    8(%rbx), %rdx # TOS = third argument
+        movq    (%rbx), %rax
+        call    *%rax
+        addq    $24, %rbx
+        movq    %rax, (%rbx)
+        NEXT
+        .cfi_endproc
+
+
+.BSS0501:
+        .string "CCALL4"
+        .data
+        .align 32
+        .type   header_ccall_4, @object
+        .size   header_ccall_4, 32
+header_ccall_4:
+        .quad   header_ccall_3
+        .quad   6
+        .quad   .BSS0501
+        .quad   code_ccall_4
+        .globl  key_ccall_4
+        .align  4
+        .type   key_ccall_4, @object
+        .size   key_ccall_4, 4
+key_ccall_4:
+        .long   112
+        .text
+        .globl  code_ccall_4
+        .type   code_ccall_4, @function
+code_ccall_4:
+        .cfi_startproc
+        movq    32(%rbx), %rdi # sp[4] = first argument
+        movq    24(%rbx), %rsi # sp[3] = second argument
+        movq    16(%rbx), %rdx # sp[2] = third argument
+        movq    8(%rbx), %rcx # TOS = fourth argument
+        movq    (%rbx), %rax
+        call    *%rax
+        addq    $32, %rbx
+        movq    %rax, (%rbx)
+        NEXT
+        .cfi_endproc
+
+.BSS0601:
+        .string "C-LIBRARY"
+        .data
+        .align 32
+        .type   header_c_library, @object
+        .size   header_c_library, 32
+header_c_library:
+        .quad   header_ccall_4
+        .quad   9
+        .quad   .BSS0601
+        .quad   code_c_library
+        .globl  key_c_library
+        .align  4
+        .type   key_c_library, @object
+        .size   key_c_library, 4
+key_c_library:
+        .long   113
+        .text
+        .globl  code_c_library
+        .type   code_c_library, @function
+code_c_library:
+        .cfi_startproc
+        # Expects a null-terminated C-style string on the stack, and dlopen()s
+        # it, globally, so a generic dlsym() for it will work.
+        movq    (%rbx), %rdi
+        addq    $8, %rbx
+        movq    $258, %rsi  # That's RTLD_NOW | RTLD_GLOBAL.
+        call    dlopen
+        NEXT
+        .cfi_endproc
+
+.BSS0701:
+        .string "C-SYMBOL"
+        .data
+        .align 32
+        .type   header_c_symbol, @object
+        .size   header_c_symbol, 32
+header_c_symbol:
+        .quad   header_c_library
+        .quad   8
+        .quad   .BSS0701
+        .quad   code_c_symbol
+        .globl  key_c_symbol
+        .align  4
+        .type   key_c_symbol, @object
+        .size   key_c_symbol, 4
+key_c_symbol:
+        .long   114
+        .text
+        .globl code_c_symbol
+        .type  code_c_symbol, @function
+code_c_symbol:
+        # Expects the C-style null-terminated string on the stack, and dlsym()s
+        # it, returning the resulting pointer on the stack.
+        .cfi_startproc
+        movq   (%rbx), %rsi
+        movq   $0, %rdi      # 0 = RTLD_DEFAULT, searching everywhere.
+        call   dlsym
+        movq   %rax, (%rbx)  # Put the void* result onto the stack.
+        NEXT
+        .cfi_endproc
+
+
 .LFE123:
 	.section	.rodata
 	.align 8
@@ -5769,7 +5992,7 @@ main:
 	.cfi_startproc
 	movl	%edi, 12(%rsp)
 	movq	%rsi, (%rsp)
-	movq	$header_loop_end, dictionary(%rip)
+	movq	$header_c_symbol, dictionary(%rip)
 	movq	$10, base(%rip)
 	movq	$0, inputIndex(%rip)
 	movq	inputIndex(%rip), %rcx
@@ -7224,6 +7447,93 @@ init_primitives:
 	salq	$4, %rdx
 	addq	$primitives+8, %rdx
 	movl	%eax, (%rdx)
+
+        # ccall0
+	movl	key_ccall_0(%rip), %eax
+	leal	-1(%rax), %edx
+	movl	key_ccall_0(%rip), %eax
+	movl	%edx, %ecx
+	salq	$4, %rcx
+	addq	$primitives, %rcx
+	movq	$code_ccall_0, (%rcx)
+	movl	%edx, %edx
+	salq	$4, %rdx
+	addq	$primitives+8, %rdx
+	movl	%eax, (%rdx)
+        # ccall1
+	movl	key_ccall_1(%rip), %eax
+	leal	-1(%rax), %edx
+	movl	key_ccall_1(%rip), %eax
+	movl	%edx, %ecx
+	salq	$4, %rcx
+	addq	$primitives, %rcx
+	movq	$code_ccall_1, (%rcx)
+	movl	%edx, %edx
+	salq	$4, %rdx
+	addq	$primitives+8, %rdx
+	movl	%eax, (%rdx)
+        # ccall2
+	movl	key_ccall_2(%rip), %eax
+	leal	-1(%rax), %edx
+	movl	key_ccall_2(%rip), %eax
+	movl	%edx, %ecx
+	salq	$4, %rcx
+	addq	$primitives, %rcx
+	movq	$code_ccall_2, (%rcx)
+	movl	%edx, %edx
+	salq	$4, %rdx
+	addq	$primitives+8, %rdx
+	movl	%eax, (%rdx)
+        # ccall3
+	movl	key_ccall_3(%rip), %eax
+	leal	-1(%rax), %edx
+	movl	key_ccall_3(%rip), %eax
+	movl	%edx, %ecx
+	salq	$4, %rcx
+	addq	$primitives, %rcx
+	movq	$code_ccall_3, (%rcx)
+	movl	%edx, %edx
+	salq	$4, %rdx
+	addq	$primitives+8, %rdx
+	movl	%eax, (%rdx)
+        # ccall4
+	movl	key_ccall_4(%rip), %eax
+	leal	-1(%rax), %edx
+	movl	key_ccall_4(%rip), %eax
+	movl	%edx, %ecx
+	salq	$4, %rcx
+	addq	$primitives, %rcx
+	movq	$code_ccall_4, (%rcx)
+	movl	%edx, %edx
+	salq	$4, %rdx
+	addq	$primitives+8, %rdx
+	movl	%eax, (%rdx)
+
+        # c-library
+	movl	key_c_library(%rip), %eax
+	leal	-1(%rax), %edx
+	movl	key_c_library(%rip), %eax
+	movl	%edx, %ecx
+	salq	$4, %rcx
+	addq	$primitives, %rcx
+	movq	$code_c_library, (%rcx)
+	movl	%edx, %edx
+	salq	$4, %rdx
+	addq	$primitives+8, %rdx
+	movl	%eax, (%rdx)
+        # c-symbol
+	movl	key_c_symbol(%rip), %eax
+	leal	-1(%rax), %edx
+	movl	key_c_symbol(%rip), %eax
+	movl	%edx, %ecx
+	salq	$4, %rcx
+	addq	$primitives, %rcx
+	movq	$code_c_symbol, (%rcx)
+	movl	%edx, %edx
+	salq	$4, %rdx
+	addq	$primitives+8, %rdx
+	movl	%eax, (%rdx)
+
 	nop
 	ret
 	.cfi_endproc
