@@ -101,7 +101,7 @@ quitTopPtr:
 	.type	primitive_count, @object
 	.size	primitive_count, 4
 primitive_count:
-	.long	107
+	.long	108
 	.globl	queue
 	.bss
 	.align 8
@@ -5690,8 +5690,73 @@ code_semicolon:
 	movq	$0, state(%rip)
 	NEXT
 	.cfi_endproc
-.LFE123:
+.BSS001:
 	.size	code_semicolon, .-code_semicolon
+	.globl	header_loop_end
+	.section	.rodata
+        .align 8
+.BSS002:
+	.string	"(LOOP-END)"
+	.data
+	.align 32
+	.type	header_loop_end, @object
+	.size	header_loop_end, 32
+header_loop_end:
+	.quad	header_semicolon
+	.quad	10
+	.quad	.BSS002
+	.quad	code_loop_end
+	.globl	key_loop_end
+	.align 4
+	.type	key_loop_end, @object
+	.size	key_loop_end, 4
+key_loop_end:
+	.long	107
+	.text
+	.globl	code_loop_end
+	.type	code_loop_end, @function
+code_loop_end:
+.BSS003:
+	.cfi_startproc
+        movq    rsp(%rip), %r9    # r9 holds the RSP
+        movq    (%r9), %rcx       # rcx holds the index
+        movq    %rcx, %rdx
+        subq    8(%r9), %rdx      # rdx holds the index-limit
+        movq    (%rbx), %r10      # r10 caches the delta
+
+        # Calculate delta + limit-index
+        movq    %r10, %rax
+        addq    %rdx, %rax
+        xorq    %rdx, %rax     # rax is now d+i-l XOR i-l
+        # We want a truth flag that's true when the top bit is 0.
+        testq   %rax, %rax
+        js      .L9901         # Jumps when the top bit is 1.
+        movq    $-1, %r11      # Sets flag true when top bit is 0.
+        jmp     .L9902
+.L9901:
+        movq    $0, %r11       # Or false when top bit is 1.
+.L9902:
+        movq    %rdx, %rax     # rdx is the index-limit, remember.
+        xorq    %r10, %rax     # now rax is delta XOR index-limit
+        # Same flow as above: true flag when top bit is 0.
+        # We OR the new result with the old one, in r11.
+        testq   %rax, %rax
+        js      .L9903         # Jumps when the top bit is 1.
+        orq     $-1, %r11      # Sets flag true when top bit is 0.
+        jmp     .L9904
+.L9903:
+        orq     $0, %r11       # Or false when top bit is 1.
+.L9904:
+        # Finally, negate the returned flag.
+        xorq    $-1, %r11
+        # Now r11 holds the flag we want to return, write it onto the stack.
+        movq    %r11, (%rbx)
+        # And write the delta + index onto the return stack.
+        addq    %r10, %rcx
+        movq    %rcx, (%r9)
+	NEXT
+	.cfi_endproc
+.LFE123:
 	.section	.rodata
 	.align 8
 .LC131:
@@ -5704,7 +5769,7 @@ main:
 	.cfi_startproc
 	movl	%edi, 12(%rsp)
 	movq	%rsi, (%rsp)
-	movq	$header_semicolon, dictionary(%rip)
+	movq	$header_loop_end, dictionary(%rip)
 	movq	$10, base(%rip)
 	movq	$0, inputIndex(%rip)
 	movq	inputIndex(%rip), %rcx
@@ -7144,6 +7209,17 @@ init_primitives:
 	salq	$4, %rcx
 	addq	$primitives, %rcx
 	movq	$code_utime, (%rcx)
+	movl	%edx, %edx
+	salq	$4, %rdx
+	addq	$primitives+8, %rdx
+	movl	%eax, (%rdx)
+	movl	key_loop_end(%rip), %eax
+	leal	-1(%rax), %edx
+	movl	key_loop_end(%rip), %eax
+	movl	%edx, %ecx
+	salq	$4, %rcx
+	addq	$primitives, %rcx
+	movq	$code_loop_end, (%rcx)
 	movl	%edx, %edx
 	salq	$4, %rdx
 	addq	$primitives+8, %rdx
