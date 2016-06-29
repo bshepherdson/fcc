@@ -14,4 +14,8 @@ typedef unsigned char bool;
 #define false (0)
 
 
+// This will need to be different on different platforms.
+// For now, it's ARM only.
+typedef uint32_t output_t;
+
 #endif

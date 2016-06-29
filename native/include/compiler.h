@@ -3,6 +3,9 @@
 
 #include <core.h>
 
+// TODO: Fill this in sanely.
+#define CODEWORD_DOCOL ((void(*)(void)) 4)
+
 // A stacked value.
 typedef struct {
   bool is_literal;
@@ -11,12 +14,11 @@ typedef struct {
 
 struct state_;
 
-typedef struct operation_ {
-  ucell (*resolve)(struct state_ *s, cell* data, ucell offset, void* target);
-  ucell (*emit)(struct state_ *s, cell data, ucell offset, void* target);
-  cell data;
-} operation;
-
+typedef struct {
+  output_t* target;
+  void* data;
+  void (*code)(struct state_ *s, output_t* target, void* data);
+} finalizer;
 
 // Labels go through three phases:
 // 0. When initially created, they are set to -1, to mean unresolved.
@@ -30,6 +32,7 @@ typedef ucell label;
 #define MAX_STACK (32)
 #define MAX_REGS (16)
 #define MAX_LITERAL_POOL (32)
+#define MAX_FINALIZERS (64)
 
 typedef struct state_ {
   stacked stack[MAX_STACK];
@@ -44,13 +47,15 @@ typedef struct state_ {
   int literal_count;
   ucell literal_pool_offset;
 
+  finalizer finalizers[MAX_FINALIZERS];
+  int finalizer_count;
 
-  operation output[1024];
-  operation *op;
+  output_t* output_start;
+  output_t* output;
 } state;
 
 
-typedef void *primitive(void);
+typedef void *primitive(state *s);
 
 typedef struct {
   void (*codeword)(void);
@@ -75,8 +80,7 @@ void compile_nonprimitive(nonprimitive *np);
 
 void compile_literal(cell value);
 
-// Called to actually emit the compiled buffer to emit machine code.
-ucell compile_emit(void *target);
+nonprimitive* compile_finish(void);
 
 
 // Labels and control flow are the tricky bit. The [0branch-fwd] et al

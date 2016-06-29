@@ -1,4 +1,4 @@
-
+#include <stdlib.h>
 #include <core.h>
 #include <compiler.h>
 #include <primitives.h>
@@ -7,12 +7,14 @@
 state _global_compiler_state;
 state *compiler_state = &_global_compiler_state;
 
+
 void compile_init(void) {
   compiler_state->depth = 0;
   compiler_state->label_count = 0;
-  compiler_state->op = &(compiler_state->output[0]);
 
   compiler_state->literal_count = 0;
+
+  compiler_state->finalizer_count = 0;
 
   // Call through to the machine-specific primitive initializer.
   primitive_compiler_init(compiler_state);
@@ -21,7 +23,7 @@ void compile_init(void) {
 // TODO: How to identify the primitives? They're functions that I call, so I
 // guess with their pointers?
 void compile_primitive(primitive *p) {
-  (*p)();
+  (*p)(compiler_state);
 }
 
 void compile_literal(cell value) {
@@ -36,36 +38,36 @@ void compile_nonprimitive(nonprimitive *np) {
   prim_call_nonprimitive(compiler_state, np);
 }
 
-// Takes in the target location, and returns the total size in bytes of the
-// compiled code.
-ucell compile_emit(void *target) {
-  operation *op = &(compiler_state->output[0]);
-  ucell offset = 0;
-  // First pass: resolve labels.
-  while (op != compiler_state->op) {
-    offset += op->resolve(compiler_state, op->data, offset, target + offset);
-    op++;
-  }
+// Returns the completed nonprimitive object, which will be useful to the
+// codebase later on.
+nonprimitive* compile_finish(void) {
+  // We're done, but still need to:
+  // - Output the literal pool.
+  // - Set the literal_pool_offset.
+  // - Run any finalizers, in order.
 
-  // Now that we know where the end of the function is, we know where to put the
-  // literal pool, if any.
-  compiler_state->literal_pool_offset = offset;
+  compiler_state->literal_pool_offset = compiler_state->output -
+      compiler_state->output_start;
 
-  // Second pass: emit code.
-  op = &(compiler_state->output[0]);
-  offset = 0;
-  while (op != compiler_state->op) {
-    offset += op->emit(compiler_state, op->data, offset, target + offset);
-    op++;
-  }
-
-  // Emit the literal pool as well.
+  // Output the necessary literals into the literal pool.
   for (int i = 0; i < compiler_state->literal_count; i++) {
-    offset += primitive_emit_literal_pool(compiler_state, compiler_state->literal_pool[i], offset, target + offset);
+    primitive_emit_literal_pool(compiler_state, compiler_state->literal_pool[i]);
   }
 
-  return offset;
+  // Now call any finalizers.
+  for (int i = 0; i < compiler_state->finalizer_count; i++) {
+    finalizer *f = &(compiler_state->finalizers[i]);
+    f->code(compiler_state, f->target, f->data);
+  }
+
+  nonprimitive *np = malloc(sizeof *np);
+  np->codeword = CODEWORD_DOCOL;
+  np->code = (void (*)(void)) compiler_state->output_start;
+
+  primitive_compiler_finish(compiler_state);
+  return np;
 }
+
 
 
 void free_reg(state *s, cell reg) {
