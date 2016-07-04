@@ -205,8 +205,6 @@ VARIABLE (loop-top)
 \ ;
 
 : +LOOP ( step --    C: old-jump-addr )
-  \ Compute the point where the end of the loop will be.
-  \ 9 cells after this point.
   ['] (LOOP-END) compile, [0branch] ( old-top bottom )
   (loop-top) @ cell+   over - swap ! ( old-top )
 
@@ -247,16 +245,13 @@ VARIABLE (loop-top)
   2drop
 ;
 
-: test 5 0 DO i (print) LOOP 10 emit ; test bye
 
 : MOVE> ( src dst u -- ) 0 DO over i + c@   over i + c! LOOP 2drop ;
 : MOVE< ( src dst u -- ) 1- 0 swap DO over i + c@   over i + c! -1 +LOOP 2drop ;
-bye
 : MOVE ( src dst u -- )
   dup 0= IF drop 2drop EXIT THEN \ Special case for 0 length.
   >R 2dup <   R> swap   IF MOVE< ELSE MOVE> THEN ;
 
-bye
 : ABORT quit ;
 
 \ Safer ['], checks whether we found the word and ABORTs if not.
@@ -265,7 +260,6 @@ bye
   parse-name (find)
   IF [literal] ELSE ABORT THEN
 ; IMMEDIATE
-bye
 
 VARIABLE (string-buffer-index)
 8 CONSTANT (string-buffer-count)
@@ -274,7 +268,6 @@ VARIABLE (string-buffer-index)
 here 8 cells allot CONSTANT (string-buffer-lengths)
 here 256 8 * chars allot CONSTANT (string-buffers)
 
-bye
 : S"
   [CHAR] " parse ( c-addr u )
   state @ IF
@@ -628,4 +621,3 @@ VARIABLE (picout)
   2drop 0
 ;
 
-bye

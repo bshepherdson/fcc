@@ -2524,7 +2524,6 @@ key_to_does:
 	.type	code_to_does, %function
 code_to_does:
         pop     {r0}
-        ldr     r0, [r0]
         add     r0, r0, #16
         push    {r0}
         NEXT
@@ -2930,6 +2929,9 @@ parse_:
 	add	r2, r0, #1
 	str	r2, [r3, #4]
 .L109:
+	movw	r2, #:lower16:str1
+	movt	r2, #:upper16:str1
+        ldr     r2, [r2]
         push    {r2}
 	movw	r3, #:lower16:c1
 	movt	r3, #:upper16:c1
@@ -4350,54 +4352,36 @@ call_:
 	.fpu vfpv3-d16
 	.type	lookup_primitive, %function
 lookup_primitive:
-	movw	r3, #:lower16:c2
-	movt	r3, #:upper16:c2
-	mov	r2, #0
-	str	r2, [r3]
+        @ let r3 hold my target, r2 the base of primitives[], r1 the index
+        movw    r3, #:lower16:c1
+        movt    r3, #:upper16:c1
+        ldr     r3, [r3]
+        movw    r2, #:lower16:primitives
+        movt    r2, #:upper16:primitives
+        mov     r1, #0
 	b	.L190
 .L193:
-	movw	r3, #:lower16:primitives
-	movt	r3, #:upper16:primitives
-	movw	r2, #:lower16:c2
-	movt	r2, #:upper16:c2
-	ldr	r2, [r2]
-	ldr	r2, [r3, r2, lsl #3]
-	movw	r3, #:lower16:c1
-	movt	r3, #:upper16:c1
-	ldr	r3, [r3]
-	cmp	r2, r3
+        ldr     r0, [r2, r1, lsl #3]
+        cmp     r0, r3
 	bne	.L191
-	movw	r2, #:lower16:primitives
-	movt	r2, #:upper16:primitives
-	movw	r3, #:lower16:c2
-	movt	r3, #:upper16:c2
-	ldr	r3, [r3]
-	lsl	r3, r3, #3
-	add	r3, r2, r3
-	ldr	r2, [r3, #4]
+	lsl	r1, r1, #3
+	add	r1, r2, r1
+	ldr	r2, [r1, #4]
 	movw	r3, #:lower16:key1
 	movt	r3, #:upper16:key1
 	str	r2, [r3]
 	b	.L194
 .L191:
-	movw	r3, #:lower16:c2
-	movt	r3, #:upper16:c2
-	movw	r2, #:lower16:c2
-	movt	r2, #:upper16:c2
-	ldr	r2, [r2]
-	add	r2, r2, #1
-	str	r2, [r3]
+	add	r1, r1, #1
 .L190:
-	movw	r3, #:lower16:c2
-	movt	r3, #:upper16:c2
-	ldr	r2, [r3]
-	movw	r3, #:lower16:primitive_count
-	movt	r3, #:upper16:primitive_count
-	ldr	r3, [r3]
-	cmp	r2, r3
+
+	movw	r0, #:lower16:primitive_count
+	movt	r0, #:upper16:primitive_count
+	ldr	r0, [r0]
+	cmp	r1, r0
 	blt	.L193
-	movw    r3, #:lower16:key1
-	movt    r3, #:upper16:key1
+	movw    r3, #:lower16:c1
+	movt    r3, #:upper16:c1
         ldr     r2, [r3]
 	movw	r0, #:lower16:stderr
 	movt	r0, #:upper16:stderr
@@ -9670,6 +9654,23 @@ init_primitives:
 	lsl	r3, r1, #3
 	add	r3, r2, r3
 	str	r0, [r3, #4]
+	movw	r3, #:lower16:key_loop_end
+	movt	r3, #:upper16:key_loop_end
+	ldr	r3, [r3]
+	sub	r1, r3, #1
+	movw	r3, #:lower16:key_loop_end
+	movt	r3, #:upper16:key_loop_end
+	ldr	r0, [r3]
+	movw	r3, #:lower16:primitives
+	movt	r3, #:upper16:primitives
+	movw	r2, #:lower16:code_loop_end
+	movt	r2, #:upper16:code_loop_end
+	str	r2, [r3, r1, lsl #3]
+	movw	r2, #:lower16:primitives
+	movt	r2, #:upper16:primitives
+	lsl	r3, r1, #3
+	add	r3, r2, r3
+	str	r0, [r3, #4]
 	movw	r3, #:lower16:key_ccall_0
 	movt	r3, #:upper16:key_ccall_0
 	ldr	r3, [r3]
@@ -9879,7 +9880,7 @@ code_superinstruction_dolit_equal:
         ldr     r1, [sp]
 	mov	r3, #0
         cmp     r0, r1
-        subne   r3, r3, #1
+        subeq   r3, r3, #1
 	str	r3, [sp]
 	NEXT
 	.size	code_superinstruction_dolit_equal, .-code_superinstruction_dolit_equal
