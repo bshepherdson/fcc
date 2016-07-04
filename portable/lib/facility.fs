@@ -43,8 +43,8 @@
 
 
 \ Helpers that wraps the internal calls in a more Forth-friendly form.
-: C-LIBRARY ( addr u -- ) (>CSTRING) c-library ;
-: C-SYMBOL ( addr u -- sym ) (>CSTRING) c-symbol ;
+: C-LIBRARY ( addr u -- ) >CSTRING c-library ;
+: C-SYMBOL ( addr u -- sym ) >CSTRING c-symbol ;
 
 \ Now the real user-friendly constant creator:
 : C-CALL-NAMED ( addr1 u1 "forth name" -- )
