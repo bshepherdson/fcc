@@ -101,7 +101,7 @@ quitTopPtr:
 	.type	primitive_count, @object
 	.size	primitive_count, 4
 primitive_count:
-	.long	115
+	.long	117
 	.globl	queue
 	.bss
 	.align 8
@@ -5925,15 +5925,88 @@ code_ccall_4:
         .cfi_endproc
 
 .BSS0601:
+        .string "CCALL5"
+        .data
+        .align 32
+        .type   header_ccall_5, @object
+        .size   header_ccall_5, 32
+header_ccall_5:
+        .quad   header_ccall_4
+        .quad   6
+        .quad   .BSS0601
+        .quad   code_ccall_5
+        .globl  key_ccall_5
+        .align  4
+        .type   key_ccall_5, @object
+        .size   key_ccall_5, 4
+key_ccall_5:
+        .long   115
+        .text
+        .globl  code_ccall_5
+        .type   code_ccall_5, @function
+code_ccall_5:
+        .cfi_startproc
+        movq    40(%rbx), %rdi # sp[5] = first argument
+        movq    32(%rbx), %rsi # sp[4] = second argument
+        movq    24(%rbx), %rdx # sp[3] = third argument
+        movq    16(%rbx), %rcx # sp[2] = fourth argument
+        movq    8(%rbx), %r8 # sp[1] = fifth argument
+        movq    (%rbx), %rax
+        subq    $8, %rsp # Align rsp to 16 bytes
+        call    *%rax
+        addq    $8, %rsp
+        addq    $40, %rbx
+        movq    %rax, (%rbx)
+        NEXT
+        .cfi_endproc
+
+.BSS0701:
+        .string "CCALL6"
+        .data
+        .align 32
+        .type   header_ccall_6, @object
+        .size   header_ccall_6, 32
+header_ccall_6:
+        .quad   header_ccall_5
+        .quad   6
+        .quad   .BSS0701
+        .quad   code_ccall_6
+        .globl  key_ccall_6
+        .align  4
+        .type   key_ccall_6, @object
+        .size   key_ccall_6, 4
+key_ccall_6:
+        .long   116
+        .text
+        .globl  code_ccall_6
+        .type   code_ccall_6, @function
+code_ccall_6:
+        .cfi_startproc
+        movq    48(%rbx), %rdi # sp[6] = first argument
+        movq    40(%rbx), %rsi # sp[5] = second argument
+        movq    32(%rbx), %rdx # sp[4] = third argument
+        movq    24(%rbx), %rcx # sp[3] = fourth argument
+        movq    16(%rbx), %r8  # sp[2] = fifth argument
+        movq    8(%rbx),  %r9  # sp[1] = sixth argument
+        movq    (%rbx), %rax
+        subq    $8, %rsp # Align rsp to 16 bytes
+        call    *%rax
+        addq    $8, %rsp
+        addq    $48, %rbx
+        movq    %rax, (%rbx)
+        NEXT
+        .cfi_endproc
+
+.BSS0801:
         .string "C-LIBRARY"
         .data
         .align 32
         .type   header_c_library, @object
         .size   header_c_library, 32
 header_c_library:
-        .quad   header_ccall_4
+        .quad   header_ccall_6
         .quad   9
-        .quad   .BSS0601
+        .quad   .BSS0801
         .quad   code_c_library
         .globl  key_c_library
         .align  4
@@ -7517,6 +7590,30 @@ init_primitives:
 	salq	$4, %rcx
 	addq	$primitives, %rcx
 	movq	$code_ccall_4, (%rcx)
+	movl	%edx, %edx
+	salq	$4, %rdx
+	addq	$primitives+8, %rdx
+	movl	%eax, (%rdx)
+        # ccall5
+	movl	key_ccall_5(%rip), %eax
+	leal	-1(%rax), %edx
+	movl	key_ccall_5(%rip), %eax
+	movl	%edx, %ecx
+	salq	$4, %rcx
+	addq	$primitives, %rcx
+	movq	$code_ccall_5, (%rcx)
+	movl	%edx, %edx
+	salq	$4, %rdx
+	addq	$primitives+8, %rdx
+	movl	%eax, (%rdx)
+        # ccall6
+	movl	key_ccall_6(%rip), %eax
+	leal	-1(%rax), %edx
+	movl	key_ccall_6(%rip), %eax
+	movl	%edx, %ecx
+	salq	$4, %rcx
+	addq	$primitives, %rcx
+	movq	$code_ccall_6, (%rcx)
 	movl	%edx, %edx
 	salq	$4, %rdx
 	addq	$primitives+8, %rdx

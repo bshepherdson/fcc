@@ -64,4 +64,6 @@
 : CCALL2-NR ccall2 drop ;
 : CCALL3-NR ccall3 drop ;
 : CCALL4-NR ccall4 drop ;
+: CCALL5-NR ccall5 drop ;
+: CCALL6-NR ccall6 drop ;
 
