@@ -5813,7 +5813,9 @@ code_ccall_1:
         .cfi_startproc
         movq    8(%rbx), %rdi # TOS = first argument
         movq    (%rbx), %rax
+        subq    $8, %rsp
         call    *%rax
+        addq    $8, %rsp
         addq    $8, %rbx
         movq    %rax, (%rbx)
         NEXT
@@ -5844,7 +5846,9 @@ code_ccall_2:
         movq    16(%rbx), %rdi # sp[2] = first argument
         movq    8(%rbx), %rsi # TOS = second argument
         movq    (%rbx), %rax
+        subq    $8, %rsp # Align rsp to 16 bytes
         call    *%rax
+        addq    $8, %rsp
         addq    $16, %rbx
         movq    %rax, (%rbx)
         NEXT
@@ -5876,7 +5880,9 @@ code_ccall_3:
         movq    16(%rbx), %rsi # sp[2] = second argument
         movq    8(%rbx), %rdx # TOS = third argument
         movq    (%rbx), %rax
+        subq    $8, %rsp # Align rsp to 16 bytes
         call    *%rax
+        addq    $8, %rsp
         addq    $24, %rbx
         movq    %rax, (%rbx)
         NEXT
@@ -5910,7 +5916,9 @@ code_ccall_4:
         movq    16(%rbx), %rdx # sp[2] = third argument
         movq    8(%rbx), %rcx # TOS = fourth argument
         movq    (%rbx), %rax
+        subq    $8, %rsp # Align rsp to 16 bytes
         call    *%rax
+        addq    $8, %rsp
         addq    $32, %rbx
         movq    %rax, (%rbx)
         NEXT
@@ -5941,13 +5949,16 @@ code_c_library:
         # Expects a null-terminated C-style string on the stack, and dlopen()s
         # it, globally, so a generic dlsym() for it will work.
         movq    (%rbx), %rdi
-        addq    $8, %rbx
         movq    $258, %rsi  # That's RTLD_NOW | RTLD_GLOBAL.
+        subq    $8, %rsp # Align rsp to 16 bytes
         call    dlopen
+        addq    $8, %rsp
+        movq    %rax, (%rbx) # Push the result. NULL = 0 indicates an error.
+        # That's a negated Forth flag.
         NEXT
         .cfi_endproc
 
-.BSS0701:
+.BSS0901:
         .string "C-SYMBOL"
         .data
         .align 32
@@ -5956,7 +5967,7 @@ code_c_library:
 header_c_symbol:
         .quad   header_c_library
         .quad   8
-        .quad   .BSS0701
+        .quad   .BSS0901
         .quad   code_c_symbol
         .globl  key_c_symbol
         .align  4
@@ -5973,7 +5984,9 @@ code_c_symbol:
         .cfi_startproc
         movq   (%rbx), %rsi
         movq   $0, %rdi      # 0 = RTLD_DEFAULT, searching everywhere.
+        subq   $8, %rsp # Align rsp to 16 bytes
         call   dlsym
+        addq   $8, %rsp
         movq   %rax, (%rbx)  # Put the void* result onto the stack.
         NEXT
         .cfi_endproc
