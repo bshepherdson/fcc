@@ -1,5 +1,8 @@
         @ r11 holds IP, sp/r13 the Forth stack pointer
         @ it's saved by the callee, so that should work
+        @ r9 is reserved as the dump slot before calling
+        @ external C functions. (It should only appear in the CALL and
+        @ CALL_REG macros, below, as well as ccall5 and 6.)
 	.arch armv7-a
 	.eabi_attribute 28, 1
 	.eabi_attribute 20, 1
@@ -41,6 +44,20 @@
         .macro EXIT_NEXT
         POPRSP r11, r1, r2
         NEXT
+        .endm
+
+        .macro CALL label
+        mov     r9, sp
+        bic     sp, sp, #7
+        bl      \label
+        mov     sp, r9
+        .endm
+
+        .macro CALL_REG reg
+        mov     r9, sp
+        bic     sp, sp, #7
+        blx     \reg
+        mov     sp, r9
         .endm
 
         .macro CALL_NEXT
@@ -123,7 +140,7 @@ quitTopPtr:
 	.type	primitive_count, %object
 	.size	primitive_count, 4
 primitive_count:
-	.word	115
+	.word	117
 	.global	queue
 	.bss
 	.align	2
@@ -179,7 +196,7 @@ print:
 	ldr	r3, [sp]
 	add	r3, r3, #1
 	mov	r0, r3
-	bl	malloc
+	CALL	malloc
 	mov	r3, r0
 	mov	r2, r3
 	movw	r3, #:lower16:str1
@@ -190,7 +207,7 @@ print:
 	ldr	r2, [sp]
 	ldr	r1, [sp, #4]
 	ldr	r0, [r3]
-	bl	strncpy
+	CALL	strncpy
 	movw	r3, #:lower16:str1
 	movt	r3, #:upper16:str1
 	ldr	r2, [r3]
@@ -203,11 +220,11 @@ print:
 	ldr	r1, [r3]
 	movw	r0, #:lower16:.LC0
 	movt	r0, #:upper16:.LC0
-	bl	printf
+	CALL	printf
 	movw	r3, #:lower16:str1
 	movt	r3, #:upper16:str1
 	ldr	r0, [r3]
-	bl	free
+	CALL	free
 	nop
 	add	sp, sp, #12
 	@ sp needed
@@ -343,7 +360,7 @@ key_div:
 code_div:
         pop     {r1, r2}
         mov     r0, r1
-	bl	__aeabi_idiv
+	CALL	__aeabi_idiv
         push    {r0}
 	NEXT
 	.size	code_div, .-code_div
@@ -378,7 +395,7 @@ key_udiv:
 code_udiv:
         pop     {r1, r2}
         mov     r0, r1
-        bl      __aeabi_uidiv
+        CALL      __aeabi_uidiv
         push    {r0}
 	NEXT
 	.size	code_udiv, .-code_udiv
@@ -413,7 +430,7 @@ key_mod:
 code_mod:
         pop     {r1, r2}
         mov     r0, r2
-	bl	__aeabi_idivmod
+	CALL	__aeabi_idivmod
         push    {r1}
 	NEXT
 	.size	code_mod, .-code_mod
@@ -448,7 +465,7 @@ key_umod:
 code_umod:
         pop     {r1, r2}
         mov     r0, r2
-	bl	__aeabi_uidivmod
+	CALL	__aeabi_uidivmod
         push    {r1}
 	NEXT
 	.size	code_umod, .-code_umod
@@ -1318,7 +1335,7 @@ key_raw_alloc:
 	.type	code_raw_alloc, %function
 code_raw_alloc:
         pop     {r0}
-	bl	malloc
+	CALL	malloc
         push    {r0}
 	NEXT
 	.size	code_raw_alloc, .-code_raw_alloc
@@ -1390,7 +1407,7 @@ code_print_internal:
 	pop    	{r1}
 	movw	r0, #:lower16:.LC36
 	movt	r0, #:upper16:.LC36
-	bl	printf
+	CALL	printf
 	NEXT
 	.size	code_print_internal, .-code_print_internal
 	.global	header_state
@@ -1636,7 +1653,7 @@ refill_:
         @ Middle case: keyboard
 	movw	r0, #:lower16:.LC42
 	movt	r0, #:upper16:.LC42
-	bl	readline
+	CALL	readline
 	mov	r2, r0
 	movw	r3, #:lower16:str1
 	movt	r3, #:upper16:str1
@@ -1647,7 +1664,7 @@ refill_:
 	movw	r3, #:lower16:str1
 	movt	r3, #:upper16:str1
 	ldr	r0, [r3]
-	bl	strlen
+	CALL	strlen
 	mov	r3, r0
 	mov	r2, r3
 	movw	r3, #:lower16:inputSources
@@ -1671,7 +1688,7 @@ refill_:
 	mov	r2, r0
 	ldr	r1, [r1]
 	ldr	r0, [r3, #12]
-	bl	strncpy
+	CALL	strncpy
 	movw	r3, #:lower16:inputIndex
 	movt	r3, #:upper16:inputIndex
 	ldr	r3, [r3]
@@ -1684,7 +1701,7 @@ refill_:
 	movw	r3, #:lower16:str1
 	movt	r3, #:upper16:str1
 	ldr	r0, [r3]
-	bl	free
+	CALL	free
 	mvn	r3, #0
 	b	.L60
 .L59:
@@ -1785,7 +1802,7 @@ refill_:
 	add	r3, r2, r3
 	mov	r2, r0
 	ldr	r0, [r3, #12]
-	bl	strncpy
+	CALL	strncpy
 	movw	r3, #:lower16:inputIndex
 	movt	r3, #:upper16:inputIndex
 	ldr	r3, [r3]
@@ -1839,7 +1856,7 @@ refill_:
 	movt	r1, #:upper16:tempSize
 	movw	r0, #:lower16:str1
 	movt	r0, #:upper16:str1
-	bl	getline
+	CALL	getline
 	mov	r2, r0
 	movw	r3, #:lower16:c1
 	movt	r3, #:upper16:c1
@@ -1892,11 +1909,11 @@ refill_:
 	ldr	r2, [r2]
 	ldr	r1, [r1]
 	ldr	r0, [r3, #12]
-	bl	strncpy
+	CALL	strncpy
 	movw	r3, #:lower16:str1
 	movt	r3, #:upper16:str1
 	ldr	r0, [r3]
-	bl	free
+	CALL	free
 	movw	r3, #:lower16:inputIndex
 	movt	r3, #:upper16:inputIndex
 	ldr	r1, [r3]
@@ -1999,9 +2016,9 @@ key_accept:
 	.type	code_accept, %function
 code_accept:
 	mov	r0, #0
-	bl	readline
+	CALL	readline
 	mov	r4, r0     @ r4 holds the string
-	bl	strlen     @ r0 holds the length
+	CALL	strlen     @ r0 holds the length
         ldr     r1, [sp]
         cmp     r1, r0
         bge     .L77
@@ -2012,11 +2029,11 @@ code_accept:
         mov     r2, r0 @ length in r2, saved in r5
         mov     r1, r4 @ string in r1
         ldr     r0, [sp, #4] @ sp[1] in r0
-	bl	strncpy
+	CALL	strncpy
         add     sp, sp, #4
         push    {r5}   @ push the saved length
         mov     r0, r4
-        bl      free   @ free the string
+        CALL    free   @ free the string
         NEXT
 	.size	code_accept, .-code_accept
 	.global	header_key
@@ -2050,7 +2067,7 @@ code_key:
 	movw	r1, #:lower16:old_tio
 	movt	r1, #:upper16:old_tio
 	mov	r0, #0
-	bl	tcgetattr
+	CALL	tcgetattr
 	movw	r2, #:lower16:new_tio
 	movt	r2, #:upper16:new_tio
 	movw	r3, #:lower16:old_tio
@@ -2076,14 +2093,14 @@ code_key:
 	movt	r2, #:upper16:new_tio
 	mov	r1, #0
 	mov	r0, #0
-	bl	tcsetattr
-	bl	getchar
+	CALL	tcsetattr
+	CALL	getchar
         push    {r0}
 	movw	r2, #:lower16:old_tio
 	movt	r2, #:upper16:old_tio
 	mov	r1, #0
 	mov	r0, #0
-	bl	tcsetattr
+	CALL	tcsetattr
 	NEXT
 	.size	code_key, .-code_key
 	.global	header_latest
@@ -2190,7 +2207,7 @@ code_emit:
 	movw	r3, #:lower16:stdout
 	movt	r3, #:upper16:stdout
 	ldr	r1, [r3]
-	bl	fputc
+	CALL	fputc
 	NEXT
 	.size	code_emit, .-code_emit
 	.global	header_source
@@ -3601,7 +3618,7 @@ find_:
 	ldr	r0, [r3, #8]
 	ldr     r1, [sp, #4]
 	ldr     r2, [sp]
-	bl	strncasecmp
+	CALL	strncasecmp
 	mov	r3, r0
 	cmp	r3, #0
 	bne	.L151
@@ -3811,7 +3828,7 @@ code_create:
 	movt	r3, #:upper16:tempHeader
 	ldr	r4, [r3]
 	ldr     r0, [sp]
-	bl	malloc
+	CALL	malloc
 	mov	r3, r0
 	str	r0, [r4, #8]
 	movw	r3, #:lower16:tempHeader
@@ -3820,7 +3837,7 @@ code_create:
 	ldr     r1, [sp, #4]
 	ldr     r2, [sp]
 	ldr	r0, [r0, #8]
-	bl	strncpy
+	CALL	strncpy
         add     sp, sp, #8
 	movw	r3, #:lower16:tempHeader
 	movt	r3, #:upper16:tempHeader
@@ -4060,7 +4077,7 @@ dot_s_:
 	mov	r1, r3
 	movw	r0, #:lower16:.LC76
 	movt	r0, #:upper16:.LC76
-	bl	printf
+	CALL	printf
 	movw	r3, #:lower16:spTop
 	movt	r3, #:upper16:spTop
 	ldr	r3, [r3]
@@ -4077,7 +4094,7 @@ dot_s_:
 	ldr	r1, [r3]
 	movw	r0, #:lower16:.LC36
 	movt	r0, #:upper16:.LC36
-	bl	printf
+	CALL	printf
 	movw	r3, #:lower16:c1
 	movt	r3, #:upper16:c1
 	movw	r2, #:lower16:c1
@@ -4092,7 +4109,7 @@ dot_s_:
 	cmp	r2, sp
 	bge	.L174
 	mov	r0, #10
-	bl	putchar
+	CALL	putchar
 	nop
 	POPRSP  lr, r1, r2
         bx      lr
@@ -4150,7 +4167,7 @@ u_dot_s_:
 	mov	r1, r3
 	movw	r0, #:lower16:.LC76
 	movt	r0, #:upper16:.LC76
-	bl	printf
+	CALL	printf
 	movw	r3, #:lower16:spTop
 	movt	r3, #:upper16:spTop
 	ldr	r3, [r3]
@@ -4167,7 +4184,7 @@ u_dot_s_:
 	ldr	r1, [r3]
 	movw	r0, #:lower16:.LC78
 	movt	r0, #:upper16:.LC78
-	bl	printf
+	CALL	printf
 	movw	r3, #:lower16:c1
 	movt	r3, #:upper16:c1
 	movw	r2, #:lower16:c1
@@ -4182,7 +4199,7 @@ u_dot_s_:
 	cmp	r2, sp
 	bge	.L180
 	mov	r0, #10
-	bl	putchar
+	CALL	putchar
 	nop
 	POPRSP  lr, r1, r2
         bx      lr
@@ -4260,7 +4277,7 @@ code_dump_file:
 	ldr	r2, [sp]
 	movw	r0, #:lower16:tempBuf
 	movt	r0, #:upper16:tempBuf
-	bl	strncpy
+	CALL	strncpy
 	ldr	r2, [sp]
 	movw	r3, #:lower16:tempBuf
 	movt	r3, #:upper16:tempBuf
@@ -4270,7 +4287,7 @@ code_dump_file:
 	movt	r1, #:upper16:.LC81
 	movw	r0, #:lower16:tempBuf
 	movt	r0, #:upper16:tempBuf
-	bl	fopen
+	CALL	fopen
 	mov	r2, r0
 	movw	r3, #:lower16:tempFile
 	movt	r3, #:upper16:tempFile
@@ -4287,7 +4304,7 @@ code_dump_file:
 	movw	r1, #:lower16:.LC82
 	movt	r1, #:upper16:.LC82
 	ldr	r0, [r3]
-	bl	fprintf
+	CALL	fprintf
 	b	.L186
 .L185:
 	ldr     r0, [sp, #12]
@@ -4296,7 +4313,7 @@ code_dump_file:
 	movt	r3, #:upper16:tempFile
 	ldr	r3, [r3]
 	mov	r1, #1
-	bl	fwrite
+	CALL	fwrite
 	mov	r3, r0
 	mov	r2, r3
 	movw	r3, #:lower16:c1
@@ -4310,11 +4327,11 @@ code_dump_file:
 	ldr	r1, [r1]
 	movw	r0, #:lower16:.LC83
 	movt	r0, #:upper16:.LC83
-	bl	printf
+	CALL	printf
 	movw	r3, #:lower16:tempFile
 	movt	r3, #:upper16:tempFile
 	ldr	r0, [r3]
-	bl	fclose
+	CALL	fclose
 	movw	r3, #:lower16:tempFile
 	movt	r3, #:upper16:tempFile
 	mov	r2, #0
@@ -4388,9 +4405,9 @@ lookup_primitive:
 	ldr	r0, [r0]
 	movw	r1, #:lower16:.BSS_ERR_INVALID_KEY
 	movt	r1, #:upper16:.BSS_ERR_INVALID_KEY
-	bl	fprintf
+	CALL	fprintf
 	mov	r0, #40
-	bl	exit
+	CALL	exit
 .L194:
 	bx	lr
 	.size	lookup_primitive, .-lookup_primitive
@@ -4991,7 +5008,7 @@ quit_:
 	bne	.L235
 	movw	r0, #:lower16:.LC85
 	movt	r0, #:upper16:.LC85
-	bl	puts
+	CALL	puts
 .L235:
 	add	sp, sp, #8
 	bl	refill_
@@ -5044,7 +5061,7 @@ quit_:
 	ldr	r1, [r3]
 	movw	r0, #:lower16:tempBuf
 	movt	r0, #:upper16:tempBuf
-	bl	strncpy
+	CALL	strncpy
 	movw	r3, #:lower16:savedLength
 	movt	r3, #:upper16:savedLength
 	ldr	r2, [r3]
@@ -5059,7 +5076,7 @@ quit_:
 	movw	r1, #:lower16:.LC86
 	movt	r1, #:upper16:.LC86
 	ldr	r0, [r3]
-	bl	fprintf
+	CALL	fprintf
 	b	.L230
 .L236:
 	ldr	r3, [sp]
@@ -5162,7 +5179,7 @@ key_bye:
 	.type	code_bye, %function
 code_bye:
 	mov	r0, #0
-	bl	exit
+	CALL	exit
 	.size	code_bye, .-code_bye
 	.global	header_compile_comma
 	.section	.rodata
@@ -5466,10 +5483,10 @@ key_close_file:
 	.type	code_close_file, %function
 code_close_file:
 	ldr     r0, [sp]
-	bl	fclose
+	CALL	fclose
 	cmp	r0, #0
 	beq	.L277
-	bl	__errno_location
+	CALL	__errno_location
 	mov	r3, r0
 	ldr	r3, [r3]
 	b	.L278
@@ -5555,7 +5572,7 @@ code_create_file:
 	movt	r0, #:upper16:tempBuf
         ldr     r1, [sp, #8]
         ldr     r2, [sp, #4]
-	bl	strncpy
+	CALL	strncpy
 	ldr     r2, [sp, #4]
 	movw	r3, #:lower16:tempBuf
 	movt	r3, #:upper16:tempBuf
@@ -5571,11 +5588,11 @@ code_create_file:
 	mov	r1, r3
 	movw	r0, #:lower16:tempBuf
 	movt	r0, #:upper16:tempBuf
-	bl	fopen
+	CALL	fopen
         str     r0, [sp, #4]
 	cmp	r0, #0
 	bne	.L281
-	bl	__errno_location
+	CALL	__errno_location
 	mov	r3, r0
 	ldr	r3, [r3]
 	b	.L282
@@ -5617,7 +5634,7 @@ code_open_file:
 	ldr     r2, [sp, #4]
 	movw	r0, #:lower16:tempBuf
 	movt	r0, #:upper16:tempBuf
-	bl	strncpy
+	CALL	strncpy
 	ldr     r2, [sp, #4]
 	movw	r3, #:lower16:tempBuf
 	movt	r3, #:upper16:tempBuf
@@ -5630,7 +5647,7 @@ code_open_file:
 	mov	r1, r3
 	movw	r0, #:lower16:tempBuf
 	movt	r0, #:upper16:tempBuf
-	bl	fopen
+	CALL	fopen
 	str	r0, [sp, #8]
 	cmp	r0, #0
 	bne	.L285
@@ -5646,13 +5663,13 @@ code_open_file:
 	mov	r1, r3
 	movw	r0, #:lower16:tempBuf
 	movt	r0, #:upper16:tempBuf
-	bl	fopen
+	CALL	fopen
 	str	r0, [sp, #8]
 .L285:
         ldr     r3, [sp, #8]
 	cmp	r3, #0
 	bne	.L286
-	bl	__errno_location
+	CALL	__errno_location
 	mov	r3, r0
 	ldr	r3, [r3]
 	b	.L287
@@ -5695,7 +5712,7 @@ code_delete_file:
         ldr     r1, [sp, #4]
 	movw	r0, #:lower16:tempBuf
 	movt	r0, #:upper16:tempBuf
-	bl	strncpy
+	CALL	strncpy
 	ldr	r2, [sp, #4]
 	movw	r3, #:lower16:tempBuf
 	movt	r3, #:upper16:tempBuf
@@ -5704,11 +5721,11 @@ code_delete_file:
         add     sp, sp, #4
 	movw	r0, #:lower16:tempBuf
 	movt	r0, #:upper16:tempBuf
-	bl	remove
+	CALL	remove
 	str	r0, [sp]
 	cmn	r0, #1
 	bne	.L290
-	bl	__errno_location
+	CALL	__errno_location
         ldr     r0, [r0]
         str     r0, [sp]
 .L290:
@@ -5746,11 +5763,11 @@ code_file_position:
         mov     r0, #0
         str     r0, [sp, #4]
         ldr     r0, [sp, #8]
-	bl	ftell
+	CALL	ftell
         str     r0, [sp, #8]
 	cmn	r0, #1
 	bne	.L293
-	bl	__errno_location
+	CALL	__errno_location
 	mov	r3, r0
 	ldr	r3, [r3]
 	b	.L294
@@ -5793,11 +5810,11 @@ code_file_size:
         str     r0, [sp, #4]
         ldr     r7, [sp, #8]    @ r7 holds the file pointer
         mov     r0, r7
-        bl ftell
+        CALL ftell
         mov     r8, r0          @ r8 holds the original position.
         cmp     r0, #0
         bge     .L297
-        bl      __errno_location
+        CALL      __errno_location
         ldr     r0, [r0]
         str     r0, [sp]
         b       .L298
@@ -5807,17 +5824,17 @@ code_file_size:
 	mov	r2, #2   @ SEEK_END
         cmp     r0, #0
         bge     .L299
-        bl      __errno_location
+        CALL      __errno_location
         ldr     r0, [r0]
         str     r0, [sp]
         mov     r0, r7
         mov     r1, r8
         mov     r2, #0   @ SEEK_SET
-        bl      fseek
+        CALL      fseek
 	b	.L298
 .L299:
         mov     r0, r7
-        bl      ftell    @ r0 is now the actual position
+        CALL      ftell    @ r0 is now the actual position
         str     r0, [sp, #8]
         mov     r0, #0
         str     r0, [sp]
@@ -5936,11 +5953,11 @@ code_read_file:
         ldr     r2, [sp, #4]
         mov     r1, #1
         ldr     r0, [sp, #8]
-        bl      fread
+        CALL      fread
         cmp     r0, #0
         bne     .L303
         ldr     r0, [sp]
-        bl      feof
+        CALL      feof
         cmp     r0, #0
         beq     .L304
         add     sp, sp, #4
@@ -5950,7 +5967,7 @@ code_read_file:
         b       .L306
 .L304:
         ldr     r0, [sp]
-        bl      ferror
+        CALL      ferror
         str     r0, [sp, #4]
         mov     r0, #0
         str     r0, [sp, #8]
@@ -6006,7 +6023,7 @@ code_read_line:
 	movt	r1, #:upper16:tempSize
 	movw	r0, #:lower16:str1
 	movt	r0, #:upper16:str1
-	bl	getline
+	CALL	getline
 	mov	r2, r0
 	movw	r3, #:lower16:c1
 	movt	r3, #:upper16:c1
@@ -6016,7 +6033,7 @@ code_read_line:
 	ldr	r3, [r3]
 	cmn	r3, #1
 	bne	.L309
-	bl	__errno_location
+	CALL	__errno_location
 	ldr	r0, [r0]
         str     r0, [sp]
         mov     r0, #0
@@ -6049,7 +6066,7 @@ code_read_line:
         ldr     r3, [sp, #4]
         sub     r1, r2, r3
 	mov	r2, #1    @ SEEK_CUR
-	bl	fseek
+	CALL	fseek
 	ldr     r2, [sp, #4]
 	add	r2, r3, #1
 	movw	r3, #:lower16:c1
@@ -6084,7 +6101,7 @@ code_read_line:
 	movw	r3, #:lower16:str1
 	movt	r3, #:upper16:str1
 	ldr	r1, [r3]
-	bl	strncpy
+	CALL	strncpy
         mov     r0, #0
         str     r0, [sp]
         mvn     r1, #0
@@ -6103,7 +6120,7 @@ code_read_line:
 	movw	r3, #:lower16:str1
 	movt	r3, #:upper16:str1
 	ldr	r0, [r3]
-	bl	free
+	CALL	free
 .L314:
 	NEXT
 	.size	code_read_line, .-code_read_line
@@ -6138,11 +6155,11 @@ code_reposition_file:
         ldr     r0, [sp]
         ldr     r1, [sp, #8]
         mov     r2, #0     @ SEEK_SET
-        bl      fseek
+        CALL      fseek
         add     sp, sp, #8
         cmn     r0, #1
         bne     .L317
-        bl      __errno_location
+        CALL      __errno_location
         ldr     r3, [r0]
         str     r3, [sp]
 .L317:
@@ -6177,14 +6194,14 @@ key_resize_file:
 	.type	code_resize_file, %function
 code_resize_file:
         ldr     r0, [sp]
-        bl      fileno
+        CALL      fileno
         ldr     r1, [sp, #8]
-        bl      ftruncate
+        CALL      ftruncate
         str     r0, [sp, #8]
         add     sp, sp , #8
         cmn     r0, #1
 	bne	.L320
-	bl	__errno_location
+	CALL	__errno_location
 	ldr	r3, [r3]
 	b	.L321
 .L320:
@@ -6225,7 +6242,7 @@ code_write_file:
         mov     r0, r5
         mov     r1, #1
         mov     r2, r4
-        bl      fwrite
+        CALL      fwrite
         mov     r0, #0
         push    {r0}
         NEXT
@@ -6262,7 +6279,7 @@ code_write_line:
         ldr     r1, [sp, #8]
 	movw	r0, #:lower16:tempBuf
 	movt	r0, #:upper16:tempBuf
-	bl	strncpy
+	CALL	strncpy
 	ldr     r2, [sp, #4]
 	movw	r3, #:lower16:tempBuf
 	movt	r3, #:upper16:tempBuf
@@ -6274,7 +6291,7 @@ code_write_line:
         mov     r1, #1
 	movw	r0, #:lower16:tempBuf
 	movt	r0, #:upper16:tempBuf
-	bl	fwrite
+	CALL	fwrite
         add     sp, sp, #8
         mov     r0, #0
         str     r0, [sp]
@@ -6309,11 +6326,11 @@ key_flush_file:
 	.type	code_flush_file, %function
 code_flush_file:
         pop     {r0}
-        bl      fileno
-        bl      fsync
+        CALL      fileno
+        CALL      fsync
         cmn     r0, #1
         bne     .L328
-        bl      __errno_location
+        CALL      __errno_location
         ldr     r0, [r0]
 .L328:
         push    {r0}
@@ -6397,14 +6414,14 @@ code_colon:
 	mov	r1, #1
 	movw	r0, #:lower16:.LC118
 	movt	r0, #:upper16:.LC118
-	bl	fwrite
+	CALL	fwrite
 	bl	code_quit
 .L331:
 	movw	r3, #:lower16:tempHeader
 	movt	r3, #:upper16:tempHeader
 	ldr	r4, [r3]
 	ldr	r0, [sp]
-	bl	malloc
+	CALL	malloc
 	mov	r3, r0
 	str	r3, [r4, #8]
 	movw	r3, #:lower16:tempHeader
@@ -6413,7 +6430,7 @@ code_colon:
 	ldr	r0, [r0, #8]
         ldr     r1, [sp, #4]
         ldr     r2, [sp]
-	bl	strncpy
+	CALL	strncpy
 	movw	r3, #:lower16:tempHeader
 	movt	r3, #:upper16:tempHeader
 	ldr	r2, [r3]
@@ -6586,19 +6603,19 @@ code_see:
 	bl	parse_name_
 	movw	r0, #:lower16:.LC122
 	movt	r0, #:upper16:.LC122
-	bl	printf
+	CALL	printf
 	ldr     r0, [sp, #4]
         ldr     r1, [sp]
 	bl	print
 	mov	r0, #10
-	bl	putchar
+	CALL	putchar
 	bl	find_
 	ldr     r3, [sp]
 	cmp	r3, #0
 	bne	.L336
 	movw	r0, #:lower16:.LC123
 	movt	r0, #:upper16:.LC123
-	bl	puts
+	CALL	puts
 	b	.L337
 .L336:
 	ldr     r2, [sp, #4]
@@ -6615,7 +6632,7 @@ code_see:
 	beq	.L338
 	movw	r0, #:lower16:.LC124
 	movt	r0, #:upper16:.LC124
-	bl	puts
+	CALL	puts
 	b	.L337
 .L338:
 	movw	r3, #:lower16:tempHeader
@@ -6657,7 +6674,7 @@ code_see:
 	ldr	r1, [r3]
 	movw	r0, #:lower16:.LC125
 	movt	r0, #:upper16:.LC125
-	bl	printf
+	CALL	printf
 	b	.L340
 .L339:
 	movw	r3, #:lower16:tempHeader
@@ -6710,7 +6727,7 @@ code_see:
 	ldr	r1, [r1]
 	movw	r0, #:lower16:.LC126
 	movt	r0, #:upper16:.LC126
-	bl	printf
+	CALL	printf
 	b	.L340
 .L342:
 	movw	r3, #:lower16:tempHeader
@@ -6753,7 +6770,7 @@ code_see:
 	ldr	r1, [r3]
 	movw	r0, #:lower16:tempBuf
 	movt	r0, #:upper16:tempBuf
-	bl	strncpy
+	CALL	strncpy
 	movw	r3, #:lower16:c1
 	movt	r3, #:upper16:c1
 	ldr	r2, [r3]
@@ -6770,7 +6787,7 @@ code_see:
 	mov	r1, r3
 	movw	r0, #:lower16:.LC36
 	movt	r0, #:upper16:.LC36
-	bl	printf
+	CALL	printf
 	movw	r3, #:lower16:str1
 	movt	r3, #:upper16:str1
 	movw	r2, #:lower16:str1
@@ -6795,7 +6812,7 @@ code_see:
 	movt	r1, #:upper16:tempBuf
 	movw	r0, #:lower16:.LC127
 	movt	r0, #:upper16:.LC127
-	bl	printf
+	CALL	printf
 	movw	r3, #:lower16:str1
 	movt	r3, #:upper16:str1
 	ldr	r3, [r3]
@@ -6826,7 +6843,7 @@ code_see:
 	ldr	r1, [r3]
 	movw	r0, #:lower16:.LC128
 	movt	r0, #:upper16:.LC128
-	bl	printf
+	CALL	printf
 	movw	r3, #:lower16:tempHeader
 	movt	r3, #:upper16:tempHeader
 	ldr	r2, [r3]
@@ -6839,7 +6856,7 @@ code_see:
 	ldr	r0, [r2, #8]
 	bl	print
 	mov	r0, #10
-	bl	putchar
+	CALL	putchar
 .L340:
 	movw	r3, #:lower16:cfa
 	movt	r3, #:upper16:cfa
@@ -6888,7 +6905,7 @@ code_utime:
 	mov	r1, #0
 	movw	r0, #:lower16:timeVal
 	movt	r0, #:upper16:timeVal
-	bl	gettimeofday
+	CALL	gettimeofday
         sub     sp, sp, #8
 	movw	r3, #:lower16:timeVal
 	movt	r3, #:upper16:timeVal
@@ -6951,9 +6968,9 @@ key_loop_end:
         .global code_loop_end
         .type   code_loop_end, %function
 code_loop_end:
-        movw    r9, #:lower16:rsp
-        movt    r9, #:upper16:rsp
-        ldr     r8, [r9]     @ r8 is RSP
+        movw    r7, #:lower16:rsp
+        movt    r7, #:upper16:rsp
+        ldr     r8, [r7]     @ r8 is RSP
         ldr     r3, [r8]     @ r3 is the index
         ldr     r4, [r8, #4] @ r4 is the limit
         sub     r2, r3, r4   @ r2 is index-limit
@@ -7009,7 +7026,7 @@ key_ccall_0:
 	.type	code_ccall_0, %function
 code_ccall_0:
 	pop     {r0}
-        blx     r0
+        CALL_REG r0
         push    {r0}
         NEXT
 
@@ -7043,7 +7060,7 @@ key_ccall_1:
 code_ccall_1:
         pop     {r1, r2}
         mov     r0, r2
-        blx     r1
+        CALL_REG r1
         push    {r0}
         NEXT
 
@@ -7078,7 +7095,7 @@ code_ccall_2:
         pop     {r8}
         pop     {r1, r2}
         mov     r0, r2
-        blx     r8
+        CALL_REG r8
         push    {r0}
         NEXT
 
@@ -7114,9 +7131,9 @@ code_ccall_3:
         ldr     r2, [sp]
         ldr     r1, [sp, #4]
         ldr     r0, [sp, #8]
-        blx     r8
-        add     sp, sp, #12
-        push    {r0}
+        add     sp, sp, #8 @ Leave room for the return.
+        CALL_REG r8
+        str     r0,  [sp]
         NEXT
 
 	.global	header_ccall_4
@@ -7147,13 +7164,99 @@ key_ccall_4:
 	.fpu vfpv3-d16
 	.type	code_ccall_4, %function
 code_ccall_4:
-	ldr     r8, [sp]
+	pop     {r8}
         ldr     r3, [sp]
         ldr     r2, [sp, #4]
         ldr     r1, [sp, #8]
         ldr     r0, [sp, #12]
-        blx     r8
-        add     sp, sp, #16
+        add     sp, sp, #12 @ Leave room for the return.
+        CALL_REG r8
+        str     r0, [sp]
+        NEXT
+
+	.global	header_ccall_5
+	.section	.rodata
+	.align	2
+.BSS_CC5:
+	.ascii	"CCALL5\000"
+	.data
+	.align	2
+	.type	header_ccall_5, %object
+	.size	header_ccall_5, 16
+header_ccall_5:
+	.word	header_ccall_4
+	.word	6
+	.word	.BSS_CC5
+	.word	code_ccall_5
+	.global	key_ccall_5
+	.align	2
+	.type	key_ccall_5, %object
+	.size	key_ccall_5, 4
+key_ccall_5:
+	.word	115
+	.text
+	.align	2
+	.global	code_ccall_5
+	.syntax unified
+	.arm
+	.fpu vfpv3-d16
+	.type	code_ccall_5, %function
+code_ccall_5:
+	pop     {r7, r8} @ r7 = ptr, r8 = arg4
+        ldr     r3, [sp]
+        ldr     r2, [sp, #4]
+        ldr     r1, [sp, #8]
+        ldr     r0, [sp, #12]
+        @ Special case: Needs to not use CALL_REG directly.
+        add     r9, sp, #12 @ Final sp here (ready to receive result).
+        bic     sp, sp, #7 @ 8-byte alignment
+        str     r8, [sp]
+        blx     r7
+        mov     sp, r9
+        str     r0, [sp]
+        NEXT
+
+	.global	header_ccall_6
+	.section	.rodata
+	.align	2
+.BSS_CC6:
+	.ascii	"CCALL6\000"
+	.data
+	.align	2
+	.type	header_ccall_6, %object
+	.size	header_ccall_6, 16
+header_ccall_6:
+	.word	header_ccall_5
+	.word	6
+	.word	.BSS_CC6
+	.word	code_ccall_6
+	.global	key_ccall_6
+	.align	2
+	.type	key_ccall_6, %object
+	.size	key_ccall_6, 4
+key_ccall_6:
+	.word	116
+	.text
+	.align	2
+	.global	code_ccall_6
+	.syntax unified
+	.arm
+	.fpu vfpv3-d16
+	.type	code_ccall_6, %function
+code_ccall_6:
+	pop     {r6, r7, r8} @ r6 = ptr, r7 = arg5, r8 = arg4
+        ldr     r3, [sp]
+        ldr     r2, [sp, #4]
+        ldr     r1, [sp, #8]
+        ldr     r0, [sp, #12]
+        @ Special case: Needs to not use CALL_REG directly.
+        add     r9, sp, #12 @ Final sp here (ready to receive result).
+        sub     sp, sp, #8
+        bic     sp, sp, #7 @ 8-byte alignment
+        str     r8, [sp]
+        str     r7, [sp, #4]
+        blx     r6
+        mov     sp, r9
         str     r0, [sp]
         NEXT
 
@@ -7167,7 +7270,7 @@ code_ccall_4:
 	.type	header_c_library, %object
 	.size	header_c_library, 16
 header_c_library:
-	.word	header_ccall_4
+	.word	header_ccall_6
 	.word	9
 	.word	.BSS_CL
 	.word	code_c_library
@@ -7189,7 +7292,7 @@ code_c_library:
         @ it, globally, so a generic dlsym() for it will work.
         pop     {r0}
         movw     r1, #258    @ RTLD_NOW | RTLD_GLOBAL
-        bl      dlopen
+        CALL      dlopen
         NEXT
 
 	.global	header_c_symbol
@@ -7224,7 +7327,7 @@ code_c_symbol:
         @ it, returning the resulting pointer on the stack.
         pop     {r1}
         mov     r0, #0    @ 0 is RTLD_DEFAULT, searching everywhere.
-        bl      dlsym
+        CALL      dlsym
         push    {r0}
         NEXT
 
@@ -7386,7 +7489,7 @@ main:
 	movw	r1, #:lower16:.LC97
 	movt	r1, #:upper16:.LC97
 	ldr	r0, [r3]
-	bl	fopen
+	CALL	fopen
 	mov	r3, r0
 	mov	r1, r3
 	movw	r2, #:lower16:inputSources
@@ -7414,9 +7517,9 @@ main:
 	movw	r1, #:lower16:.LC131
 	movt	r1, #:upper16:.LC131
 	ldr	r0, [r3]
-	bl	fprintf
+	CALL	fprintf
 	mov	r0, #1
-	bl	exit
+	CALL	exit
 .L360:
 	movw	r3, #:lower16:inputIndex
 	movt	r3, #:upper16:inputIndex
@@ -7464,7 +7567,7 @@ main:
 	add	r2, r2, #1
 	str	r2, [r3]
 	mov	r0, #8
-	bl	malloc
+	CALL	malloc
 	mov	r3, r0
 	str	r3, [sp, #12]
 	ldr	r2, [sp, #12]
@@ -7524,7 +7627,7 @@ main:
 	add	r2, r2, #1
 	str	r2, [r3]
 	mov	r0, #8
-	bl	malloc
+	CALL	malloc
 	mov	r3, r0
 	str	r3, [sp, #12]
 	ldr	r2, [sp, #12]
@@ -7584,7 +7687,7 @@ main:
 	add	r2, r2, #1
 	str	r2, [r3]
 	mov	r0, #8
-	bl	malloc
+	CALL	malloc
 	mov	r3, r0
 	str	r3, [sp, #12]
 	ldr	r2, [sp, #12]
@@ -7644,7 +7747,7 @@ main:
 	add	r2, r2, #1
 	str	r2, [r3]
 	mov	r0, #8
-	bl	malloc
+	CALL	malloc
 	mov	r3, r0
 	str	r3, [sp, #12]
 	ldr	r2, [sp, #12]
@@ -7704,7 +7807,7 @@ main:
 	add	r2, r2, #1
 	str	r2, [r3]
 	mov	r0, #8
-	bl	malloc
+	CALL	malloc
 	mov	r3, r0
 	str	r3, [sp, #12]
 	ldr	r2, [sp, #12]
@@ -7764,7 +7867,7 @@ main:
 	add	r2, r2, #1
 	str	r2, [r3]
 	mov	r0, #8
-	bl	malloc
+	CALL	malloc
 	mov	r3, r0
 	str	r3, [sp, #12]
 	ldr	r2, [sp, #12]
@@ -9750,6 +9853,40 @@ init_primitives:
 	movt	r3, #:upper16:primitives
 	movw	r2, #:lower16:code_ccall_4
 	movt	r2, #:upper16:code_ccall_4
+	str	r2, [r3, r1, lsl #3]
+	movw	r2, #:lower16:primitives
+	movt	r2, #:upper16:primitives
+	lsl	r3, r1, #3
+	add	r3, r2, r3
+	str	r0, [r3, #4]
+	movw	r3, #:lower16:key_ccall_5
+	movt	r3, #:upper16:key_ccall_5
+	ldr	r3, [r3]
+	sub	r1, r3, #1
+	movw	r3, #:lower16:key_ccall_5
+	movt	r3, #:upper16:key_ccall_5
+	ldr	r0, [r3]
+	movw	r3, #:lower16:primitives
+	movt	r3, #:upper16:primitives
+	movw	r2, #:lower16:code_ccall_5
+	movt	r2, #:upper16:code_ccall_5
+	str	r2, [r3, r1, lsl #3]
+	movw	r2, #:lower16:primitives
+	movt	r2, #:upper16:primitives
+	lsl	r3, r1, #3
+	add	r3, r2, r3
+	str	r0, [r3, #4]
+	movw	r3, #:lower16:key_ccall_6
+	movt	r3, #:upper16:key_ccall_6
+	ldr	r3, [r3]
+	sub	r1, r3, #1
+	movw	r3, #:lower16:key_ccall_6
+	movt	r3, #:upper16:key_ccall_6
+	ldr	r0, [r3]
+	movw	r3, #:lower16:primitives
+	movt	r3, #:upper16:primitives
+	movw	r2, #:lower16:code_ccall_6
+	movt	r2, #:upper16:code_ccall_6
 	str	r2, [r3, r1, lsl #3]
 	movw	r2, #:lower16:primitives
 	movt	r2, #:upper16:primitives
