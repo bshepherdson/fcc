@@ -123,7 +123,8 @@ union {
 // A few more core globals.
 cell state;
 cell base;
-header *dictionary;
+header *searchOrder[16];
+header **currentDictionary;
 code **lastWord;
 
 char parseBuffers[INPUT_SOURCE_COUNT][256];
@@ -148,6 +149,7 @@ char* str1;
 char** strptr1;
 size_t tempSize;
 header* tempHeader;
+header** tempHeaderPtr;
 char tempBuf[256];
 unsigned char numBuf[sizeof(cell) * 2];
 FILE* tempFile;
@@ -725,7 +727,7 @@ WORD(key, 43, "KEY", 3, &header_accept) {
 WORD(latest, 44, "(LATEST)", 8, &header_key) {
   ACCOUNT(latest);
   PRINT_TRACE("(LATEST)");
-  *(--sp) = (cell) &dictionary;
+  *(--sp) = (cell) currentDictionary;
   NEXT;
 }
 
@@ -1024,16 +1026,21 @@ void parse_number_(void) {
 // Expects c-addr u on top of the stack.
 // Returns 0 0 on not found, xt 1 for immediate, or xt -1 for not immediate.
 void find_(void) {
-  tempHeader = dictionary;
-  while (tempHeader != NULL) {
-    if ((tempHeader->metadata & LEN_HIDDEN_MASK) == sp[0]) {
-      if (strncasecmp(tempHeader->name, (char*) sp[1], sp[0]) == 0) {
-        sp[1] = (cell) (&(tempHeader->code_field));
-        sp[0] = (tempHeader->metadata & IMMEDIATE) == 0 ? -1 : 1;
-        return;
+  tempHeaderPtr = currentDictionary;
+  while (tempHeaderPtr != NULL) {
+    tempHeader = *tempHeaderPtr;
+    while (tempHeader != NULL) {
+      if ((tempHeader->metadata & LEN_HIDDEN_MASK) == sp[0]) {
+        if (strncasecmp(tempHeader->name, (char*) sp[1], sp[0]) == 0) {
+          sp[1] = (cell) (&(tempHeader->code_field));
+          sp[0] = (tempHeader->metadata & IMMEDIATE) == 0 ? -1 : 1;
+          return;
+        }
       }
+      tempHeader = tempHeader->link;
     }
-    tempHeader = tempHeader->link;
+    if (tempHeaderPtr == searchOrder) break;
+    tempHeaderPtr--;
   }
   sp[1] = 0;
   sp[0] = 0;
@@ -1071,8 +1078,8 @@ WORD(create, 67, "CREATE", 6, &header_to_number) {
   dsp.chars = (char*) ((((cell)dsp.chars) + sizeof(cell) - 1) & ~(sizeof(cell) - 1));
   tempHeader = (header*) dsp.chars;
   dsp.chars += sizeof(header);
-  tempHeader->link = dictionary;
-  dictionary = tempHeader;
+  tempHeader->link = *currentDictionary;
+  *currentDictionary = tempHeader;
 
   tempHeader->metadata = sp[0];
   tempHeader->name = (char*) malloc(sp[0] * sizeof(char));
@@ -1736,8 +1743,8 @@ WORD(colon, 95, ":", 1, &header_flush_file) {
   dsp.chars = (char*) ((((ucell) (dsp.chars)) + sizeof(cell) - 1) & ~(sizeof(cell) - 1));
   tempHeader = (header*) dsp.chars;
   dsp.chars += sizeof(header);
-  tempHeader->link = dictionary;
-  dictionary = tempHeader;
+  tempHeader->link = *currentDictionary;
+  *currentDictionary = tempHeader;
   parse_name_(); // ( c-addr u )
   if (sp[0] == 0) {
     fprintf(stderr, "*** Colon definition with no name\n");
@@ -1884,7 +1891,7 @@ WORD(utime, 106, "UTIME", 5, &header_see) {
 WORD(semicolon, 99, ";", 1 | IMMEDIATE, &header_utime) {
   ACCOUNT(semicolon);
   PRINT_TRACE(";");
-  dictionary->metadata &= (~HIDDEN); // Clear the hidden bit.
+  (*currentDictionary)->metadata &= (~HIDDEN); // Clear the hidden bit.
 
   // Compile an EXIT
   *(--sp) = (cell) &(header_exit.code_field);
@@ -1903,7 +1910,8 @@ void init_primitives(void);
 void init_superinstructions(void);
 
 int main(int argc, char **argv) {
-  dictionary = &header_semicolon;
+  currentDictionary = searchOrder;
+  *currentDictionary = &header_semicolon;
   base = 10;
   inputIndex = 0;
   SRC.type = SRC.parseLength = SRC.inputPtr = 0;

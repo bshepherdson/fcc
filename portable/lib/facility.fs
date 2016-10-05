@@ -67,3 +67,18 @@
 : CCALL5-NR ccall5 drop ;
 : CCALL6-NR ccall6 drop ;
 
+
+\ These are from the MEMORY word set, but I'm lazy and don't want to add a new
+\ file for these few words.
+: ALLOCATE ( u -- a-addr ior ) (allocate) dup 0= ;
+
+S" free" c-call-named (free)
+: FREE ( a-addr -- ior ) (free) ccall1-nr   0 ;
+
+S" realloc" c-call-named (realloc)
+: RESIZE ( a-addr1 u -- a-addr2 ior )
+  over >r
+  (realloc) ccall2 ( a-addr2    R: a-addr1 )
+  dup 0= IF drop r> 1 ELSE r> drop 0 THEN
+;
+

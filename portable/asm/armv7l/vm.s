@@ -94,15 +94,15 @@
 	.global	header_\code_name
 	.section	.rodata
 	.align	2
-.str_\code_name
-	.ascii	"\forth_name\000"
+.str_\code_name:
+	.asciz	"\forth_name"
 	.data
 	.align	2
 	.type	header_\code_name, %object
 	.size	header_\code_name, 16
 header_\code_name:
 	.word	\previous
-	.word	\key
+	.word	\name_length
 	.word	.str_\code_name
 	.word	code_\code_name
 	.global	key_\code_name
@@ -197,7 +197,7 @@ quitTopPtr:
 	.type	primitive_count, %object
 	.size	primitive_count, 4
 primitive_count:
-	.word	120
+	.word	118
 	.global	queue
 	.bss
 	.align	2
@@ -353,39 +353,12 @@ code_minus:
         push    {r0}
 	NEXT
 	.size	code_minus, .-code_minus
-	.global	header_times
-	.section	.rodata
-	.align	2
-.LC3:
-	.ascii	"*\000"
-	.data
-	.align	2
-	.type	header_times, %object
-	.size	header_times, 16
-header_times:
-	.word	header_minus
-	.word	1
-	.word	.LC3
-	.word	code_times
-	.global	key_times
-	.align	2
-	.type	key_times, %object
-	.size	key_times, 4
-key_times:
-	.word	3
-	.text
-	.align	2
-	.global	code_times
-	.syntax unified
-	.arm
-	.fpu vfpv3-d16
-	.type	code_times, %function
-code_times:
+WORD_HDR times, "*", 1, 3, header_minus
 	pop     {r1, r3}
 	mul	r3, r3, r1
         push    {r3}
 	NEXT
-	.size	code_times, .-code_times
+WORD_TAIL times
 	.global	header_div
 	.section	.rodata
 	.align	2
@@ -2194,6 +2167,14 @@ code_latest:
         push    {r3}
 	NEXT
 	.size	code_latest, .-code_latest
+WORD_HDR dictionary_info, "(DICT-INFO)", 11, 117, header_latest
+	movw	r3, #:lower16:currentDictionary
+	movt	r3, #:upper16:currentDictionary
+	movw	r2, #:lower16:searchOrder
+	movt	r2, #:upper16:searchOrder
+        push    {r2, r3}
+        NEXT
+WORD_TAIL dictionary_info
 	.global	header_in_ptr
 	.section	.rodata
 	.align	2
@@ -2204,7 +2185,7 @@ code_latest:
 	.type	header_in_ptr, %object
 	.size	header_in_ptr, 16
 header_in_ptr:
-	.word	header_latest
+	.word	header_dictionary_info
 	.word	3
 	.word	.LC47
 	.word	code_in_ptr
@@ -3653,33 +3634,35 @@ parse_number_:
 	.type	find_, %function
 find_:
 	PUSHRSP lr, r1, r2
-	movw	r3, #:lower16:tempHeader
-	movt	r3, #:upper16:tempHeader
 	movw	r6, #:lower16:currentDictionary
 	movt	r6, #:upper16:currentDictionary
 	ldr	r6, [r6]
+	b	.LF150
+.LF159:
 	ldr	r2, [r6]
+	movw	r3, #:lower16:tempHeader
+	movt	r3, #:upper16:tempHeader
 	str	r2, [r3]
-	b	.L150
-.L155:
+	b	.LF151
+.LF156:
 	movw	r3, #:lower16:tempHeader
 	movt	r3, #:upper16:tempHeader
 	ldr	r3, [r3]
 	ldr	r3, [r3, #4]
 	ubfx	r2, r3, #0, #9
-	ldr     r3, [sp]
+	ldr	r3, [sp]
 	cmp	r2, r3
-	bne	.L151
+	bne	.LF152
 	movw	r3, #:lower16:tempHeader
 	movt	r3, #:upper16:tempHeader
 	ldr	r3, [r3]
 	ldr	r0, [r3, #8]
-	ldr     r1, [sp, #4]
-	ldr     r2, [sp]
-	CALL	strncasecmp
+	ldr	r1, [sp, #4]
+	ldr	r2, [sp]
+	bl	strncasecmp
 	mov	r3, r0
 	cmp	r3, #0
-	bne	.L151
+	bne	.LF152
 	movw	r3, #:lower16:tempHeader
 	movt	r3, #:upper16:tempHeader
 	ldr	r3, [r3]
@@ -3691,46 +3674,42 @@ find_:
 	ldr	r3, [r3, #4]
 	and	r3, r3, #512
 	cmp	r3, #0
-	bne	.L152
+	bne	.LF153
 	mvn	r3, #0
-	b	.L153
-.L152:
-	mov	r3, #1
-.L153:
-	str	r3, [sp]
-	b	.L149
-.L151:
+	b	.LF154
+.LF153:
+        mov     r3, #1
+.LF154:
+        str     r3, [sp]
+        b       .LF149
+.LF152:
 	movw	r3, #:lower16:tempHeader
 	movt	r3, #:upper16:tempHeader
-	ldr	r3, [r3]
 	ldr	r2, [r3]
-	movw	r3, #:lower16:tempHeader
-	movt	r3, #:upper16:tempHeader
+	ldr	r2, [r2]
 	str	r2, [r3]
-.L150:
+.LF151:
 	movw	r3, #:lower16:tempHeader
 	movt	r3, #:upper16:tempHeader
 	ldr	r3, [r3]
 	cmp	r3, #0
-	bne	.L155
-.LB150:
-        movw    r3, #:lower16:searchOrder
-        movt    r3, #:upper16:searchOrder
-        cmp     r3, r6
-        beq     .LB151
-        @ If they're not equal, then load the next search order.
+	bne	.LF156
+	movw	r3, #:lower16:searchOrder
+	movt	r3, #:upper16:searchOrder
+	cmp	r6, r3
+	beq	.LF160
         sub     r6, r6, #4
-	movw	r3, #:lower16:tempHeader
-	movt	r3, #:upper16:tempHeader
-        ldr     r2, [r6]
-        str     r2, [r3]
-        b       .L150
-.LB151:
-        @ If they are equal, we've run out of search, so stop.
+.LF150:
+	cmp	r6, #0
+	bne	.LF159
+	b	.LF158
+.LF160:
+	nop
+.LF158:
         mov     r2, #0
-        str     r2, [sp]
         str     r2, [sp, #4]
-.L149:
+        str     r2, [sp]
+.LF149:
         POPRSP  lr, r2, r3
         bx lr
 	.size	find_, .-find_
@@ -3888,11 +3867,11 @@ code_create:
 	str	r3, [r2]
 	movw	r3, #:lower16:currentDictionary
 	movt	r3, #:upper16:currentDictionary
-	movw	r2, #:lower16:tempHeader
-	movt	r2, #:upper16:tempHeader
-	ldr	r2, [r2]
-        ldr     r3, [r3]
-	str	r2, [r3]
+        ldr     r2, [r3]
+	movw	r3, #:lower16:tempHeader
+	movt	r3, #:upper16:tempHeader
+	ldr	r3, [r3]
+	str	r3, [r2]
 	movw	r3, #:lower16:tempHeader
 	movt	r3, #:upper16:tempHeader
 	ldr	r2, [r3]
@@ -6474,11 +6453,11 @@ code_colon:
 	str	r3, [r2] @ Gets written into the new header.
 	movw	r3, #:lower16:currentDictionary
 	movt	r3, #:upper16:currentDictionary
+	ldr	r2, [r3]
+	movw	r3, #:lower16:tempHeader
+	movt	r3, #:upper16:tempHeader
 	ldr	r3, [r3]
-	movw	r2, #:lower16:tempHeader
-	movt	r2, #:upper16:tempHeader
-	ldr	r2, [r2]
-	str	r2, [r3]
+	str	r3, [r2]
 	bl	parse_name_
 	ldr	r3, [sp]
 	cmp	r3, #0
@@ -7437,6 +7416,7 @@ key_semicolon:
 code_semicolon:
 	movw	r3, #:lower16:currentDictionary
 	movt	r3, #:upper16:currentDictionary
+        ldr     r3, [r3]
 	ldr	r2, [r3]
 	ldr	r1, [r2, #4]
         bic     r1, r1, #256
