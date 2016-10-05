@@ -359,7 +359,7 @@ key_div:
 	.type	code_div, %function
 code_div:
         pop     {r1, r2}
-        mov     r0, r1
+        mov     r0, r2
 	CALL	__aeabi_idiv
         push    {r0}
 	NEXT
@@ -394,7 +394,7 @@ key_udiv:
 	.type	code_udiv, %function
 code_udiv:
         pop     {r1, r2}
-        mov     r0, r1
+        mov     r0, r2
         CALL      __aeabi_uidiv
         push    {r0}
 	NEXT
@@ -2030,7 +2030,7 @@ code_accept:
         mov     r1, r4 @ string in r1
         ldr     r0, [sp, #4] @ sp[1] in r0
 	CALL	strncpy
-        add     sp, sp, #4
+        add     sp, sp, #8
         push    {r5}   @ push the saved length
         mov     r0, r4
         CALL    free   @ free the string
@@ -2608,7 +2608,6 @@ key_to_body:
 	.type	code_to_body, %function
 code_to_body:
         pop     {r0}
-        ldr     r0, [r0]
         add     r0, r0, #8
         push    {r0}
 	NEXT
@@ -5822,6 +5821,7 @@ code_file_size:
         mov     r0, r7
         mov     r1, #0
 	mov	r2, #2   @ SEEK_END
+        CALL    fseek
         cmp     r0, #0
         bge     .L299
         CALL      __errno_location
@@ -5841,6 +5841,7 @@ code_file_size:
         mov     r0, r7
         mov     r1, r8
         mov     r2, #0   @ SEEK_SET
+        CALL    fseek
 .L298:
         NEXT
 	.size	code_file_size, .-code_file_size
@@ -6028,10 +6029,7 @@ code_read_line:
 	movw	r3, #:lower16:c1
 	movt	r3, #:upper16:c1
 	str	r0, [r3]
-	movw	r3, #:lower16:c1
-	movt	r3, #:upper16:c1
-	ldr	r3, [r3]
-	cmn	r3, #1
+	cmn	r2, #1
 	bne	.L309
 	CALL	__errno_location
 	ldr	r0, [r0]
@@ -6163,6 +6161,7 @@ code_reposition_file:
         ldr     r3, [r0]
         str     r3, [sp]
 .L317:
+        str     r0, [sp]
 	NEXT
 	.size	code_reposition_file, .-code_reposition_file
 	.global	header_resize_file
@@ -6978,12 +6977,12 @@ code_loop_end:
         @ Calculate delta + index-limit
         add     r0, r5, r2
         eor     r0, r0, r2
-        ands    r0, #0x8000   @ sets the Zero flag
+        ands    r0, #0x80000000   @ sets the Zero flag
         mov     r0, #0
         mvneq   r0, #0        @ true flag when top bit was 0
         @ Calculate delta XOR index-limit
         eor     r1, r5, r2
-        ands    r1, #0x8000   @ sets the Zero flag
+        ands    r1, #0x80000000   @ sets the Zero flag
         mov     r1, #0
         mvneq   r1, #0        @ true flag when top bit was 0
         orr     r1, r1, r0    @ OR those two flags together

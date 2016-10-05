@@ -90,6 +90,12 @@ bench: FORCE forth
 	time ./forth bench/$$a.fs ; \
 	done
 
+bench-baseline: FORCE
+	@for a in $(BENCHMARKS); do \
+	echo =======   $$a   ======== ; \
+	time $(FORTH) bench/$$a.fs ; \
+	done
+
 asm: FORCE vm.c
 	$(CC) $(CFLAGS) $(INCLUDES) -S vm.c -o vm_raw.s
 
