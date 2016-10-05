@@ -90,6 +90,41 @@
 	str	r0, [r3, #4]
         .endm
 
+        .macro WORD_HDR code_name, forth_name, name_length, key, previous
+	.global	header_\code_name
+	.section	.rodata
+	.align	2
+.str_\code_name
+	.ascii	"\forth_name\000"
+	.data
+	.align	2
+	.type	header_\code_name, %object
+	.size	header_\code_name, 16
+header_\code_name:
+	.word	\previous
+	.word	\key
+	.word	.str_\code_name
+	.word	code_\code_name
+	.global	key_\code_name
+	.align	2
+	.type	key_\code_name, %object
+	.size	key_\code_name, 4
+key_\code_name:
+	.word	\key
+	.text
+	.align	2
+	.global	code_\code_name
+	.syntax unified
+	.arm
+	.fpu vfpv3-d16
+	.type	code_\code_name, %function
+code_\code_name:
+        .endm
+
+        .macro WORD_TAIL name
+	.size	code_\name, .-code_\name
+        .endm
+
 
 
 	.comm	_stack_data,65536,4
@@ -134,7 +169,8 @@ quitTopPtr:
 	.comm	dsp,4,4
 	.comm	state,4,4
 	.comm	base,4,4
-	.comm	dictionary,4,4
+	.comm	searchOrder,64,4 @ An array of 16 pointers to word entries
+	.comm	currentDictionary,4,4 @ Pointer to the current one
 	.comm	lastWord,4,4
 	.comm	parseBuffers,8192,4
 	.comm	inputSources,512,4
@@ -161,7 +197,7 @@ quitTopPtr:
 	.type	primitive_count, %object
 	.size	primitive_count, 4
 primitive_count:
-	.word	117
+	.word	120
 	.global	queue
 	.bss
 	.align	2
@@ -2152,8 +2188,9 @@ key_latest:
 	.fpu vfpv3-d16
 	.type	code_latest, %function
 code_latest:
-	movw	r3, #:lower16:dictionary
-	movt	r3, #:upper16:dictionary
+	movw	r3, #:lower16:currentDictionary
+	movt	r3, #:upper16:currentDictionary
+        ldr     r3, [r3]
         push    {r3}
 	NEXT
 	.size	code_latest, .-code_latest
@@ -3618,9 +3655,10 @@ find_:
 	PUSHRSP lr, r1, r2
 	movw	r3, #:lower16:tempHeader
 	movt	r3, #:upper16:tempHeader
-	movw	r2, #:lower16:dictionary
-	movt	r2, #:upper16:dictionary
-	ldr	r2, [r2]
+	movw	r6, #:lower16:currentDictionary
+	movt	r6, #:upper16:currentDictionary
+	ldr	r6, [r6]
+	ldr	r2, [r6]
 	str	r2, [r3]
 	b	.L150
 .L155:
@@ -3675,6 +3713,20 @@ find_:
 	ldr	r3, [r3]
 	cmp	r3, #0
 	bne	.L155
+.LB150:
+        movw    r3, #:lower16:searchOrder
+        movt    r3, #:upper16:searchOrder
+        cmp     r3, r6
+        beq     .LB151
+        @ If they're not equal, then load the next search order.
+        sub     r6, r6, #4
+	movw	r3, #:lower16:tempHeader
+	movt	r3, #:upper16:tempHeader
+        ldr     r2, [r6]
+        str     r2, [r3]
+        b       .L150
+.LB151:
+        @ If they are equal, we've run out of search, so stop.
         mov     r2, #0
         str     r2, [sp]
         str     r2, [sp, #4]
@@ -3829,15 +3881,17 @@ code_create:
 	movw	r3, #:lower16:tempHeader
 	movt	r3, #:upper16:tempHeader
 	ldr	r2, [r3]
-	movw	r3, #:lower16:dictionary
-	movt	r3, #:upper16:dictionary
+	movw	r3, #:lower16:currentDictionary
+	movt	r3, #:upper16:currentDictionary
+	ldr	r3, [r3]
 	ldr	r3, [r3]
 	str	r3, [r2]
-	movw	r3, #:lower16:dictionary
-	movt	r3, #:upper16:dictionary
+	movw	r3, #:lower16:currentDictionary
+	movt	r3, #:upper16:currentDictionary
 	movw	r2, #:lower16:tempHeader
 	movt	r2, #:upper16:tempHeader
 	ldr	r2, [r2]
+        ldr     r3, [r3]
 	str	r2, [r3]
 	movw	r3, #:lower16:tempHeader
 	movt	r3, #:upper16:tempHeader
@@ -6413,12 +6467,14 @@ code_colon:
 	movw	r3, #:lower16:tempHeader
 	movt	r3, #:upper16:tempHeader
 	ldr	r2, [r3]
-	movw	r3, #:lower16:dictionary
-	movt	r3, #:upper16:dictionary
+	movw	r3, #:lower16:currentDictionary
+	movt	r3, #:upper16:currentDictionary
 	ldr	r3, [r3]
-	str	r3, [r2]
-	movw	r3, #:lower16:dictionary
-	movt	r3, #:upper16:dictionary
+	ldr	r3, [r3] @ The actual previous head.
+	str	r3, [r2] @ Gets written into the new header.
+	movw	r3, #:lower16:currentDictionary
+	movt	r3, #:upper16:currentDictionary
+	ldr	r3, [r3]
 	movw	r2, #:lower16:tempHeader
 	movt	r2, #:upper16:tempHeader
 	ldr	r2, [r2]
@@ -7379,15 +7435,12 @@ key_semicolon:
 	.fpu vfpv3-d16
 	.type	code_semicolon, %function
 code_semicolon:
-	movw	r3, #:lower16:dictionary
-	movt	r3, #:upper16:dictionary
+	movw	r3, #:lower16:currentDictionary
+	movt	r3, #:upper16:currentDictionary
 	ldr	r2, [r3]
-	movw	r3, #:lower16:dictionary
-	movt	r3, #:upper16:dictionary
-	ldr	r3, [r3]
-	ldr	r3, [r3, #4]
-	bic	r3, r3, #256
-	str	r3, [r2, #4]
+	ldr	r1, [r2, #4]
+        bic     r1, r1, #256
+        str     r1, [r2, #4]
 	ldr	r2, .L356
 	push    {r2}
 	bl	compile_
@@ -7428,11 +7481,14 @@ main:
 	sub	sp, sp, #16
 	str	r0, [sp, #4]
 	str	r1, [sp]
-	movw	r3, #:lower16:dictionary
-	movt	r3, #:upper16:dictionary
+	movw	r3, #:lower16:searchOrder
+	movt	r3, #:upper16:searchOrder
 	movw	r2, #:lower16:header_semicolon
 	movt	r2, #:upper16:header_semicolon
 	str	r2, [r3]
+	movw	r2, #:lower16:currentDictionary
+	movt	r2, #:upper16:currentDictionary
+        str     r3, [r2]
 	movw	r3, #:lower16:base
 	movt	r3, #:upper16:base
 	mov	r2, #10
