@@ -19,7 +19,7 @@
         .macro NEXT
 	ldr	r2, [r11]
 	add	r11, r11, #4
-	mov	pc, r2
+	bx	r2
         .endm
 
         @ TODO: These could be faster with write-back LDR and STR.
@@ -1550,7 +1550,7 @@ code_execute:
 	movw	r3, #:lower16:ca
 	movt	r3, #:upper16:ca
 	str	r2, [r3]
-	mov	pc, r2
+	bx	r2
 	.size	code_execute, .-code_execute
 	.global	header_evaluate
 	.section	.rodata
@@ -10274,9 +10274,10 @@ code_superinstruction_dolit_dolit_plus:
 	.fpu vfpv3-d16
 	.type	code_superinstruction_cells_sp_fetch_plus, %function
 code_superinstruction_cells_sp_fetch_plus:
+        mov     r1, sp
         pop     {r0}
         lsl     r0, r0, #2
-        add     r0, r0, sp
+        add     r0, r0, r1
         push    {r0}
         NEXT
 	.size	code_superinstruction_cells_sp_fetch_plus, .-code_superinstruction_cells_sp_fetch_plus
@@ -10443,9 +10444,10 @@ code_superinstruction_from_r_from_r_dup_to_r:
 	.fpu vfpv3-d16
 	.type	code_superinstruction_cells_sp_fetch_plus_fetch, %function
 code_superinstruction_cells_sp_fetch_plus_fetch:
+        mov     r1, sp
         pop     {r0}
         lsl     r0, r0, #2
-        add     r0, r0, sp
+        add     r0, r0, r1
         ldr     r0, [r0]
         push    {r0}
         NEXT
