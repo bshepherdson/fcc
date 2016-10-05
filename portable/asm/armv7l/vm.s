@@ -169,8 +169,19 @@ quitTopPtr:
 	.comm	dsp,4,4
 	.comm	state,4,4
 	.comm	base,4,4
-	.comm	searchOrder,64,4 @ An array of 16 pointers to word entries
-	.comm	currentDictionary,4,4 @ Pointer to the current one
+        @ A word list is a linked list of word headers.
+        @ Each word list is a cell that points to that header.
+        @ The indirection is needed so that a wordlist has a fixed identity,
+        @ even as it grows.
+        @ searchIndex is the index of the topmost wordlist in the search order.
+        @ searchArray is the buffer, with room for 16 searches.
+        @ compilationWordlist points to the current compilation wordlist.
+        @ Both of those default to the main Forth wordlist.
+        @ That main wordlist is pre-allocated as forthWordlist.
+        .comm   searchArray,64,4
+        .comm   searchIndex,4,4
+        .comm   compilationWordlist,4,4
+        .comm   forthWordlist,4,4
 	.comm	lastWord,4,4
 	.comm	parseBuffers,8192,4
 	.comm	inputSources,512,4
@@ -1001,18 +1012,22 @@ WORD_HDR key, "KEY", 3, 43, header_accept
 	NEXT
 WORD_TAIL key
 WORD_HDR latest, "(LATEST)", 8, 44, header_key
-	movw	r3, #:lower16:currentDictionary
-	movt	r3, #:upper16:currentDictionary
+	movw	r3, #:lower16:compilationWordlist
+	movt	r3, #:upper16:compilationWordlist
         ldr     r3, [r3]
         push    {r3}
 	NEXT
 WORD_TAIL latest
 WORD_HDR dictionary_info, "(DICT-INFO)", 11, 117, header_latest
-	movw	r3, #:lower16:currentDictionary
-	movt	r3, #:upper16:currentDictionary
-	movw	r2, #:lower16:searchOrder
-	movt	r2, #:upper16:searchOrder
-        push    {r2, r3}
+	movw	r3, #:lower16:compilationWordlist
+	movt	r3, #:upper16:compilationWordlist
+        push    {r3}
+	movw	r2, #:lower16:searchIndex
+	movt	r2, #:upper16:searchIndex
+        push    {r2}
+	movw	r2, #:lower16:searchArray
+	movt	r2, #:upper16:searchArray
+        push    {r2}
         NEXT
 WORD_TAIL dictionary_info
 WORD_HDR in_ptr, ">IN", 3, 45, header_dictionary_info
@@ -1961,12 +1976,15 @@ parse_number_:
 	.type	find_, %function
 find_:
 	PUSHRSP lr, r1, r2
-	movw	r6, #:lower16:currentDictionary
-	movt	r6, #:upper16:currentDictionary
+	movw	r6, #:lower16:searchIndex
+	movt	r6, #:upper16:searchIndex
 	ldr	r6, [r6]
-	b	.LF150
 .LF159:
-	ldr	r2, [r6]
+	movw	r3, #:lower16:searchArray
+	movt	r3, #:upper16:searchArray
+        lsl     r2, r6, #2
+        add     r3, r3, r2
+	ldr	r2, [r3]
 	movw	r3, #:lower16:tempHeader
 	movt	r3, #:upper16:tempHeader
 	str	r2, [r3]
@@ -2021,15 +2039,11 @@ find_:
 	ldr	r3, [r3]
 	cmp	r3, #0
 	bne	.LF156
-	movw	r3, #:lower16:searchOrder
-	movt	r3, #:upper16:searchOrder
-	cmp	r6, r3
-	beq	.LF160
-        sub     r6, r6, #4
 .LF150:
-	cmp	r6, #0
-	bne	.LF159
-	b	.LF158
+        cmp     r6, #0
+	beq	.LF158
+        sub     r6, r6, #1
+	b	.LF159
 .LF160:
 	nop
 .LF158:
@@ -2079,13 +2093,13 @@ WORD_HDR create, "CREATE", 6, 67, header_to_number
 	movw	r3, #:lower16:tempHeader
 	movt	r3, #:upper16:tempHeader
 	ldr	r2, [r3]
-	movw	r3, #:lower16:currentDictionary
-	movt	r3, #:upper16:currentDictionary
+	movw	r3, #:lower16:compilationWordlist
+	movt	r3, #:upper16:compilationWordlist
 	ldr	r3, [r3]
 	ldr	r3, [r3]
 	str	r3, [r2]
-	movw	r3, #:lower16:currentDictionary
-	movt	r3, #:upper16:currentDictionary
+	movw	r3, #:lower16:compilationWordlist
+	movt	r3, #:upper16:compilationWordlist
         ldr     r2, [r3]
 	movw	r3, #:lower16:tempHeader
 	movt	r3, #:upper16:tempHeader
@@ -3781,13 +3795,13 @@ WORD_HDR colon, ":", 1, 95, header_flush_file
 	movw	r3, #:lower16:tempHeader
 	movt	r3, #:upper16:tempHeader
 	ldr	r2, [r3]
-	movw	r3, #:lower16:currentDictionary
-	movt	r3, #:upper16:currentDictionary
+	movw	r3, #:lower16:compilationWordlist
+	movt	r3, #:upper16:compilationWordlist
 	ldr	r3, [r3]
 	ldr	r3, [r3] @ The actual previous head.
 	str	r3, [r2] @ Gets written into the new header.
-	movw	r3, #:lower16:currentDictionary
-	movt	r3, #:upper16:currentDictionary
+	movw	r3, #:lower16:compilationWordlist
+	movt	r3, #:upper16:compilationWordlist
 	ldr	r2, [r3]
 	movw	r3, #:lower16:tempHeader
 	movt	r3, #:upper16:tempHeader
@@ -4351,8 +4365,8 @@ WORD_HDR c_symbol, "C-SYMBOL", 8, 114, header_c_library
         NEXT
 
 WORD_HDR semicolon, ";", 513, 99, header_c_symbol
-	movw	r3, #:lower16:currentDictionary
-	movt	r3, #:upper16:currentDictionary
+	movw	r3, #:lower16:compilationWordlist
+	movt	r3, #:upper16:compilationWordlist
         ldr     r3, [r3]
 	ldr	r2, [r3]
 	ldr	r1, [r2, #4]
@@ -4398,13 +4412,16 @@ main:
 	sub	sp, sp, #16
 	str	r0, [sp, #4]
 	str	r1, [sp]
-	movw	r3, #:lower16:searchOrder
-	movt	r3, #:upper16:searchOrder
+	movw	r3, #:lower16:forthWordlist
+	movt	r3, #:upper16:forthWordlist
 	movw	r2, #:lower16:header_semicolon
 	movt	r2, #:upper16:header_semicolon
 	str	r2, [r3]
-	movw	r2, #:lower16:currentDictionary
-	movt	r2, #:upper16:currentDictionary
+	movw	r2, #:lower16:searchArray
+	movt	r2, #:upper16:searchArray
+        str     r3, [r2]
+	movw	r2, #:lower16:compilationWordlist
+	movt	r2, #:upper16:compilationWordlist
         str     r3, [r2]
 	movw	r3, #:lower16:base
 	movt	r3, #:upper16:base
@@ -4975,6 +4992,7 @@ init_primitives:
 	INIT_WORD accept
 	INIT_WORD key
 	INIT_WORD latest
+	INIT_WORD dictionary_info
 	INIT_WORD in_ptr
 	INIT_WORD emit
 	INIT_WORD source
