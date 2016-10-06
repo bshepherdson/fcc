@@ -127,7 +127,8 @@ code_\code_name:
 
 
 
-	.comm	_stack_data,65536,4
+        @ Stacks are aligned to 64 bytes to keep them on round cache lines.
+	.comm	_stack_data,65536,64
 	.global	spTop
 	.data
 	.align	2
@@ -136,7 +137,7 @@ code_\code_name:
 spTop:
 	.word	_stack_data+65536
 	.comm	sp,4,4
-	.comm	_stack_return,4096,4
+	.comm	_stack_return,4096,64
 	.global	rspTop
 	.align	2
 	.type	rspTop, %object
