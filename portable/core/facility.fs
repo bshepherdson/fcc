@@ -100,7 +100,7 @@ S" realloc" c-call-named (realloc)
 
 \ Replaces the top of the search order with the Forth wordlist.
 : FORTH ( -- )
-  (search-order) (search-index) cells +
+  (search-order) (search-index) @ cells +
   forth-wordlist swap !
 ;
 
@@ -124,11 +124,13 @@ S" realloc" c-call-named (realloc)
     EXIT
   THEN
 
-  dup >r
-  0 ?DO
-    i cells (search-order) + !
-  LOOP
-  r> 1- (search-index) !
+  dup 1- (search-index) !
+  BEGIN dup 0> WHILE
+    1- dup >r
+    cells (search-order) + !
+    r>
+  REPEAT
+  drop
 ;
 
 \ Reduces to the minimum: the core Forth wordlist.
@@ -156,14 +158,12 @@ S" realloc" c-call-named (realloc)
 
 \ This duplicates the code for FIND but this is easier since that's in core.
 : SEARCH-WORDLIST ( c-addr u wid -- 0 | xt 1 | xt -1 )
-  \ Uppercase the incoming word first.
-  >r 2dup 0 DO dup i + dup c@ dup 'a' 'z' IF 32 - THEN swap c! LOOP
   \ Then scan the wordlist.
   BEGIN @ dup WHILE ( c-addr u *header)
-    >r 2dup ( c-addr u c-addr u    R: *header )
+    >r 2dup   ( c-addr u c-addr u    R: *header )
     r@ 2 cells + @
     r@ cell+ @ 255 and ( c-addr u c-addr u word-addr word-len   R: *header )
-    compare 0= IF \ matched
+    compare-ic 0= IF \ matched
       \ The xt is the header + 3 cells
       2drop r@ 3 cells +
       \ And the immediate bit is header[1] & 512
@@ -173,7 +173,7 @@ S" realloc" c-call-named (realloc)
     THEN
     r>
   REPEAT
-  drop
+  drop 2drop 0
 ;
 
 \ Creates a new wordlist (but doesn't but it into either the search order or
@@ -181,7 +181,7 @@ S" realloc" c-call-named (realloc)
 : WORDLIST ( -- wid ) here 1 cells allot   0 over ! ;
 
 \ Makes the current top of the search order into the compilation wordlist.
-: DEFINITIONS ( -- ) get-order swap set-current (discard) ;
+: DEFINITIONS ( -- ) get-order over set-current (discard) ;
 
 : ALSO ( -- ) get-order over swap 1+ set-order ;
 

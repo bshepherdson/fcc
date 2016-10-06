@@ -4,7 +4,7 @@
 
 
 
-: ( 41 parse drop drop ; (debug) IMMEDIATE
+: ( 41 parse drop drop ; IMMEDIATE
 : \ refill drop ; IMMEDIATE
 
 : BL 32 ;
@@ -586,11 +586,20 @@ VARIABLE (picout)
 ;
 : .  (#HOLD) type space ;
 
-\ Helper that compares strings. From the STRING word list.
-: COMPARE ( c-addr1 u1 c-addr2 u2 -- n )
+\ Implementation taken from the Forth 2012 appendix.
+: WITHIN ( test lo hi -- ? ) over - >R   - R> U< ;
+
+VARIABLE (str-adjust)
+: (compare-case) ;
+: (compare-ignore-case) dup 'a' 'z' within IF 32 - THEN ;
+
+\ Internal helper word. Runs the xt in (str-adjust) on each character before
+\ comparing them. That allows flattening case and similar.
+: (COMPARE) ( c-addr1 u1 c-addr2 u2 -- n )
   rot 2dup = >R 2dup > >R    min   ( c1 c2 min   R: same? 1smaller? )
   0 DO ( c1 c2 )
-    over i + c@   over i + c@ ( c1 c2 b1 b2 )
+    over i + c@  (str-adjust) @ execute
+    over i + c@  (str-adjust) @ execute ( c1 c2 b1 b2 )
     2dup = not IF
       > >R 2drop R>
       IF 1 ELSE -1 THEN
@@ -602,6 +611,14 @@ VARIABLE (picout)
   R> R> ( 1smaller? same? )
   IF drop 0 ELSE IF -1 ELSE 1 THEN THEN
 ;
+
+\ Helper that compares strings. From the STRING word list.
+: COMPARE ( c-addr1 u1 c-addr2 u2 -- n )
+  ['] (compare-case) (str-adjust) !  (compare) ;
+
+\ Case-insensitive string comparison. Nonstandard, but useful.
+: COMPARE-IC ( c-addr1 u1 c-addr2 u2 -- n )
+  ['] (compare-ignore-case) (str-adjust) !  (compare) ;
 
 : ENVIRONMENT? ( c-addr u -- i*x true | false )
   2dup S" /COUNTED-STRING" compare 0= IF 2drop 255 -1 EXIT THEN

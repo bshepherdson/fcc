@@ -55,9 +55,6 @@
 
 1024 BUFFER: PAD
 
-\ Implementation taken from the Forth 2012 appendix.
-: WITHIN ( test lo hi -- ? ) over - >R   - R> U< ;
-
 : ROLL ( xn ... x1 x0 u -- xn-1 .. x1 x0 xn )
   dup 0= IF drop EXIT THEN
   1- swap >R recurse ( ... ret )
@@ -148,6 +145,7 @@ VARIABLE (included-file-list)
 
 \ These are actually from the DOUBLE word set; but the test suite uses them
 : 2VARIABLE CREATE 0 , 0 , ;
+: 2CONSTANT create , , does> 2@ ;
 : D= ( xd1 xd2 -- flag ) rot = >R = R> and ;
 
 
