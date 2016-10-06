@@ -209,7 +209,7 @@ quitTopPtr:
 	.type	primitive_count, %object
 	.size	primitive_count, 4
 primitive_count:
-	.word	118
+	.word	120
 	.global	queue
 	.bss
 	.align	2
@@ -509,7 +509,19 @@ WORD_HDR cstore, "C!", 2, 32, header_cfetch
         strb    r1, [r0]
         NEXT
 WORD_TAIL cstore
-WORD_HDR raw_alloc, "(ALLOCATE)", 10, 33, header_cstore
+WORD_HDR two_fetch, "2@", 2, 118, header_cstore
+        pop     {r2}
+        ldr     r0, [r2]
+        ldr     r1, [r2, #4]
+        push    {r0, r1}
+        NEXT
+WORD_TAIL two_fetch
+WORD_HDR two_store, "2!", 2, 119, header_two_fetch
+        pop     {r0, r1, r2} @ addr, [0], [1]
+        str     r1, [r0]
+        str     r2, [r0, #4]
+        NEXT
+WORD_HDR raw_alloc, "(ALLOCATE)", 10, 33, header_two_store
         pop     {r0}
 	CALL	malloc
         push    {r0}
@@ -4981,6 +4993,8 @@ init_primitives:
 	INIT_WORD store
 	INIT_WORD cfetch
 	INIT_WORD cstore
+	INIT_WORD two_fetch
+	INIT_WORD two_store
 	INIT_WORD raw_alloc
 	INIT_WORD here_ptr
 	INIT_WORD print_internal

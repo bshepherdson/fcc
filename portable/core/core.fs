@@ -20,8 +20,6 @@
 : INVERT -1 xor ;
 : NOT 0= ;
 
-: 2! ( x1 x2 a-addr -- ) dup >r   !   r> cell+ ! ;
-: 2@ ( a-addr -- x1 x2 ) dup cell+ @ swap @ ;
 : 2* ( x -- x ) 1 LSHIFT ;
 : 2/ ( x -- x ) -1 1 rshift invert ( x msb ) over and   swap 1 rshift  or ;
 
