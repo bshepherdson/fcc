@@ -4581,12 +4581,12 @@ main:
 	mov	r3, r0
 	str	r3, [sp, #12]
 	ldr	r2, [sp, #12]
-	movw	r3, #:lower16:_binary_lib_file_fs_start
-	movt	r3, #:upper16:_binary_lib_file_fs_start
+	movw	r3, #:lower16:_binary_core_file_fs_start
+	movt	r3, #:upper16:_binary_core_file_fs_start
 	str	r3, [r2]
 	ldr	r2, [sp, #12]
-	movw	r3, #:lower16:_binary_lib_file_fs_end
-	movt	r3, #:upper16:_binary_lib_file_fs_end
+	movw	r3, #:lower16:_binary_core_file_fs_end
+	movt	r3, #:upper16:_binary_core_file_fs_end
 	str	r3, [r2, #4]
 	movw	r3, #:lower16:inputIndex
 	movt	r3, #:upper16:inputIndex
@@ -4641,12 +4641,12 @@ main:
 	mov	r3, r0
 	str	r3, [sp, #12]
 	ldr	r2, [sp, #12]
-	movw	r3, #:lower16:_binary_lib_facility_fs_start
-	movt	r3, #:upper16:_binary_lib_facility_fs_start
+	movw	r3, #:lower16:_binary_core_facility_fs_start
+	movt	r3, #:upper16:_binary_core_facility_fs_start
 	str	r3, [r2]
 	ldr	r2, [sp, #12]
-	movw	r3, #:lower16:_binary_lib_facility_fs_end
-	movt	r3, #:upper16:_binary_lib_facility_fs_end
+	movw	r3, #:lower16:_binary_core_facility_fs_end
+	movt	r3, #:upper16:_binary_core_facility_fs_end
 	str	r3, [r2, #4]
 	movw	r3, #:lower16:inputIndex
 	movt	r3, #:upper16:inputIndex
@@ -4701,12 +4701,12 @@ main:
 	mov	r3, r0
 	str	r3, [sp, #12]
 	ldr	r2, [sp, #12]
-	movw	r3, #:lower16:_binary_lib_tools_fs_start
-	movt	r3, #:upper16:_binary_lib_tools_fs_start
+	movw	r3, #:lower16:_binary_core_tools_fs_start
+	movt	r3, #:upper16:_binary_core_tools_fs_start
 	str	r3, [r2]
 	ldr	r2, [sp, #12]
-	movw	r3, #:lower16:_binary_lib_tools_fs_end
-	movt	r3, #:upper16:_binary_lib_tools_fs_end
+	movw	r3, #:lower16:_binary_core_tools_fs_end
+	movt	r3, #:upper16:_binary_core_tools_fs_end
 	str	r3, [r2, #4]
 	movw	r3, #:lower16:inputIndex
 	movt	r3, #:upper16:inputIndex
@@ -4761,12 +4761,12 @@ main:
 	mov	r3, r0
 	str	r3, [sp, #12]
 	ldr	r2, [sp, #12]
-	movw	r3, #:lower16:_binary_lib_exception_fs_start
-	movt	r3, #:upper16:_binary_lib_exception_fs_start
+	movw	r3, #:lower16:_binary_core_exception_fs_start
+	movt	r3, #:upper16:_binary_core_exception_fs_start
 	str	r3, [r2]
 	ldr	r2, [sp, #12]
-	movw	r3, #:lower16:_binary_lib_exception_fs_end
-	movt	r3, #:upper16:_binary_lib_exception_fs_end
+	movw	r3, #:lower16:_binary_core_exception_fs_end
+	movt	r3, #:upper16:_binary_core_exception_fs_end
 	str	r3, [r2, #4]
 	movw	r3, #:lower16:inputIndex
 	movt	r3, #:upper16:inputIndex
@@ -4821,12 +4821,12 @@ main:
 	mov	r3, r0
 	str	r3, [sp, #12]
 	ldr	r2, [sp, #12]
-	movw	r3, #:lower16:_binary_lib_ext_fs_start
-	movt	r3, #:upper16:_binary_lib_ext_fs_start
+	movw	r3, #:lower16:_binary_core_ext_fs_start
+	movt	r3, #:upper16:_binary_core_ext_fs_start
 	str	r3, [r2]
 	ldr	r2, [sp, #12]
-	movw	r3, #:lower16:_binary_lib_ext_fs_end
-	movt	r3, #:upper16:_binary_lib_ext_fs_end
+	movw	r3, #:lower16:_binary_core_ext_fs_end
+	movt	r3, #:upper16:_binary_core_ext_fs_end
 	str	r3, [r2, #4]
 	movw	r3, #:lower16:inputIndex
 	movt	r3, #:upper16:inputIndex
@@ -4881,12 +4881,12 @@ main:
 	mov	r3, r0
 	str	r3, [sp, #12]
 	ldr	r2, [sp, #12]
-	movw	r3, #:lower16:_binary_lib_core_fs_start
-	movt	r3, #:upper16:_binary_lib_core_fs_start
+	movw	r3, #:lower16:_binary_core_core_fs_start
+	movt	r3, #:upper16:_binary_core_core_fs_start
 	str	r3, [r2]
 	ldr	r2, [sp, #12]
-	movw	r3, #:lower16:_binary_lib_core_fs_end
-	movt	r3, #:upper16:_binary_lib_core_fs_end
+	movw	r3, #:lower16:_binary_core_core_fs_end
+	movt	r3, #:upper16:_binary_core_core_fs_end
 	str	r3, [r2, #4]
 	movw	r3, #:lower16:inputIndex
 	movt	r3, #:upper16:inputIndex

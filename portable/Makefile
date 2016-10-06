@@ -1,4 +1,4 @@
-MODULE_DIR=lib
+MODULE_DIR=core
 FORTH_MODULES=$(shell find $(MODULE_DIR) -name "*.fs")
 FORTH_OBJECTS := $(FORTH_MODULES:%.fs=%.o)
 
@@ -71,7 +71,7 @@ forth: vm.o $(FORTH_OBJECTS)
 all: forth
 
 clean: FORCE
-	rm -f *.o lib/*.o forth
+	rm -f *.o $(MODULE_DIR)/*.o forth
 
 test: forth FORCE
 	./forth \
