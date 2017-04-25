@@ -6170,9 +6170,9 @@ main:
 	call	malloc
 	movq	%rax, 24(%rsp)
 	movq	24(%rsp), %rax
-	movq	$_binary_lib_file_fs_start, (%rax)
+	movq	$_binary_core_file_fs_start, (%rax)
 	movq	24(%rsp), %rax
-	movq	$_binary_lib_file_fs_end, 8(%rax)
+	movq	$_binary_core_file_fs_end, 8(%rax)
 	movq	inputIndex(%rip), %rax
 	movq	24(%rsp), %rdx
 	orq	$1, %rdx
@@ -6199,9 +6199,9 @@ main:
 	call	malloc
 	movq	%rax, 24(%rsp)
 	movq	24(%rsp), %rax
-	movq	$_binary_lib_facility_fs_start, (%rax)
+	movq	$_binary_core_facility_fs_start, (%rax)
 	movq	24(%rsp), %rax
-	movq	$_binary_lib_facility_fs_end, 8(%rax)
+	movq	$_binary_core_facility_fs_end, 8(%rax)
 	movq	inputIndex(%rip), %rax
 	movq	24(%rsp), %rdx
 	orq	$1, %rdx
@@ -6228,9 +6228,9 @@ main:
 	call	malloc
 	movq	%rax, 24(%rsp)
 	movq	24(%rsp), %rax
-	movq	$_binary_lib_tools_fs_start, (%rax)
+	movq	$_binary_core_tools_fs_start, (%rax)
 	movq	24(%rsp), %rax
-	movq	$_binary_lib_tools_fs_end, 8(%rax)
+	movq	$_binary_core_tools_fs_end, 8(%rax)
 	movq	inputIndex(%rip), %rax
 	movq	24(%rsp), %rdx
 	orq	$1, %rdx
@@ -6257,9 +6257,9 @@ main:
 	call	malloc
 	movq	%rax, 24(%rsp)
 	movq	24(%rsp), %rax
-	movq	$_binary_lib_exception_fs_start, (%rax)
+	movq	$_binary_core_exception_fs_start, (%rax)
 	movq	24(%rsp), %rax
-	movq	$_binary_lib_exception_fs_end, 8(%rax)
+	movq	$_binary_core_exception_fs_end, 8(%rax)
 	movq	inputIndex(%rip), %rax
 	movq	24(%rsp), %rdx
 	orq	$1, %rdx
@@ -6286,9 +6286,9 @@ main:
 	call	malloc
 	movq	%rax, 24(%rsp)
 	movq	24(%rsp), %rax
-	movq	$_binary_lib_ext_fs_start, (%rax)
+	movq	$_binary_core_ext_fs_start, (%rax)
 	movq	24(%rsp), %rax
-	movq	$_binary_lib_ext_fs_end, 8(%rax)
+	movq	$_binary_core_ext_fs_end, 8(%rax)
 	movq	inputIndex(%rip), %rax
 	movq	24(%rsp), %rdx
 	orq	$1, %rdx
@@ -6315,9 +6315,9 @@ main:
 	call	malloc
 	movq	%rax, 24(%rsp)
 	movq	24(%rsp), %rax
-	movq	$_binary_lib_core_fs_start, (%rax)
+	movq	$_binary_core_core_fs_start, (%rax)
 	movq	24(%rsp), %rax
-	movq	$_binary_lib_core_fs_end, 8(%rax)
+	movq	$_binary_core_core_fs_end, 8(%rax)
 	movq	inputIndex(%rip), %rax
 	movq	24(%rsp), %rdx
 	orq	$1, %rdx
