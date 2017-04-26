@@ -2103,6 +2103,7 @@ WORD_HDR create, "CREATE", 6, 67, header_to_number
 	ldr	r2, [r2]
 	add	r2, r2, #16
 	str	r2, [r3]
+
 	movw	r3, #:lower16:tempHeader
 	movt	r3, #:upper16:tempHeader
 	ldr	r2, [r3]
@@ -2111,6 +2112,7 @@ WORD_HDR create, "CREATE", 6, 67, header_to_number
 	ldr	r3, [r3]
 	ldr	r3, [r3]
 	str	r3, [r2]
+
 	movw	r3, #:lower16:compilationWordlist
 	movt	r3, #:upper16:compilationWordlist
         ldr     r2, [r3]
@@ -2118,11 +2120,13 @@ WORD_HDR create, "CREATE", 6, 67, header_to_number
 	movt	r3, #:upper16:tempHeader
 	ldr	r3, [r3]
 	str	r3, [r2]
+
 	movw	r3, #:lower16:tempHeader
 	movt	r3, #:upper16:tempHeader
 	ldr	r2, [r3]
 	ldr     r3, [sp]
 	str	r3, [r2, #4]
+
 	movw	r3, #:lower16:tempHeader
 	movt	r3, #:upper16:tempHeader
 	ldr	r4, [r3]
@@ -2130,6 +2134,7 @@ WORD_HDR create, "CREATE", 6, 67, header_to_number
 	CALL	malloc
 	mov	r3, r0
 	str	r0, [r4, #8]
+
 	movw	r3, #:lower16:tempHeader
 	movt	r3, #:upper16:tempHeader
 	ldr	r0, [r3]
@@ -2138,6 +2143,7 @@ WORD_HDR create, "CREATE", 6, 67, header_to_number
 	ldr	r0, [r0, #8]
 	CALL	strncpy
         add     sp, sp, #8
+
 	movw	r3, #:lower16:tempHeader
 	movt	r3, #:upper16:tempHeader
 	ldr	r2, [r3]

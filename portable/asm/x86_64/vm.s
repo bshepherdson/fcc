@@ -74,8 +74,21 @@ quitTopPtr:
 	.comm	dsp,8,8
 	.comm	state,8,8
 	.comm	base,8,8
-	.comm	dictionary,8,8
-	.comm	lastWord,8,8
+
+	# A word list is a linked list of word headers.
+	# Each word list is a cell that points to the first header.
+	# The indirection is needed so that a wordlist has a fixed identity,
+	# even as it grows.
+	# searchIndex is the index of the topmost wordlist in the search order.
+	# searchArray is the buffer, with room for 16 searches.
+	# compilationWordlist points to the current compilation wordlist.
+	# Both of those default to the main Forth wordlist.
+	# That main wordlist is pre-allocated as forthWordlist.
+	.comm   searchArray,128,8
+	.comm   searchIndex,8,8
+	.comm   compilationWordlist,8,8
+	.comm   forthWordlist,8,8
+	.comm   lastWord,8,8
 	.comm	parseBuffers,8192,32
 	.comm	inputSources,1024,32
 	.comm	inputIndex,8,8
@@ -101,7 +114,7 @@ quitTopPtr:
 	.type	primitive_count, @object
 	.size	primitive_count, 4
 primitive_count:
-	.long	117
+	.long	118
 	.globl	queue
 	.bss
 	.align 8
@@ -1947,12 +1960,44 @@ code_latest:
 .LFB47:
 	.cfi_startproc
 	subq	$8, %rbx
-	movl	$dictionary, %eax
+	movq    compilationWordlist(%rip), %rax
 	movq	%rax, (%rbx)
 	NEXT
 	.cfi_endproc
 .LFE47:
 	.size	code_latest, .-code_latest
+	.globl	header_dictionary_info
+	.section	.rodata
+.LCBraden47:
+	.string	"(DICT-INFO)"
+	.data
+	.align 32
+	.type	header_in_ptr, @object
+	.size	header_in_ptr, 32
+header_dictionary_info:
+	.quad	header_latest
+	.quad	11
+	.quad	.LCBraden47
+	.quad	code_dictionary_info
+	.globl	key_dictionary_info
+	.align 4
+	.type	key_dictionary_info, @object
+	.size	key_dictionary_info, 4
+key_dictionary_info:
+	.long	117
+	.text
+	.globl	code_dictionary_info
+	.type	code_dictionary_info, @function
+code_dictionary_info:
+	.cfi_startproc
+	subq	$16, %rbx
+	movl	$compilationWordlist, %eax
+	movq	%rax, 8(%rbx)
+	movl	$searchIndex, %eax
+	movq	%rax, (%rbx)
+	NEXT
+	.cfi_endproc
+	.size	code_dictionary_info, .-code_dictionary_info
 	.globl	header_in_ptr
 	.section	.rodata
 .LC47:
@@ -1962,7 +2007,7 @@ code_latest:
 	.type	header_in_ptr, @object
 	.size	header_in_ptr, 32
 header_in_ptr:
-	.quad	header_latest
+	.quad	header_dictionary_info
 	.quad	3
 	.quad	.LC47
 	.quad	code_in_ptr
@@ -3078,61 +3123,77 @@ parse_number_:
 	.globl	find_
 	.type	find_, @function
 find_:
-.LFB72:
-	.cfi_startproc
-	subq	$8, %rsp
-	.cfi_def_cfa_offset 16
-	movq	dictionary(%rip), %rax
-	movq	%rax, tempHeader(%rip)
-	jmp	.L142
-.L147:
-	movq	tempHeader(%rip), %rax
-	movq	8(%rax), %rax
-	andl	$511, %eax
-	movq	%rax, %rdx
-	movq	(%rbx), %rax
-	cmpq	%rax, %rdx
-	jne	.L143
-	movq	(%rbx), %rdx
-	movq	8(%rbx), %rcx
-	movq	tempHeader(%rip), %rax
-	movq	16(%rax), %rax
-	movq	%rcx, %rsi
-	movq	%rax, %rdi
-	call	strncasecmp
-	testl	%eax, %eax
-	jne	.L143
-	movq	tempHeader(%rip), %rax
-	addq	$24, %rax
-	movq	%rax, 8(%rbx)
-	movq	tempHeader(%rip), %rax
-	movq	8(%rax), %rax
-	andl	$512, %eax
-	testq	%rax, %rax
-	jne	.L144
-	movq	$-1, %rax
-	jmp	.L145
-.L144:
-	movl	$1, %eax
-.L145:
-	movq	%rax, (%rbx)
-	jmp	.L141
-.L143:
-	movq	tempHeader(%rip), %rax
-	movq	(%rax), %rax
-	movq	%rax, tempHeader(%rip)
-.L142:
-	movq	tempHeader(%rip), %rax
-	testq	%rax, %rax
-	jne	.L147
-        movq    $0, 8(%rbx)
-        movq    $0, (%rbx)
-.L141:
-	addq	$8, %rsp
-	.cfi_def_cfa_offset 8
+	movq    searchIndex(%rip), %r12    # r12 is reserved for the index.
+.LF159:
+	leaq    searchArray(%rip), %rax
+	movq    (%rax,%r12,8), %rax
+	movq    (%rax), %rax
+	movq    %rax, tempHeader(%rip)   # Store it in tempHeader.
+	jmp     .LF151
+
+.LF156:
+	movq    tempHeader(%rip), %rax
+	movq    8(%rax), %rax  # The length word.
+	andl	$511, %eax     # The length/hidden mask
+	movq    (%rbx), %rcx
+	cmpq    %rcx, %rax
+	jne     .LF152
+
+	# If we're still here, they're the same length and not hidden.
+find_debug:
+	movq    tempHeader(%rip), %rax
+	movq    16(%rax), %rdi  # 1st arg: pointer to this word's name.
+	movq    8(%rbx), %rsi   # 2nd arg: pointer to target name.
+	movq    (%rbx), %rdx    # 3rd arg: length.
+
+	# %rsp needs to be aligned to 16 bytes for C calls, but it already is,
+	# because find_ is a C call itself.
+	call strncasecmp
+	testl   %eax, %eax  # ZF=1 when the response was 0, meaning equal.
+	jne  .LF152  # If it's not equal, we didn't find it.
+
+	# If they are equal, we found it.
+find_found:
+	movq    tempHeader(%rip), %rax
+	addq    $24, %rax
+	movq    %rax, 8(%rbx)   # CFA in next-but-top.
+
+	movq    tempHeader(%rip), %rax
+	movq    8(%rax), %rax   # Length
+	andl    $512, %eax      # Immediate flag
+	testl   %eax, %eax      # ZF=1 when not immediate
+	jne     .LF153          # Set 1 when immediate
+	movq    $-1, %rax
+	jmp     .LF154
+.LF153:
+	movq    $1, %rax
+.LF154:
+	movq    %rax, (%rbx)
+	jmp     .LF149
+
+.LF152: # Mismatch, keep searching this linked list.
+	movq    tempHeader(%rip), %rax
+	movq    (%rax), %rax
+	movq    %rax, tempHeader(%rip)
+
+.LF151:
+	movq    tempHeader(%rip), %rax
+	testq   %rax, %rax
+	jne     .LF156  # Nonzero, so loop back.
+.LF150: # Reached the end of a wordlist. Try the next one, if any.
+	testq   %r12, %r12
+	je      .LF158  # Index = 0, bail.
+	subq    $1, %r12 # If nonzero, subtract and loop.
+	jmp     .LF159
+
+.LF160:
+	nop
+.LF158: # Run out of wordlists too.
+	movq $0, %rax
+	movq %rax, 8(%rbx) # 0 underneath
+	movq %rax, (%rbx)  # 0 on top
+.LF149: # Returning
 	ret
-	.cfi_endproc
-.LFE72:
 	.size	find_, .-find_
 	.globl	header_parse
 	.section	.rodata
@@ -3255,17 +3316,21 @@ code_create:
 	addq	$7, %rax
 	andq	$-8, %rax
 	movq	%rax, dsp(%rip)
-	movq	dsp(%rip), %rax
 	movq	%rax, tempHeader(%rip)
 	addq	$32, dsp(%rip)
 	movq	tempHeader(%rip), %rax
-	movq	dictionary(%rip), %rdx
+	movq	compilationWordlist(%rip), %rdx
+	movq    (%rdx), %rdx
 	movq	%rdx, (%rax)
+
 	movq	tempHeader(%rip), %rax
-	movq	%rax, dictionary(%rip)
+	movq    compilationWordlist(%rip), %rdx
+	movq    %rax, (%rdx)
+
 	movq	tempHeader(%rip), %rax
 	movq	(%rbx), %rdx
 	movq	%rdx, 8(%rax)
+
 	movq	tempHeader(%rip), %r12
 	movq	(%rbx), %rdi
 	call	malloc
@@ -3276,6 +3341,7 @@ code_create:
 	movq	%rax, %rdi
 	call	strncpy
 	addq	$16, %rbx
+
 	movq	tempHeader(%rip), %rax
 	movq	$code_dodoes, 24(%rax)
 	movq	dsp(%rip), %rax
@@ -5303,10 +5369,10 @@ code_colon:
 	movq	%rax, tempHeader(%rip)
 	addq	$32, dsp(%rip)
 	movq	tempHeader(%rip), %rax
-	movq	dictionary(%rip), %rdx
-	movq	%rdx, (%rax)
-	movq	tempHeader(%rip), %rax
-	movq	%rax, dictionary(%rip)
+	movq	compilationWordlist(%rip), %rdx
+	movq    (%rdx), %rcx   # The actual previous head.
+	movq	%rcx, (%rax)   # Written to the new header.
+	movq    %rax, (%rdx)   # And the new one into the compilation list
 	call	parse_name_
 	movq	(%rbx), %rax
 	testq	%rax, %rax
@@ -5324,8 +5390,6 @@ code_colon:
 	movq	%rax, 16(%r12)
 	movq	(%rbx), %rdx
 	movq	8(%rbx), %rsi
-	movq	tempHeader(%rip), %rax
-	movq	16(%rax), %rax
 	movq	%rax, %rdi
 	call	strncpy
 	movq	tempHeader(%rip), %rax
@@ -5670,13 +5734,13 @@ key_semicolon:
 code_semicolon:
 .LFB123:
 	.cfi_startproc
-	movq	dictionary(%rip), %rax
-	movq	dictionary(%rip), %rdx
-	movq	8(%rdx), %rdx
+	movq	compilationWordlist(%rip), %rax  # Pointer to the header
+	movq    (%rax), %rax  # The header itself.
+	movq	8(%rax), %rdx # The length word.
 	andb	$254, %dh
 	movq	%rdx, 8(%rax)
 	subq    $8, %rbx
-	movl	$header_exit+24, %edx
+	movq	$header_exit+24, %rdx
 	movq	%rdx, (%rbx)
 	movl	$0, %eax
 	call	compile_
@@ -6078,7 +6142,21 @@ main:
 	.cfi_startproc
 	movl	%edi, 12(%rsp)
 	movq	%rsi, (%rsp)
-	movq	$header_c_symbol, dictionary(%rip)
+	# A word list is a linked list of word headers.
+	# Each word list is a cell that points to the first header.
+	# The indirection is needed so that a wordlist has a fixed identity,
+	# even as it grows.
+	# searchIndex is the index of the topmost wordlist in the search order.
+	# searchArray is the buffer, with room for 16 searches.
+	# compilationWordlist points to the current compilation wordlist.
+	# Both of those default to the main Forth wordlist.
+	# That main wordlist is pre-allocated as forthWordlist.
+	movq    $header_c_symbol, %rax
+	movq	%rax, forthWordlist(%rip)
+	leaq    forthWordlist(%rip), %rax
+	movq	%rax, searchArray(%rip)
+	movq	%rax, compilationWordlist(%rip)
+
 	movq	$10, base(%rip)
 	movq	$0, inputIndex(%rip)
 	movq	inputIndex(%rip), %rcx
@@ -7639,6 +7717,19 @@ init_primitives:
 	salq	$4, %rcx
 	addq	$primitives, %rcx
 	movq	$code_c_symbol, (%rcx)
+	movl	%edx, %edx
+	salq	$4, %rdx
+	addq	$primitives+8, %rdx
+	movl	%eax, (%rdx)
+
+        # dictionary_info
+	movl	key_dictionary_info(%rip), %eax
+	leal	-1(%rax), %edx
+	movl	key_dictionary_info(%rip), %eax
+	movl	%edx, %ecx
+	salq	$4, %rcx
+	addq	$primitives, %rcx
+	movq	$code_dictionary_info, (%rcx)
 	movl	%edx, %edx
 	salq	$4, %rdx
 	addq	$primitives+8, %rdx
