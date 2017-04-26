@@ -76,7 +76,7 @@ code_\code_name:
 	.endm
 
 	.file	"vm.c"
-	.comm	_stack_data,131072,32
+	.comm	_stack_data,131072,64
 	.globl	spTop
 	.data
 	.align 8
@@ -85,7 +85,7 @@ code_\code_name:
 spTop:
 	.quad	_stack_data+131072
 	.comm	sp,8,8
-	.comm	_stack_return,8192,32
+	.comm	_stack_return,8192,64
 	.globl	rspTop
 	.align 8
 	.type	rspTop, @object
