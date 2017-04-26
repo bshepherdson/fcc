@@ -31,6 +31,50 @@
         movq    \reg, (\thru)
         .endm
 
+        .macro WORD_HDR code_name, forth_name, name_length, key, previous
+	.globl	header_\code_name
+	.section	.rodata
+.str_\code_name:
+	.string	"\forth_name"
+	.data
+	.align 32
+	.type	header_\code_name, @object
+	.size	header_\code_name, 32
+header_\code_name:
+	.quad	\previous
+	.quad	\name_length
+	.quad	.str_\code_name
+	.quad	code_\code_name
+	.globl	key_\code_name
+	.align 4
+	.type	key_\code_name, @object
+	.size	key_\code_name, 4
+key_\code_name:
+	.long	\key
+	.text
+	.globl	code_\code_name
+	.type	code_\code_name, @function
+code_\code_name:
+	.endm
+
+	.macro WORD_TAIL name
+	.size	code_\name, .-code_\name
+        .endm
+
+	.macro INIT_WORD name
+	movl	key_\name(%rip), %eax
+	leal	-1(%rax), %edx
+	movl	key_\name(%rip), %eax
+	movl	%edx, %ecx
+	salq	$4, %rcx
+	addq	$primitives, %rcx
+	movq	$code_\name, (%rcx)
+	movl	%edx, %edx
+	salq	$4, %rdx
+	addq	$primitives+8, %rdx
+	movl	%eax, (%rdx)
+	.endm
+
 	.file	"vm.c"
 	.comm	_stack_data,131072,32
 	.globl	spTop
@@ -114,7 +158,7 @@ quitTopPtr:
 	.type	primitive_count, @object
 	.size	primitive_count, 4
 primitive_count:
-	.long	118
+	.long	120
 	.globl	queue
 	.bss
 	.align 8
@@ -191,131 +235,30 @@ print:
 	.cfi_endproc
 .LFE2:
 	.size	print, .-print
-	.globl	header_plus
-	.section	.rodata
-.LC1:
-	.string	"+"
-	.data
-	.align 32
-	.type	header_plus, @object
-	.size	header_plus, 32
-header_plus:
-	.quad	0
-	.quad	1
-	.quad	.LC1
-	.quad	code_plus
-	.globl	key_plus
-	.align 4
-	.type	key_plus, @object
-	.size	key_plus, 4
-key_plus:
-	.long	1
-	.text
-	.globl	code_plus
-	.type	code_plus, @function
-code_plus:
-.LFB3:
-	.cfi_startproc
+
+WORD_HDR plus, "+", 1, 1, 0
 	movq    (%rbx), %rax
 	addq    $8, %rbx
 	addq    %rax, (%rbx)
 	NEXT
-	.cfi_endproc
-.LFE3:
-	.size	code_plus, .-code_plus
-	.globl	header_minus
-	.section	.rodata
-.LC2:
-	.string	"-"
-	.data
-	.align 32
-	.type	header_minus, @object
-	.size	header_minus, 32
-header_minus:
-	.quad	header_plus
-	.quad	1
-	.quad	.LC2
-	.quad	code_minus
-	.globl	key_minus
-	.align 4
-	.type	key_minus, @object
-	.size	key_minus, 4
-key_minus:
-	.long	2
-	.text
-	.globl	code_minus
-	.type	code_minus, @function
-code_minus:
-.LFB4:
-	.cfi_startproc
+WORD_TAIL plus
+WORD_HDR minus, "-", 1, 2, header_plus
 	movq	(%rbx), %rcx
 	movq	8(%rbx), %rax
 	subq	%rcx, %rax
         addq    $8, %rbx
 	movq	%rax, (%rbx)
 	NEXT
-	.cfi_endproc
-.LFE4:
-	.size	code_minus, .-code_minus
-	.globl	header_times
-	.section	.rodata
-.LC3:
-	.string	"*"
-	.data
-	.align 32
-	.type	header_times, @object
-	.size	header_times, 32
-header_times:
-	.quad	header_minus
-	.quad	1
-	.quad	.LC3
-	.quad	code_times
-	.globl	key_times
-	.align 4
-	.type	key_times, @object
-	.size	key_times, 4
-key_times:
-	.long	3
-	.text
-	.globl	code_times
-	.type	code_times, @function
-code_times:
-.LFB5:
-	.cfi_startproc
+WORD_TAIL minus
+WORD_HDR times, "*", 1, 3, header_minus
         movq    (%rbx), %rdx
 	addq	$8, %rbx
 	movq	(%rbx), %rcx
 	imulq	%rcx, %rdx
 	movq	%rdx, (%rbx)
 	NEXT
-	.cfi_endproc
-.LFE5:
-	.size	code_times, .-code_times
-	.globl	header_div
-	.section	.rodata
-.LC4:
-	.string	"/"
-	.data
-	.align 32
-	.type	header_div, @object
-	.size	header_div, 32
-header_div:
-	.quad	header_times
-	.quad	1
-	.quad	.LC4
-	.quad	code_div
-	.globl	key_div
-	.align 4
-	.type	key_div, @object
-	.size	key_div, 4
-key_div:
-	.long	4
-	.text
-	.globl	code_div
-	.type	code_div, @function
-code_div:
-.LFB6:
-	.cfi_startproc
+WORD_TAIL times
+WORD_HDR div, "/", 1, 4, header_times
         movq    (%rbx), %rsi
         addq    $8, %rbx
         movq    (%rbx), %rax
@@ -323,34 +266,8 @@ code_div:
 	idivq	%rsi
 	movq	%rax, (%rbx)
 	NEXT
-	.cfi_endproc
-.LFE6:
-	.size	code_div, .-code_div
-	.globl	header_udiv
-	.section	.rodata
-.LC5:
-	.string	"U/"
-	.data
-	.align 32
-	.type	header_udiv, @object
-	.size	header_udiv, 32
-header_udiv:
-	.quad	header_div
-	.quad	2
-	.quad	.LC5
-	.quad	code_udiv
-	.globl	key_udiv
-	.align 4
-	.type	key_udiv, @object
-	.size	key_udiv, 4
-key_udiv:
-	.long	5
-	.text
-	.globl	code_udiv
-	.type	code_udiv, @function
-code_udiv:
-.LFB7:
-	.cfi_startproc
+WORD_TAIL div
+WORD_HDR udiv, "U/", 2, 5, header_div
         movq    (%rbx), %rsi
         addq    $8, %rbx
         movq    (%rbx), %rax
@@ -358,34 +275,8 @@ code_udiv:
 	divq	%rsi
 	movq	%rax, (%rbx)
 	NEXT
-	.cfi_endproc
-.LFE7:
-	.size	code_udiv, .-code_udiv
-	.globl	header_mod
-	.section	.rodata
-.LC6:
-	.string	"MOD"
-	.data
-	.align 32
-	.type	header_mod, @object
-	.size	header_mod, 32
-header_mod:
-	.quad	header_udiv
-	.quad	3
-	.quad	.LC6
-	.quad	code_mod
-	.globl	key_mod
-	.align 4
-	.type	key_mod, @object
-	.size	key_mod, 4
-key_mod:
-	.long	6
-	.text
-	.globl	code_mod
-	.type	code_mod, @function
-code_mod:
-.LFB8:
-	.cfi_startproc
+WORD_TAIL udiv
+WORD_HDR mod, "MOD", 3, 6, header_udiv
         movq    (%rbx), %rsi
         addq    $8, %rbx
         movq    (%rbx), %rax
@@ -393,34 +284,8 @@ code_mod:
 	idivq	%rsi
 	movq	%rdx, (%rbx)
 	NEXT
-	.cfi_endproc
-.LFE8:
-	.size	code_mod, .-code_mod
-	.globl	header_umod
-	.section	.rodata
-.LC7:
-	.string	"UMOD"
-	.data
-	.align 32
-	.type	header_umod, @object
-	.size	header_umod, 32
-header_umod:
-	.quad	header_mod
-	.quad	4
-	.quad	.LC7
-	.quad	code_umod
-	.globl	key_umod
-	.align 4
-	.type	key_umod, @object
-	.size	key_umod, 4
-key_umod:
-	.long	7
-	.text
-	.globl	code_umod
-	.type	code_umod, @function
-code_umod:
-.LFB9:
-	.cfi_startproc
+WORD_TAIL mod
+WORD_HDR umod, "UMOD", 4, 7, header_mod
         movq    (%rbx), %rsi
         addq    $8, %rbx
         movq    (%rbx), %rax
@@ -428,168 +293,38 @@ code_umod:
 	divq	%rsi      # modulus in %rdx
         movq    %rdx, (%rbx)
 	NEXT
-	.cfi_endproc
-.LFE9:
-	.size	code_umod, .-code_umod
-	.globl	header_and
-	.section	.rodata
-.LC8:
-	.string	"AND"
-	.data
-	.align 32
-	.type	header_and, @object
-	.size	header_and, 32
-header_and:
-	.quad	header_umod
-	.quad	3
-	.quad	.LC8
-	.quad	code_and
-	.globl	key_and
-	.align 4
-	.type	key_and, @object
-	.size	key_and, 4
-key_and:
-	.long	8
-	.text
-	.globl	code_and
-	.type	code_and, @function
-code_and:
-.LFB10:
-	.cfi_startproc
+WORD_TAIL umod
+WORD_HDR and, "AND", 3, 8, header_umod
         movq    (%rbx), %rdx
         addq    $8, %rbx
         movq    (%rbx), %rax
 	andq	%rdx, %rax
 	movq	%rax, (%rbx)
 	NEXT
-	.cfi_endproc
-.LFE10:
-	.size	code_and, .-code_and
-	.globl	header_or
-	.section	.rodata
-.LC9:
-	.string	"OR"
-	.data
-	.align 32
-	.type	header_or, @object
-	.size	header_or, 32
-header_or:
-	.quad	header_and
-	.quad	2
-	.quad	.LC9
-	.quad	code_or
-	.globl	key_or
-	.align 4
-	.type	key_or, @object
-	.size	key_or, 4
-key_or:
-	.long	9
-	.text
-	.globl	code_or
-	.type	code_or, @function
-code_or:
-.LFB11:
-	.cfi_startproc
+WORD_TAIL and
+WORD_HDR or, "OR", 2, 9, header_and
         movq    (%rbx), %rax
         addq    $8, %rbx
         movq    (%rbx), %rcx
 	orq	%rcx, %rax
 	movq	%rax, (%rbx)
 	NEXT
-	.cfi_endproc
-.LFE11:
-	.size	code_or, .-code_or
-	.globl	header_xor
-	.section	.rodata
-.LC10:
-	.string	"XOR"
-	.data
-	.align 32
-	.type	header_xor, @object
-	.size	header_xor, 32
-header_xor:
-	.quad	header_or
-	.quad	3
-	.quad	.LC10
-	.quad	code_xor
-	.globl	key_xor
-	.align 4
-	.type	key_xor, @object
-	.size	key_xor, 4
-key_xor:
-	.long	10
-	.text
-	.globl	code_xor
-	.type	code_xor, @function
-code_xor:
-.LFB12:
-	.cfi_startproc
+WORD_TAIL or
+WORD_HDR xor, "XOR", 3, 10, header_or
         movq    (%rbx), %rax
         addq    $8, %rbx
 	xorq	%rax, (%rbx)
 	NEXT
-	.cfi_endproc
-.LFE12:
-	.size	code_xor, .-code_xor
-	.globl	header_lshift
-	.section	.rodata
-.LC11:
-	.string	"LSHIFT"
-	.data
-	.align 32
-	.type	header_lshift, @object
-	.size	header_lshift, 32
-header_lshift:
-	.quad	header_xor
-	.quad	6
-	.quad	.LC11
-	.quad	code_lshift
-	.globl	key_lshift
-	.align 4
-	.type	key_lshift, @object
-	.size	key_lshift, 4
-key_lshift:
-	.long	11
-	.text
-	.globl	code_lshift
-	.type	code_lshift, @function
-code_lshift:
-.LFB13:
-	.cfi_startproc
+WORD_TAIL xor
+WORD_HDR lshift, "LSHIFT", 6, 11, header_xor
 	movq	(%rbx), %rcx     # sp[0] -> %rcx
         addq    $8, %rbx
         movq    (%rbx), %rsi     # sp[1] -> %rsi
 	salq	%cl, %rsi        # result in %rsi
 	movq	%rsi, (%rbx)
 	NEXT
-	.cfi_endproc
-.LFE13:
-	.size	code_lshift, .-code_lshift
-	.globl	header_rshift
-	.section	.rodata
-.LC12:
-	.string	"RSHIFT"
-	.data
-	.align 32
-	.type	header_rshift, @object
-	.size	header_rshift, 32
-header_rshift:
-	.quad	header_lshift
-	.quad	6
-	.quad	.LC12
-	.quad	code_rshift
-	.globl	key_rshift
-	.align 4
-	.type	key_rshift, @object
-	.size	key_rshift, 4
-key_rshift:
-	.long	12
-	.text
-	.globl	code_rshift
-	.type	code_rshift, @function
-code_rshift:
-.LFB14:
-	.cfi_startproc
+WORD_TAIL lshift
+WORD_HDR rshift, "RSHIFT", 6, 12, header_lshift
         movq    (%rbx), %rax
         movl    %eax, %ecx
         addq    $8, %rbx
@@ -597,66 +332,14 @@ code_rshift:
 	shrq	%cl, %rsi
 	movq	%rsi, (%rbx)
 	NEXT
-	.cfi_endproc
-.LFE14:
-	.size	code_rshift, .-code_rshift
-	.globl	header_base
-	.section	.rodata
-.LC13:
-	.string	"BASE"
-	.data
-	.align 32
-	.type	header_base, @object
-	.size	header_base, 32
-header_base:
-	.quad	header_rshift
-	.quad	4
-	.quad	.LC13
-	.quad	code_base
-	.globl	key_base
-	.align 4
-	.type	key_base, @object
-	.size	key_base, 4
-key_base:
-	.long	13
-	.text
-	.globl	code_base
-	.type	code_base, @function
-code_base:
-.LFB15:
-	.cfi_startproc
+WORD_TAIL rshift
+WORD_HDR base, "BASE", 4, 13, header_rshift
         subq    $8, %rbx
         movl    $base, %eax
         movq    %rax, (%rbx)
 	NEXT
-	.cfi_endproc
-.LFE15:
-	.size	code_base, .-code_base
-	.globl	header_less_than
-	.section	.rodata
-.LC14:
-	.string	"<"
-	.data
-	.align 32
-	.type	header_less_than, @object
-	.size	header_less_than, 32
-header_less_than:
-	.quad	header_base
-	.quad	1
-	.quad	.LC14
-	.quad	code_less_than
-	.globl	key_less_than
-	.align 4
-	.type	key_less_than, @object
-	.size	key_less_than, 4
-key_less_than:
-	.long	14
-	.text
-	.globl	code_less_than
-	.type	code_less_than, @function
-code_less_than:
-.LFB16:
-	.cfi_startproc
+WORD_TAIL base
+WORD_HDR less_than, "<", 1, 14, header_base
         movq    (%rbx), %rax
         addq    $8, %rbx
         movq    (%rbx), %rcx
@@ -669,34 +352,8 @@ code_less_than:
 .L18:
 	movq	%rax, (%rbx)
 	NEXT
-	.cfi_endproc
-.LFE16:
-	.size	code_less_than, .-code_less_than
-	.globl	header_less_than_unsigned
-	.section	.rodata
-.LC15:
-	.string	"U<"
-	.data
-	.align 32
-	.type	header_less_than_unsigned, @object
-	.size	header_less_than_unsigned, 32
-header_less_than_unsigned:
-	.quad	header_less_than
-	.quad	2
-	.quad	.LC15
-	.quad	code_less_than_unsigned
-	.globl	key_less_than_unsigned
-	.align 4
-	.type	key_less_than_unsigned, @object
-	.size	key_less_than_unsigned, 4
-key_less_than_unsigned:
-	.long	15
-	.text
-	.globl	code_less_than_unsigned
-	.type	code_less_than_unsigned, @function
-code_less_than_unsigned:
-.LFB17:
-	.cfi_startproc
+WORD_TAIL less_than
+WORD_HDR less_than_unsigned, "U<", 2, 15, header_less_than
         movq    (%rbx), %rax
         addq    $8, %rbx
         movq    (%rbx), %rcx
@@ -709,34 +366,8 @@ code_less_than_unsigned:
 .L21:
 	movq	%rax, (%rbx)
 	NEXT
-	.cfi_endproc
-.LFE17:
-	.size	code_less_than_unsigned, .-code_less_than_unsigned
-	.globl	header_equal
-	.section	.rodata
-.LC16:
-	.string	"="
-	.data
-	.align 32
-	.type	header_equal, @object
-	.size	header_equal, 32
-header_equal:
-	.quad	header_less_than_unsigned
-	.quad	1
-	.quad	.LC16
-	.quad	code_equal
-	.globl	key_equal
-	.align 4
-	.type	key_equal, @object
-	.size	key_equal, 4
-key_equal:
-	.long	16
-	.text
-	.globl	code_equal
-	.type	code_equal, @function
-code_equal:
-.LFB18:
-	.cfi_startproc
+WORD_TAIL less_than_unsigned
+WORD_HDR equal, "=", 1, 16, header_less_than_unsigned
         movq    (%rbx), %rcx
         addq    $8, %rbx
         movq    (%rbx), %rax
@@ -749,161 +380,31 @@ code_equal:
 .L24:
 	movq	%rax, (%rbx)
 	NEXT
-	.cfi_endproc
-.LFE18:
-	.size	code_equal, .-code_equal
-	.globl	header_dup
-	.section	.rodata
-.LC17:
-	.string	"DUP"
-	.data
-	.align 32
-	.type	header_dup, @object
-	.size	header_dup, 32
-header_dup:
-	.quad	header_equal
-	.quad	3
-	.quad	.LC17
-	.quad	code_dup
-	.globl	key_dup
-	.align 4
-	.type	key_dup, @object
-	.size	key_dup, 4
-key_dup:
-	.long	17
-	.text
-	.globl	code_dup
-	.type	code_dup, @function
-code_dup:
-.LFB19:
-	.cfi_startproc
+WORD_TAIL equal
+WORD_HDR dup, "DUP", 3, 17, header_equal
         movq    (%rbx), %rax
 	subq	$8, %rbx
         movq    %rax, (%rbx)
 	NEXT
-	.cfi_endproc
-.LFE19:
-	.size	code_dup, .-code_dup
-	.globl	header_swap
-	.section	.rodata
-.LC18:
-	.string	"SWAP"
-	.data
-	.align 32
-	.type	header_swap, @object
-	.size	header_swap, 32
-header_swap:
-	.quad	header_dup
-	.quad	4
-	.quad	.LC18
-	.quad	code_swap
-	.globl	key_swap
-	.align 4
-	.type	key_swap, @object
-	.size	key_swap, 4
-key_swap:
-	.long	18
-	.text
-	.globl	code_swap
-	.type	code_swap, @function
-code_swap:
-.LFB20:
-	.cfi_startproc
+WORD_TAIL dup
+WORD_HDR swap, "SWAP", 4, 18, header_dup
         movq    (%rbx), %rcx
         movq    8(%rbx), %rax
         movq    %rax, (%rbx)
         movq    %rcx, 8(%rbx)
 	NEXT
-	.cfi_endproc
-.LFE20:
-	.size	code_swap, .-code_swap
-	.globl	header_drop
-	.section	.rodata
-.LC19:
-	.string	"DROP"
-	.data
-	.align 32
-	.type	header_drop, @object
-	.size	header_drop, 32
-header_drop:
-	.quad	header_swap
-	.quad	4
-	.quad	.LC19
-	.quad	code_drop
-	.globl	key_drop
-	.align 4
-	.type	key_drop, @object
-	.size	key_drop, 4
-key_drop:
-	.long	19
-	.text
-	.globl	code_drop
-	.type	code_drop, @function
-code_drop:
-.LFB21:
-	.cfi_startproc
+WORD_TAIL swap
+WORD_HDR drop, "DROP", 4, 19, header_swap
 	addq	$8, %rbx
 	NEXT
-	.cfi_endproc
-.LFE21:
-	.size	code_drop, .-code_drop
-	.globl	header_over
-	.section	.rodata
-.LC20:
-	.string	"OVER"
-	.data
-	.align 32
-	.type	header_over, @object
-	.size	header_over, 32
-header_over:
-	.quad	header_drop
-	.quad	4
-	.quad	.LC20
-	.quad	code_over
-	.globl	key_over
-	.align 4
-	.type	key_over, @object
-	.size	key_over, 4
-key_over:
-	.long	20
-	.text
-	.globl	code_over
-	.type	code_over, @function
-code_over:
-.LFB22:
-	.cfi_startproc
+WORD_TAIL drop
+WORD_HDR over, "OVER", 4, 20, header_drop
         movq    8(%rbx), %rax
 	subq	$8, %rbx
         movq    %rax, (%rbx)
 	NEXT
-	.cfi_endproc
-.LFE22:
-	.size	code_over, .-code_over
-	.globl	header_rot
-	.section	.rodata
-.LC21:
-	.string	"ROT"
-	.data
-	.align 32
-	.type	header_rot, @object
-	.size	header_rot, 32
-header_rot:
-	.quad	header_over
-	.quad	3
-	.quad	.LC21
-	.quad	code_rot
-	.globl	key_rot
-	.align 4
-	.type	key_rot, @object
-	.size	key_rot, 4
-key_rot:
-	.long	21
-	.text
-	.globl	code_rot
-	.type	code_rot, @function
-code_rot:
-.LFB23:
-	.cfi_startproc
+WORD_TAIL over
+WORD_HDR rot, "ROT", 3, 21, header_over
 	movq	(%rbx), %rdx # ( a c d -- c d a )
 	movq	8(%rbx), %rcx
 	movq	16(%rbx), %rax
@@ -911,34 +412,8 @@ code_rot:
         movq    %rdx, 8(%rbx)
         movq    %rax, (%rbx)
 	NEXT
-	.cfi_endproc
-.LFE23:
-	.size	code_rot, .-code_rot
-	.globl	header_neg_rot
-	.section	.rodata
-.LC22:
-	.string	"-ROT"
-	.data
-	.align 32
-	.type	header_neg_rot, @object
-	.size	header_neg_rot, 32
-header_neg_rot:
-	.quad	header_rot
-	.quad	4
-	.quad	.LC22
-	.quad	code_neg_rot
-	.globl	key_neg_rot
-	.align 4
-	.type	key_neg_rot, @object
-	.size	key_neg_rot, 4
-key_neg_rot:
-	.long	22
-	.text
-	.globl	code_neg_rot
-	.type	code_neg_rot, @function
-code_neg_rot:
-.LFB24:
-	.cfi_startproc
+WORD_TAIL rot
+WORD_HDR neg_rot, "-ROT", 4, 22, header_rot
 	movq	(%rbx), %rdx # ( a c d -- d a c )
 	movq	8(%rbx), %rcx
 	movq	16(%rbx), %rax
@@ -946,98 +421,20 @@ code_neg_rot:
 	movq	%rax, 8(%rbx)
 	movq	%rcx, 0(%rbx)
 	NEXT
-	.cfi_endproc
-.LFE24:
-	.size	code_neg_rot, .-code_neg_rot
-	.globl	header_two_drop
-	.section	.rodata
-.LC23:
-	.string	"2DROP"
-	.data
-	.align 32
-	.type	header_two_drop, @object
-	.size	header_two_drop, 32
-header_two_drop:
-	.quad	header_neg_rot
-	.quad	5
-	.quad	.LC23
-	.quad	code_two_drop
-	.globl	key_two_drop
-	.align 4
-	.type	key_two_drop, @object
-	.size	key_two_drop, 4
-key_two_drop:
-	.long	23
-	.text
-	.globl	code_two_drop
-	.type	code_two_drop, @function
-code_two_drop:
-.LFB25:
-	.cfi_startproc
+WORD_TAIL neg_rot
+WORD_HDR two_drop, "2DROP", 5, 23, header_neg_rot
 	addq	$16, %rbx
 	NEXT
-	.cfi_endproc
-.LFE25:
-	.size	code_two_drop, .-code_two_drop
-	.globl	header_two_dup
-	.section	.rodata
-.LC24:
-	.string	"2DUP"
-	.data
-	.align 32
-	.type	header_two_dup, @object
-	.size	header_two_dup, 32
-header_two_dup:
-	.quad	header_two_drop
-	.quad	4
-	.quad	.LC24
-	.quad	code_two_dup
-	.globl	key_two_dup
-	.align 4
-	.type	key_two_dup, @object
-	.size	key_two_dup, 4
-key_two_dup:
-	.long	24
-	.text
-	.globl	code_two_dup
-	.type	code_two_dup, @function
-code_two_dup:
-.LFB26:
-	.cfi_startproc
+WORD_TAIL two_drop
+WORD_HDR two_dup, "2DUP", 4, 24, header_two_drop
 	subq	$16, %rbx
         movq    16(%rbx), %rax
         movq    %rax, (%rbx)
         movq    24(%rbx), %rax
         movq    %rax, 8(%rbx)
 	NEXT
-	.cfi_endproc
-.LFE26:
-	.size	code_two_dup, .-code_two_dup
-	.globl	header_two_swap
-	.section	.rodata
-.LC25:
-	.string	"2SWAP"
-	.data
-	.align 32
-	.type	header_two_swap, @object
-	.size	header_two_swap, 32
-header_two_swap:
-	.quad	header_two_dup
-	.quad	5
-	.quad	.LC25
-	.quad	code_two_swap
-	.globl	key_two_swap
-	.align 4
-	.type	key_two_swap, @object
-	.size	key_two_swap, 4
-key_two_swap:
-	.long	25
-	.text
-	.globl	code_two_swap
-	.type	code_two_swap, @function
-code_two_swap:
-.LFB27:
-	.cfi_startproc
+WORD_TAIL two_dup
+WORD_HDR two_swap, "2SWAP", 5, 25, header_two_dup
 	# Swap in pairs: 0/16, 8/24
         # First pair, 0/16
 	movq	16(%rbx), %rax
@@ -1050,428 +447,109 @@ code_two_swap:
         movq    %rcx, 24(%rbx)
         movq    %rax, 8(%rbx)
 	NEXT
-	.cfi_endproc
-.LFE27:
-	.size	code_two_swap, .-code_two_swap
-	.globl	header_two_over
-	.section	.rodata
-.LC26:
-	.string	"2OVER"
-	.data
-	.align 32
-	.type	header_two_over, @object
-	.size	header_two_over, 32
-header_two_over:
-	.quad	header_two_swap
-	.quad	5
-	.quad	.LC26
-	.quad	code_two_over
-	.globl	key_two_over
-	.align 4
-	.type	key_two_over, @object
-	.size	key_two_over, 4
-key_two_over:
-	.long	26
-	.text
-	.globl	code_two_over
-	.type	code_two_over, @function
-code_two_over:
-.LFB28:
-	.cfi_startproc
+WORD_TAIL two_swap
+WORD_HDR two_over, "2OVER", 5, 26, header_two_swap
 	subq	$16, %rbx
 	movq	32(%rbx), %rax
         movq    %rax, (%rbx)
 	movq	40(%rbx), %rax
         movq    %rax, 8(%rbx)
 	NEXT
-	.cfi_endproc
-.LFE28:
-	.size	code_two_over, .-code_two_over
-	.globl	header_to_r
-	.section	.rodata
-.LC27:
-	.string	">R"
-	.data
-	.align 32
-	.type	header_to_r, @object
-	.size	header_to_r, 32
-header_to_r:
-	.quad	header_two_over
-	.quad	2
-	.quad	.LC27
-	.quad	code_to_r
-	.globl	key_to_r
-	.align 4
-	.type	key_to_r, @object
-	.size	key_to_r, 4
-key_to_r:
-	.long	27
-	.text
-	.globl	code_to_r
-	.type	code_to_r, @function
-code_to_r:
-.LFB29:
-	.cfi_startproc
+WORD_TAIL two_over
+WORD_HDR to_r, ">R", 2, 27, header_two_over
         movq    (%rbx), %rax
         addq    $8, %rbx
         PUSHRSP %rax, %rcx
 	NEXT
-	.cfi_endproc
-.LFE29:
-	.size	code_to_r, .-code_to_r
-	.globl	header_from_r
-	.section	.rodata
-.LC28:
-	.string	"R>"
-	.data
-	.align 32
-	.type	header_from_r, @object
-	.size	header_from_r, 32
-header_from_r:
-	.quad	header_to_r
-	.quad	2
-	.quad	.LC28
-	.quad	code_from_r
-	.globl	key_from_r
-	.align 4
-	.type	key_from_r, @object
-	.size	key_from_r, 4
-key_from_r:
-	.long	28
-	.text
-	.globl	code_from_r
-	.type	code_from_r, @function
-code_from_r:
-.LFB30:
-	.cfi_startproc
+WORD_TAIL to_r
+WORD_HDR from_r, "R>", 2, 28, header_to_r
         POPRSP %rax
         subq    $8, %rbx
 	movq	%rax, (%rbx)
 	NEXT
-	.cfi_endproc
-.LFE30:
-	.size	code_from_r, .-code_from_r
-	.globl	header_fetch
-	.section	.rodata
-.LC29:
-	.string	"@"
-	.data
-	.align 32
-	.type	header_fetch, @object
-	.size	header_fetch, 32
-header_fetch:
-	.quad	header_from_r
-	.quad	1
-	.quad	.LC29
-	.quad	code_fetch
-	.globl	key_fetch
-	.align 4
-	.type	key_fetch, @object
-	.size	key_fetch, 4
-key_fetch:
-	.long	29
-	.text
-	.globl	code_fetch
-	.type	code_fetch, @function
-code_fetch:
-.LFB31:
-	.cfi_startproc
+WORD_TAIL from_r
+WORD_HDR fetch, "@", 1, 29, header_from_r
         movq    (%rbx), %rax
         movq    (%rax), %rax
         movq    %rax, (%rbx)
 	NEXT
-	.cfi_endproc
-.LFE31:
-	.size	code_fetch, .-code_fetch
-	.globl	header_store
-	.section	.rodata
-.LC30:
-	.string	"!"
-	.data
-	.align 32
-	.type	header_store, @object
-	.size	header_store, 32
-header_store:
-	.quad	header_fetch
-	.quad	1
-	.quad	.LC30
-	.quad	code_store
-	.globl	key_store
-	.align 4
-	.type	key_store, @object
-	.size	key_store, 4
-key_store:
-	.long	30
-	.text
-	.globl	code_store
-	.type	code_store, @function
-code_store:
-.LFB32:
-	.cfi_startproc
+WORD_TAIL fetch
+WORD_HDR store, "!", 1, 30, header_fetch
 	movq	(%rbx), %rdx
 	movq	8(%rbx), %rax
 	movq	%rax, (%rdx)
 	addq	$16, %rbx
 	NEXT
-	.cfi_endproc
-.LFE32:
-	.size	code_store, .-code_store
-	.globl	header_cfetch
-	.section	.rodata
-.LC31:
-	.string	"C@"
-	.data
-	.align 32
-	.type	header_cfetch, @object
-	.size	header_cfetch, 32
-header_cfetch:
-	.quad	header_store
-	.quad	2
-	.quad	.LC31
-	.quad	code_cfetch
-	.globl	key_cfetch
-	.align 4
-	.type	key_cfetch, @object
-	.size	key_cfetch, 4
-key_cfetch:
-	.long	31
-	.text
-	.globl	code_cfetch
-	.type	code_cfetch, @function
-code_cfetch:
-.LFB33:
-	.cfi_startproc
+WORD_TAIL store
+WORD_HDR cfetch, "C@", 2, 31, header_store
 	movq	(%rbx), %rax
 	movzbl	(%rax), %eax
 	movzbl	%al, %eax
 	movq	%rax, (%rbx)
 	NEXT
-	.cfi_endproc
-.LFE33:
-	.size	code_cfetch, .-code_cfetch
-	.globl	header_cstore
-	.section	.rodata
-.LC32:
-	.string	"C!"
-	.data
-	.align 32
-	.type	header_cstore, @object
-	.size	header_cstore, 32
-header_cstore:
-	.quad	header_cfetch
-	.quad	2
-	.quad	.LC32
-	.quad	code_cstore
-	.globl	key_cstore
-	.align 4
-	.type	key_cstore, @object
-	.size	key_cstore, 4
-key_cstore:
-	.long	32
-	.text
-	.globl	code_cstore
-	.type	code_cstore, @function
-code_cstore:
-.LFB34:
-	.cfi_startproc
+WORD_TAIL cfetch
+WORD_HDR cstore, "C!", 2, 32, header_cfetch
 	movq	(%rbx), %rax
 	movq	8(%rbx), %rcx
 	movb	%cl, (%rax)
 	addq	$16, %rbx
 	NEXT
-	.cfi_endproc
-.LFE34:
-	.size	code_cstore, .-code_cstore
-	.globl	header_raw_alloc
-	.section	.rodata
-.LC33:
-	.string	"(ALLOCATE)"
-	.data
-	.align 32
-	.type	header_raw_alloc, @object
-	.size	header_raw_alloc, 32
-header_raw_alloc:
-	.quad	header_cstore
-	.quad	10
-	.quad	.LC33
-	.quad	code_raw_alloc
-	.globl	key_raw_alloc
-	.align 4
-	.type	key_raw_alloc, @object
-	.size	key_raw_alloc, 4
-key_raw_alloc:
-	.long	33
-	.text
-	.globl	code_raw_alloc
-	.type	code_raw_alloc, @function
-code_raw_alloc:
-.LFB35:
-	.cfi_startproc
+WORD_TAIL cstore
+WORD_HDR two_fetch, "2@", 2, 118, header_cstore
+	movq    (%rbx), %rdx
+	subq    $8, %rbx
+	movq    (%rdx), %rax
+	movq    %rax, (%rbx)
+	movq    8(%rdx), %rax
+	movq    %rax, 8(%rbx)
+	NEXT
+WORD_TAIL two_fetch
+WORD_HDR two_store, "2!", 2, 119, header_two_fetch
+	movq    (%rbx), %rdx   # %rdx is the target address
+	movq    8(%rbx), %rax
+	movq    %rax, (%rdx)
+	movq    16(%rbx), %rax
+	movq    %rax, 8(%rdx)
+	addq    $24, %rbx
+	NEXT
+WORD_TAIL two_store
+WORD_HDR raw_alloc, "(ALLOCATE)", 10, 33, header_two_store
 	movq	(%rbx), %rax
 	movq	%rax, %rdi
 	call	malloc
 	movq	%rax, (%rbx)
 	NEXT
-	.cfi_endproc
-.LFE35:
-	.size	code_raw_alloc, .-code_raw_alloc
-	.globl	header_here_ptr
-	.section	.rodata
-.LC34:
-	.string	"(>HERE)"
-	.data
-	.align 32
-	.type	header_here_ptr, @object
-	.size	header_here_ptr, 32
-header_here_ptr:
-	.quad	header_raw_alloc
-	.quad	7
-	.quad	.LC34
-	.quad	code_here_ptr
-	.globl	key_here_ptr
-	.align 4
-	.type	key_here_ptr, @object
-	.size	key_here_ptr, 4
-key_here_ptr:
-	.long	34
-	.text
-	.globl	code_here_ptr
-	.type	code_here_ptr, @function
-code_here_ptr:
-.LFB36:
-	.cfi_startproc
+WORD_TAIL raw_alloc
+WORD_HDR here_ptr, "(>HERE)", 7, 34, header_raw_alloc
 	subq	$8, %rbx
 	movl	$dsp, %eax
 	movq	%rax, (%rbx)
 	NEXT
-	.cfi_endproc
-.LFE36:
-	.size	code_here_ptr, .-code_here_ptr
-	.globl	header_print_internal
-	.section	.rodata
-.LC35:
-	.string	"(PRINT)"
-	.data
-	.align 32
-	.type	header_print_internal, @object
-	.size	header_print_internal, 32
-header_print_internal:
-	.quad	header_here_ptr
-	.quad	7
-	.quad	.LC35
-	.quad	code_print_internal
-	.globl	key_print_internal
-	.align 4
-	.type	key_print_internal, @object
-	.size	key_print_internal, 4
-key_print_internal:
-	.long	35
+WORD_TAIL here_ptr
+
 	.section	.rodata
 .LC36:
 	.string	"%ld "
-	.text
-	.globl	code_print_internal
-	.type	code_print_internal, @function
-code_print_internal:
-.LFB37:
-	.cfi_startproc
+WORD_HDR print_internal, "(PRINT)", 7, 35, header_here_ptr
 	movq	(%rbx), %rsi
 	movl	$.LC36, %edi
 	movl	$0, %eax
 	call	printf
 	addq	$8, %rbx
 	NEXT
-	.cfi_endproc
-.LFE37:
-	.size	code_print_internal, .-code_print_internal
-	.globl	header_state
-	.section	.rodata
-.LC37:
-	.string	"STATE"
-	.data
-	.align 32
-	.type	header_state, @object
-	.size	header_state, 32
-header_state:
-	.quad	header_print_internal
-	.quad	5
-	.quad	.LC37
-	.quad	code_state
-	.globl	key_state
-	.align 4
-	.type	key_state, @object
-	.size	key_state, 4
-key_state:
-	.long	36
-	.text
-	.globl	code_state
-	.type	code_state, @function
-code_state:
-.LFB38:
-	.cfi_startproc
+WORD_TAIL print_internal
+WORD_HDR state, "STATE", 5, 36, header_print_internal
 	movl	$state, %eax
 	subq	$8, %rbx
 	movq	%rax, (%rbx)
 	NEXT
-	.cfi_endproc
-.LFE38:
-	.size	code_state, .-code_state
-	.globl	header_branch
-	.section	.rodata
-.LC38:
-	.string	"(BRANCH)"
-	.data
-	.align 32
-	.type	header_branch, @object
-	.size	header_branch, 32
-header_branch:
-	.quad	header_state
-	.quad	8
-	.quad	.LC38
-	.quad	code_branch
-	.globl	key_branch
-	.align 4
-	.type	key_branch, @object
-	.size	key_branch, 4
-key_branch:
-	.long	37
-	.text
-	.globl	code_branch
-	.type	code_branch, @function
-code_branch:
-.LFB39:
-	.cfi_startproc
+WORD_TAIL state
+WORD_HDR branch, "(BRANCH)", 8, 37, header_state
         movq    (%rbp), %rax   # The branch offset.
         addq    %rax, %rbp
         NEXT
-	.cfi_endproc
-.LFE39:
-	.size	code_branch, .-code_branch
-	.globl	header_zbranch
-	.section	.rodata
-.LC39:
-	.string	"(0BRANCH)"
-	.data
-	.align 32
-	.type	header_zbranch, @object
-	.size	header_zbranch, 32
-header_zbranch:
-	.quad	header_branch
-	.quad	9
-	.quad	.LC39
-	.quad	code_zbranch
-	.globl	key_zbranch
-	.align 4
-	.type	key_zbranch, @object
-	.size	key_zbranch, 4
-key_zbranch:
-	.long	38
-	.text
-	.globl	code_zbranch
-	.type	code_zbranch, @function
-code_zbranch:
-.LFB40:
-	.cfi_startproc
+WORD_TAIL branch
+WORD_HDR zbranch, "(0BRANCH)", 9, 38, header_branch
         movq    (%rbx), %rax
         addq    $8, %rbx
 	testq	%rax, %rax
@@ -1484,68 +562,16 @@ code_zbranch:
         # Either way when we get down here, rax contains the delta.
         addq    %rax, %rbp
 	NEXT
-	.cfi_endproc
-.LFE40:
-	.size	code_zbranch, .-code_zbranch
-	.globl	header_execute
-	.section	.rodata
-.LC40:
-	.string	"EXECUTE"
-	.data
-	.align 32
-	.type	header_execute, @object
-	.size	header_execute, 32
-header_execute:
-	.quad	header_zbranch
-	.quad	7
-	.quad	.LC40
-	.quad	code_execute
-	.globl	key_execute
-	.align 4
-	.type	key_execute, @object
-	.size	key_execute, 4
-key_execute:
-	.long	39
-	.text
-	.globl	code_execute
-	.type	code_execute, @function
-code_execute:
-.LFB41:
-	.cfi_startproc
+WORD_TAIL zbranch
+WORD_HDR execute, "EXECUTE", 7, 39, header_zbranch
         movq    (%rbx), %rax
         addq    $8, %rbx
 	movq	%rax, cfa(%rip)
 	movq	(%rax), %rax
 	movq	%rax, ca(%rip)
 	jmp	*%rax
-	.cfi_endproc
-.LFE41:
-	.size	code_execute, .-code_execute
-	.globl	header_evaluate
-	.section	.rodata
-.LC41:
-	.string	"EVALUATE"
-	.data
-	.align 32
-	.type	header_evaluate, @object
-	.size	header_evaluate, 32
-header_evaluate:
-	.quad	header_execute
-	.quad	8
-	.quad	.LC41
-	.quad	code_evaluate
-	.globl	key_evaluate
-	.align 4
-	.type	key_evaluate, @object
-	.size	key_evaluate, 4
-key_evaluate:
-	.long	40
-	.text
-	.globl	code_evaluate
-	.type	code_evaluate, @function
-code_evaluate:
-.LFB42:
-	.cfi_startproc
+WORD_TAIL execute
+WORD_HDR evaluate, "EVALUATE", 8, 40, header_execute
 	addq	$1, inputIndex(%rip)
 	movq	inputIndex(%rip), %rdx
 	movq	(%rbx), %rax
@@ -1572,9 +598,9 @@ code_evaluate:
 	movq	rsp(%rip), %rax
 	movq	%rbp, (%rax)
 	jmp	*quit_inner(%rip)
-	.cfi_endproc
-.LFE42:
-	.size	code_evaluate, .-code_evaluate
+WORD_TAIL evaluate
+
+
 	.section	.rodata
 .LC42:
 	.string	"> "
@@ -1777,31 +803,9 @@ refill_:
 	.cfi_endproc
 .LFE43:
 	.size	refill_, .-refill_
-	.globl	header_refill
-	.section	.rodata
-.LC43:
-	.string	"REFILL"
-	.data
-	.align 32
-	.type	header_refill, @object
-	.size	header_refill, 32
-header_refill:
-	.quad	header_evaluate
-	.quad	6
-	.quad	.LC43
-	.quad	code_refill
-	.globl	key_refill
-	.align 4
-	.type	key_refill, @object
-	.size	key_refill, 4
-key_refill:
-	.long	41
-	.text
-	.globl	code_refill
-	.type	code_refill, @function
-code_refill:
-.LFB44:
-	.cfi_startproc
+
+
+WORD_HDR refill, "REFILL", 6, 41, header_evaluate
 	movq	inputIndex(%rip), %rax
 	salq	$5, %rax
 	addq	$inputSources+16, %rax
@@ -1818,34 +822,8 @@ code_refill:
 	movq	%rax, (%rbx)
 .L70:
 	NEXT
-	.cfi_endproc
-.LFE44:
-	.size	code_refill, .-code_refill
-	.globl	header_accept
-	.section	.rodata
-.LC44:
-	.string	"ACCEPT"
-	.data
-	.align 32
-	.type	header_accept, @object
-	.size	header_accept, 32
-header_accept:
-	.quad	header_refill
-	.quad	6
-	.quad	.LC44
-	.quad	code_accept
-	.globl	key_accept
-	.align 4
-	.type	key_accept, @object
-	.size	key_accept, 4
-key_accept:
-	.long	42
-	.text
-	.globl	code_accept
-	.type	code_accept, @function
-code_accept:
-.LFB45:
-	.cfi_startproc
+WORD_TAIL refill
+WORD_HDR accept, "ACCEPT", 6, 42, header_refill
 	movl	$0, %edi
 	call	readline
 	movq	%rax, str1(%rip)
@@ -1870,34 +848,8 @@ code_accept:
 	movq	str1(%rip), %rdi
 	call	free
 	NEXT
-	.cfi_endproc
-.LFE45:
-	.size	code_accept, .-code_accept
-	.globl	header_key
-	.section	.rodata
-.LC45:
-	.string	"KEY"
-	.data
-	.align 32
-	.type	header_key, @object
-	.size	header_key, 32
-header_key:
-	.quad	header_accept
-	.quad	3
-	.quad	.LC45
-	.quad	code_key
-	.globl	key_key
-	.align 4
-	.type	key_key, @object
-	.size	key_key, 4
-key_key:
-	.long	43
-	.text
-	.globl	code_key
-	.type	code_key, @function
-code_key:
-.LFB46:
-	.cfi_startproc
+WORD_TAIL accept
+WORD_HDR key, "KEY", 3, 43, header_accept
 	movl	$old_tio, %esi
 	movl	$0, %edi
 	call	tcgetattr
@@ -1931,98 +883,24 @@ code_key:
 	movl	$0, %edi
 	call	tcsetattr
 	NEXT
-	.cfi_endproc
-.LFE46:
-	.size	code_key, .-code_key
-	.globl	header_latest
-	.section	.rodata
-.LC46:
-	.string	"(LATEST)"
-	.data
-	.align 32
-	.type	header_latest, @object
-	.size	header_latest, 32
-header_latest:
-	.quad	header_key
-	.quad	8
-	.quad	.LC46
-	.quad	code_latest
-	.globl	key_latest
-	.align 4
-	.type	key_latest, @object
-	.size	key_latest, 4
-key_latest:
-	.long	44
-	.text
-	.globl	code_latest
-	.type	code_latest, @function
-code_latest:
-.LFB47:
-	.cfi_startproc
+WORD_TAIL key
+WORD_HDR latest, "(LATEST)", 8, 44, header_key
 	subq	$8, %rbx
 	movq    compilationWordlist(%rip), %rax
 	movq	%rax, (%rbx)
 	NEXT
-	.cfi_endproc
-.LFE47:
-	.size	code_latest, .-code_latest
-	.globl	header_dictionary_info
-	.section	.rodata
-.LCBraden47:
-	.string	"(DICT-INFO)"
-	.data
-	.align 32
-	.type	header_in_ptr, @object
-	.size	header_in_ptr, 32
-header_dictionary_info:
-	.quad	header_latest
-	.quad	11
-	.quad	.LCBraden47
-	.quad	code_dictionary_info
-	.globl	key_dictionary_info
-	.align 4
-	.type	key_dictionary_info, @object
-	.size	key_dictionary_info, 4
-key_dictionary_info:
-	.long	117
-	.text
-	.globl	code_dictionary_info
-	.type	code_dictionary_info, @function
-code_dictionary_info:
-	.cfi_startproc
-	subq	$16, %rbx
+WORD_TAIL latest
+WORD_HDR dictionary_info, "(DICT-INFO)", 11, 117, header_latest
+	subq    $24, %rbx
 	movl	$compilationWordlist, %eax
-	movq	%rax, 8(%rbx)
+	movq	%rax, 16(%rbx)
 	movl	$searchIndex, %eax
-	movq	%rax, (%rbx)
+	movq	%rax, 8(%rbx)
+	movl    $searchArray, %eax
+	movq    %rax, (%rbx)
 	NEXT
-	.cfi_endproc
-	.size	code_dictionary_info, .-code_dictionary_info
-	.globl	header_in_ptr
-	.section	.rodata
-.LC47:
-	.string	">IN"
-	.data
-	.align 32
-	.type	header_in_ptr, @object
-	.size	header_in_ptr, 32
-header_in_ptr:
-	.quad	header_dictionary_info
-	.quad	3
-	.quad	.LC47
-	.quad	code_in_ptr
-	.globl	key_in_ptr
-	.align 4
-	.type	key_in_ptr, @object
-	.size	key_in_ptr, 4
-key_in_ptr:
-	.long	45
-	.text
-	.globl	code_in_ptr
-	.type	code_in_ptr, @function
-code_in_ptr:
-.LFB48:
-	.cfi_startproc
+WORD_TAIL dictionary_info
+WORD_HDR in_ptr, ">IN", 3, 45, header_dictionary_info
 	subq	$8, %rbx
 	movq	inputIndex(%rip), %rdx
 	salq	$5, %rdx
@@ -2030,34 +908,8 @@ code_in_ptr:
 	addq	$8, %rdx
 	movq	%rdx, (%rbx)
 	NEXT
-	.cfi_endproc
-.LFE48:
-	.size	code_in_ptr, .-code_in_ptr
-	.globl	header_emit
-	.section	.rodata
-.LC48:
-	.string	"EMIT"
-	.data
-	.align 32
-	.type	header_emit, @object
-	.size	header_emit, 32
-header_emit:
-	.quad	header_in_ptr
-	.quad	4
-	.quad	.LC48
-	.quad	code_emit
-	.globl	key_emit
-	.align 4
-	.type	key_emit, @object
-	.size	key_emit, 4
-key_emit:
-	.long	46
-	.text
-	.globl	code_emit
-	.type	code_emit, @function
-code_emit:
-.LFB49:
-	.cfi_startproc
+WORD_TAIL in_ptr
+WORD_HDR emit, "EMIT", 4, 46, header_in_ptr
 	movq	stdout(%rip), %rdx
         movq    (%rbx), %rax
         addq    $8, %rbx
@@ -2065,34 +917,8 @@ code_emit:
 	movl	%eax, %edi
 	call	fputc
 	NEXT
-	.cfi_endproc
-.LFE49:
-	.size	code_emit, .-code_emit
-	.globl	header_source
-	.section	.rodata
-.LC49:
-	.string	"SOURCE"
-	.data
-	.align 32
-	.type	header_source, @object
-	.size	header_source, 32
-header_source:
-	.quad	header_emit
-	.quad	6
-	.quad	.LC49
-	.quad	code_source
-	.globl	key_source
-	.align 4
-	.type	key_source, @object
-	.size	key_source, 4
-key_source:
-	.long	47
-	.text
-	.globl	code_source
-	.type	code_source, @function
-code_source:
-.LFB50:
-	.cfi_startproc
+WORD_TAIL emit
+WORD_HDR source, "SOURCE", 6, 47, header_emit
 	subq	$16, %rbx
 	movq	inputIndex(%rip), %rax
 	salq	$5, %rax
@@ -2105,34 +931,8 @@ code_source:
 	movq	(%rax), %rax
 	movq	%rax, 8(%rbx)
 	NEXT
-	.cfi_endproc
-.LFE50:
-	.size	code_source, .-code_source
-	.globl	header_source_id
-	.section	.rodata
-.LC50:
-	.string	"SOURCE-ID"
-	.data
-	.align 32
-	.type	header_source_id, @object
-	.size	header_source_id, 32
-header_source_id:
-	.quad	header_source
-	.quad	9
-	.quad	.LC50
-	.quad	code_source_id
-	.globl	key_source_id
-	.align 4
-	.type	key_source_id, @object
-	.size	key_source_id, 4
-key_source_id:
-	.long	48
-	.text
-	.globl	code_source_id
-	.type	code_source_id, @function
-code_source_id:
-.LFB51:
-	.cfi_startproc
+WORD_TAIL source
+WORD_HDR source_id, "SOURCE-ID", 9, 48, header_source
 	subq	$8, %rbx
 	movq	inputIndex(%rip), %rax
 	salq	$5, %rax
@@ -2140,378 +940,66 @@ code_source_id:
 	movq	(%rax), %rax
 	movq	%rax, (%rbx)
 	NEXT
-	.cfi_endproc
-.LFE51:
-	.size	code_source_id, .-code_source_id
-	.globl	header_size_cell
-	.section	.rodata
-.LC51:
-	.string	"(/CELL)"
-	.data
-	.align 32
-	.type	header_size_cell, @object
-	.size	header_size_cell, 32
-header_size_cell:
-	.quad	header_source_id
-	.quad	7
-	.quad	.LC51
-	.quad	code_size_cell
-	.globl	key_size_cell
-	.align 4
-	.type	key_size_cell, @object
-	.size	key_size_cell, 4
-key_size_cell:
-	.long	49
-	.text
-	.globl	code_size_cell
-	.type	code_size_cell, @function
-code_size_cell:
-.LFB52:
-	.cfi_startproc
+WORD_TAIL source_id
+WORD_HDR size_cell, "(/CELL)", 7, 49, header_source_id
 	subq	$8, %rbx
 	movq	$8, (%rbx)
 	NEXT
-	.cfi_endproc
-.LFE52:
-	.size	code_size_cell, .-code_size_cell
-	.globl	header_size_char
-	.section	.rodata
-.LC52:
-	.string	"(/CHAR)"
-	.data
-	.align 32
-	.type	header_size_char, @object
-	.size	header_size_char, 32
-header_size_char:
-	.quad	header_size_cell
-	.quad	7
-	.quad	.LC52
-	.quad	code_size_char
-	.globl	key_size_char
-	.align 4
-	.type	key_size_char, @object
-	.size	key_size_char, 4
-key_size_char:
-	.long	50
-	.text
-	.globl	code_size_char
-	.type	code_size_char, @function
-code_size_char:
-.LFB53:
-	.cfi_startproc
+WORD_TAIL size_cell
+WORD_HDR size_char, "(/CHAR)", 7, 50, header_size_cell
 	subq	$8, %rbx
 	movq	$1, (%rbx)
 	NEXT
-	.cfi_endproc
-.LFE53:
-	.size	code_size_char, .-code_size_char
-	.globl	header_cells
-	.section	.rodata
-.LC53:
-	.string	"CELLS"
-	.data
-	.align 32
-	.type	header_cells, @object
-	.size	header_cells, 32
-header_cells:
-	.quad	header_size_char
-	.quad	5
-	.quad	.LC53
-	.quad	code_cells
-	.globl	key_cells
-	.align 4
-	.type	key_cells, @object
-	.size	key_cells, 4
-key_cells:
-	.long	51
-	.text
-	.globl	code_cells
-	.type	code_cells, @function
-code_cells:
-.LFB54:
-	.cfi_startproc
+WORD_TAIL size_char
+WORD_HDR cells, "CELLS", 5, 51, header_size_char
 	movq	(%rbx), %rax
 	salq	$3, %rax
 	movq	%rax, (%rbx)
 	NEXT
-	.cfi_endproc
-.LFE54:
-	.size	code_cells, .-code_cells
-	.globl	header_chars
-	.section	.rodata
-.LC54:
-	.string	"CHARS"
-	.data
-	.align 32
-	.type	header_chars, @object
-	.size	header_chars, 32
-header_chars:
-	.quad	header_cells
-	.quad	5
-	.quad	.LC54
-	.quad	code_chars
-	.globl	key_chars
-	.align 4
-	.type	key_chars, @object
-	.size	key_chars, 4
-key_chars:
-	.long	52
-	.text
-	.globl	code_chars
-	.type	code_chars, @function
-code_chars:
-.LFB55:
-	.cfi_startproc
+WORD_TAIL cells
+WORD_HDR chars, "CHARS", 5, 52, header_cells
 	NEXT
-	.cfi_endproc
-.LFE55:
-	.size	code_chars, .-code_chars
-	.globl	header_unit_bits
-	.section	.rodata
-.LC55:
-	.string	"(ADDRESS-UNIT-BITS)"
-	.data
-	.align 32
-	.type	header_unit_bits, @object
-	.size	header_unit_bits, 32
-header_unit_bits:
-	.quad	header_chars
-	.quad	19
-	.quad	.LC55
-	.quad	code_unit_bits
-	.globl	key_unit_bits
-	.align 4
-	.type	key_unit_bits, @object
-	.size	key_unit_bits, 4
-key_unit_bits:
-	.long	53
-	.text
-	.globl	code_unit_bits
-	.type	code_unit_bits, @function
-code_unit_bits:
-.LFB56:
-	.cfi_startproc
+WORD_TAIL chars
+WORD_HDR unit_bits, "(ADDRESS-UNIT-BITS)", 19, 53, header_chars
 	subq	$8, %rbx
 	movq	$8, (%rbx)
 	NEXT
-	.cfi_endproc
-.LFE56:
-	.size	code_unit_bits, .-code_unit_bits
-	.globl	header_stack_cells
-	.section	.rodata
-.LC56:
-	.string	"(STACK-CELLS)"
-	.data
-	.align 32
-	.type	header_stack_cells, @object
-	.size	header_stack_cells, 32
-header_stack_cells:
-	.quad	header_unit_bits
-	.quad	13
-	.quad	.LC56
-	.quad	code_stack_cells
-	.globl	key_stack_cells
-	.align 4
-	.type	key_stack_cells, @object
-	.size	key_stack_cells, 4
-key_stack_cells:
-	.long	54
-	.text
-	.globl	code_stack_cells
-	.type	code_stack_cells, @function
-code_stack_cells:
-.LFB57:
-	.cfi_startproc
+WORD_TAIL unit_bits
+WORD_HDR stack_cells, "(STACK-CELLS)", 13, 54, header_unit_bits
 	subq	$8, %rbx
 	movq	$16384, (%rbx)
 	NEXT
-	.cfi_endproc
-.LFE57:
-	.size	code_stack_cells, .-code_stack_cells
-	.globl	header_return_stack_cells
-	.section	.rodata
-.LC57:
-	.string	"(RETURN-STACK-CELLS)"
-	.data
-	.align 32
-	.type	header_return_stack_cells, @object
-	.size	header_return_stack_cells, 32
-header_return_stack_cells:
-	.quad	header_stack_cells
-	.quad	20
-	.quad	.LC57
-	.quad	code_return_stack_cells
-	.globl	key_return_stack_cells
-	.align 4
-	.type	key_return_stack_cells, @object
-	.size	key_return_stack_cells, 4
-key_return_stack_cells:
-	.long	55
-	.text
-	.globl	code_return_stack_cells
-	.type	code_return_stack_cells, @function
-code_return_stack_cells:
-.LFB58:
-	.cfi_startproc
+WORD_TAIL stack_cells
+WORD_HDR return_stack_cells, "(RETURN-STACK-CELLS)", 20, 55, header_stack_cells
 	subq	$8, %rbx
 	movq	$1024, (%rbx)
 	NEXT
-	.cfi_endproc
-.LFE58:
-	.size	code_return_stack_cells, .-code_return_stack_cells
-	.globl	header_to_does
-	.section	.rodata
-.LC58:
-	.string	"(>DOES)"
-	.data
-	.align 32
-	.type	header_to_does, @object
-	.size	header_to_does, 32
-header_to_does:
-	.quad	header_return_stack_cells
-	.quad	7
-	.quad	.LC58
-	.quad	code_to_does
-	.globl	key_to_does
-	.align 4
-	.type	key_to_does, @object
-	.size	key_to_does, 4
-key_to_does:
-	.long	56
-	.text
-	.globl	code_to_does
-	.type	code_to_does, @function
-code_to_does:
-.LFB59:
-	.cfi_startproc
+WORD_TAIL return_stack_cells
+WORD_HDR to_does, "(>DOES)", 7, 56, header_return_stack_cells
 	movq	(%rbx), %rax
 	addq	$32, %rax
 	movq	%rax, (%rbx)
 	NEXT
-	.cfi_endproc
-.LFE59:
-	.size	code_to_does, .-code_to_does
-	.globl	header_to_cfa
-	.section	.rodata
-.LC59:
-	.string	"(>CFA)"
-	.data
-	.align 32
-	.type	header_to_cfa, @object
-	.size	header_to_cfa, 32
-header_to_cfa:
-	.quad	header_to_does
-	.quad	6
-	.quad	.LC59
-	.quad	code_to_cfa
-	.globl	key_to_cfa
-	.align 4
-	.type	key_to_cfa, @object
-	.size	key_to_cfa, 4
-key_to_cfa:
-	.long	57
-	.text
-	.globl	code_to_cfa
-	.type	code_to_cfa, @function
-code_to_cfa:
-.LFB60:
-	.cfi_startproc
+WORD_TAIL to_does
+WORD_HDR to_cfa, "(>CFA)", 6, 57, header_to_does
 	movq	(%rbx), %rax
 	addq	$24, %rax
 	movq	%rax, (%rbx)
 	NEXT
-	.cfi_endproc
-.LFE60:
-	.size	code_to_cfa, .-code_to_cfa
-	.globl	header_to_body
-	.section	.rodata
-.LC60:
-	.string	">BODY"
-	.data
-	.align 32
-	.type	header_to_body, @object
-	.size	header_to_body, 32
-header_to_body:
-	.quad	header_to_cfa
-	.quad	5
-	.quad	.LC60
-	.quad	code_to_body
-	.globl	key_to_body
-	.align 4
-	.type	key_to_body, @object
-	.size	key_to_body, 4
-key_to_body:
-	.long	58
-	.text
-	.globl	code_to_body
-	.type	code_to_body, @function
-code_to_body:
-.LFB61:
-	.cfi_startproc
+WORD_TAIL to_cfa
+WORD_HDR to_body, ">BODY", 5, 58, header_to_cfa
 	movq	(%rbx), %rax
 	addq	$16, %rax
 	movq	%rax, (%rbx)
 	NEXT
-	.cfi_endproc
-.LFE61:
-	.size	code_to_body, .-code_to_body
-	.globl	header_last_word
-	.section	.rodata
-.LC61:
-	.string	"(LAST-WORD)"
-	.data
-	.align 32
-	.type	header_last_word, @object
-	.size	header_last_word, 32
-header_last_word:
-	.quad	header_to_body
-	.quad	11
-	.quad	.LC61
-	.quad	code_last_word
-	.globl	key_last_word
-	.align 4
-	.type	key_last_word, @object
-	.size	key_last_word, 4
-key_last_word:
-	.long	59
-	.text
-	.globl	code_last_word
-	.type	code_last_word, @function
-code_last_word:
-.LFB62:
-	.cfi_startproc
+WORD_TAIL to_body
+WORD_HDR last_word, "(LAST-WORD)", 11, 59, header_to_body
 	subq	$8, %rbx
 	movq	lastWord(%rip), %rax
 	movq	%rax, (%rbx)
 	NEXT
-	.cfi_endproc
-.LFE62:
-	.size	code_last_word, .-code_last_word
-	.globl	header_docol
-	.section	.rodata
-.LC62:
-	.string	"(DOCOL)"
-	.data
-	.align 32
-	.type	header_docol, @object
-	.size	header_docol, 32
-header_docol:
-	.quad	header_last_word
-	.quad	7
-	.quad	.LC62
-	.quad	code_docol
-	.globl	key_docol
-	.align 4
-	.type	key_docol, @object
-	.size	key_docol, 4
-key_docol:
-	.long	60
-	.text
-	.globl	code_docol
-	.type	code_docol, @function
-code_docol:
-.LFB63:
-	.cfi_startproc
+WORD_TAIL last_word
+WORD_HDR docol, "(DOCOL)", 7, 60, header_last_word
 	movq	rsp(%rip), %rax
 	subq	$8, %rax
 	movq	%rax, rsp(%rip)
@@ -2520,67 +1008,15 @@ code_docol:
 	addq	$8, %rax
 	movq	%rax, %rbp
 	NEXT
-	.cfi_endproc
-.LFE63:
-	.size	code_docol, .-code_docol
-	.globl	header_dolit
-	.section	.rodata
-.LC63:
-	.string	"(DOLIT)"
-	.data
-	.align 32
-	.type	header_dolit, @object
-	.size	header_dolit, 32
-header_dolit:
-	.quad	header_docol
-	.quad	7
-	.quad	.LC63
-	.quad	code_dolit
-	.globl	key_dolit
-	.align 4
-	.type	key_dolit, @object
-	.size	key_dolit, 4
-key_dolit:
-	.long	61
-	.text
-	.globl	code_dolit
-	.type	code_dolit, @function
-code_dolit:
-.LFB64:
-	.cfi_startproc
+WORD_TAIL docol
+WORD_HDR dolit, "(DOLIT)", 7, 61, header_docol
 	subq	$8, %rbx
         movq    (%rbp), %rax
         movq    %rax, (%rbx)
         addq    $8, %rbp
 	NEXT
-	.cfi_endproc
-.LFE64:
-	.size	code_dolit, .-code_dolit
-	.globl	header_dostring
-	.section	.rodata
-.LC64:
-	.string	"(DOSTRING)"
-	.data
-	.align 32
-	.type	header_dostring, @object
-	.size	header_dostring, 32
-header_dostring:
-	.quad	header_dolit
-	.quad	10
-	.quad	.LC64
-	.quad	code_dostring
-	.globl	key_dostring
-	.align 4
-	.type	key_dostring, @object
-	.size	key_dostring, 4
-key_dostring:
-	.long	62
-	.text
-	.globl	code_dostring
-	.type	code_dostring, @function
-code_dostring:
-.LFB65:
-	.cfi_startproc
+WORD_TAIL dolit
+WORD_HDR dostring, "(DOSTRING)", 10, 62, header_dolit
         # Flow: next byte on TOS, address after it below.
         # Advance the IP (%rbp) by that byte, + 1, and then align it.
         subq    $16, %rbx
@@ -2597,34 +1033,8 @@ code_dostring:
         andq    $-8, %rax     # which is now rounded up so as to be aligned.
         movq    %rax, %rbp    # and moved back to IP
 	NEXT
-	.cfi_endproc
-.LFE65:
-	.size	code_dostring, .-code_dostring
-	.globl	header_dodoes
-	.section	.rodata
-.LC65:
-	.string	"(DODOES)"
-	.data
-	.align 32
-	.type	header_dodoes, @object
-	.size	header_dodoes, 32
-header_dodoes:
-	.quad	header_dostring
-	.quad	8
-	.quad	.LC65
-	.quad	code_dodoes
-	.globl	key_dodoes
-	.align 4
-	.type	key_dodoes, @object
-	.size	key_dodoes, 4
-key_dodoes:
-	.long	63
-	.text
-	.globl	code_dodoes
-	.type	code_dodoes, @function
-code_dodoes:
-.LFB66:
-	.cfi_startproc
+WORD_TAIL dostring
+WORD_HDR dodoes, "(DODOES)", 8, 63, header_dostring
         # Push the address of the data area (cfa + 2 cells).
         # Then check cfa + 1 cell: if nonzero, call into it.
 	movq	cfa(%rip), %rax    # CFA in %rax
@@ -2644,9 +1054,7 @@ code_dodoes:
 	movq	%rcx, %rbp
 .L98:
 	NEXT
-	.cfi_endproc
-.LFE66:
-	.size	code_dodoes, .-code_dodoes
+WORD_TAIL dodoes
 	.globl	parse_
 	.type	parse_, @function
 parse_:
@@ -3195,121 +1603,21 @@ find_found:
 .LF149: # Returning
 	ret
 	.size	find_, .-find_
-	.globl	header_parse
-	.section	.rodata
-.LC66:
-	.string	"PARSE"
-	.data
-	.align 32
-	.type	header_parse, @object
-	.size	header_parse, 32
-header_parse:
-	.quad	header_dodoes
-	.quad	5
-	.quad	.LC66
-	.quad	code_parse
-	.globl	key_parse
-	.align 4
-	.type	key_parse, @object
-	.size	key_parse, 4
-key_parse:
-	.long	64
-	.text
-	.globl	code_parse
-	.type	code_parse, @function
-code_parse:
-.LFB73:
-	.cfi_startproc
+
+
+WORD_HDR parse, "PARSE", 5, 64, header_dodoes
 	call	parse_
 	NEXT
-	.cfi_endproc
-.LFE73:
-	.size	code_parse, .-code_parse
-	.globl	header_parse_name
-	.section	.rodata
-.LC67:
-	.string	"PARSE-NAME"
-	.data
-	.align 32
-	.type	header_parse_name, @object
-	.size	header_parse_name, 32
-header_parse_name:
-	.quad	header_parse
-	.quad	10
-	.quad	.LC67
-	.quad	code_parse_name
-	.globl	key_parse_name
-	.align 4
-	.type	key_parse_name, @object
-	.size	key_parse_name, 4
-key_parse_name:
-	.long	65
-	.text
-	.globl	code_parse_name
-	.type	code_parse_name, @function
-code_parse_name:
-.LFB74:
-	.cfi_startproc
+WORD_TAIL parse
+WORD_HDR parse_name, "PARSE-NAME", 10, 65, header_parse
 	call	parse_name_
 	NEXT
-	.cfi_endproc
-.LFE74:
-	.size	code_parse_name, .-code_parse_name
-	.globl	header_to_number
-	.section	.rodata
-.LC68:
-	.string	">NUMBER"
-	.data
-	.align 32
-	.type	header_to_number, @object
-	.size	header_to_number, 32
-header_to_number:
-	.quad	header_parse_name
-	.quad	7
-	.quad	.LC68
-	.quad	code_to_number
-	.globl	key_to_number
-	.align 4
-	.type	key_to_number, @object
-	.size	key_to_number, 4
-key_to_number:
-	.long	66
-	.text
-	.globl	code_to_number
-	.type	code_to_number, @function
-code_to_number:
-.LFB75:
-	.cfi_startproc
+WORD_TAIL parse_name
+WORD_HDR to_number, ">NUMBER", 7, 66, header_parse_name
 	call	to_number_
 	NEXT
-	.cfi_endproc
-.LFE75:
-	.size	code_to_number, .-code_to_number
-	.globl	header_create
-	.section	.rodata
-.LC69:
-	.string	"CREATE"
-	.data
-	.align 32
-	.type	header_create, @object
-	.size	header_create, 32
-header_create:
-	.quad	header_to_number
-	.quad	6
-	.quad	.LC69
-	.quad	code_create
-	.globl	key_create
-	.align 4
-	.type	key_create, @object
-	.size	key_create, 4
-key_create:
-	.long	67
-	.text
-	.globl	code_create
-	.type	code_create, @function
-code_create:
-.LFB76:
-	.cfi_startproc
+WORD_TAIL to_number
+WORD_HDR create, "CREATE", 6, 67, header_to_number
         # TODO: Optimize. Low priority, CREATE is not very hot.
 	call	parse_name_
 	movq	dsp(%rip), %rax
@@ -3349,199 +1657,42 @@ code_create:
 	movq	%rdx, dsp(%rip)
 	movq	$0, (%rax)
 	NEXT
-	.cfi_endproc
-.LFE76:
-	.size	code_create, .-code_create
-	.globl	header_find
-	.section	.rodata
-.LC70:
-	.string	"(FIND)"
-	.data
-	.align 32
-	.type	header_find, @object
-	.size	header_find, 32
-header_find:
-	.quad	header_create
-	.quad	6
-	.quad	.LC70
-	.quad	code_find
-	.globl	key_find
-	.align 4
-	.type	key_find, @object
-	.size	key_find, 4
-key_find:
-	.long	68
-	.text
-	.globl	code_find
-	.type	code_find, @function
-code_find:
-.LFB77:
-	.cfi_startproc
+WORD_TAIL create
+WORD_HDR find, "(FIND)", 6, 68, header_create
 	call	find_
 	NEXT
-	.cfi_endproc
-.LFE77:
-	.size	code_find, .-code_find
-	.globl	header_depth
-	.section	.rodata
-.LC71:
-	.string	"DEPTH"
-	.data
-	.align 32
-	.type	header_depth, @object
-	.size	header_depth, 32
-header_depth:
-	.quad	header_find
-	.quad	5
-	.quad	.LC71
-	.quad	code_depth
-	.globl	key_depth
-	.align 4
-	.type	key_depth, @object
-	.size	key_depth, 4
-key_depth:
-	.long	69
-	.text
-	.globl	code_depth
-	.type	code_depth, @function
-code_depth:
-.LFB78:
-	.cfi_startproc
+WORD_TAIL find
+WORD_HDR depth, "DEPTH", 5, 69, header_find
 	movq	spTop(%rip), %rax
 	subq	%rbx, %rax
 	shrq	$3, %rax
         subq    $8, %rbx
         movq    %rax, (%rbx)
 	NEXT
-	.cfi_endproc
-.LFE78:
-	.size	code_depth, .-code_depth
-	.globl	header_sp_fetch
-	.section	.rodata
-.LC72:
-	.string	"SP@"
-	.data
-	.align 32
-	.type	header_sp_fetch, @object
-	.size	header_sp_fetch, 32
-header_sp_fetch:
-	.quad	header_depth
-	.quad	3
-	.quad	.LC72
-	.quad	code_sp_fetch
-	.globl	key_sp_fetch
-	.align 4
-	.type	key_sp_fetch, @object
-	.size	key_sp_fetch, 4
-key_sp_fetch:
-	.long	70
-	.text
-	.globl	code_sp_fetch
-	.type	code_sp_fetch, @function
-code_sp_fetch:
-.LFB79:
-	.cfi_startproc
+WORD_TAIL depth
+WORD_HDR sp_fetch, "SP@", 3, 70, header_depth
         movq    %rbx, %rax
         subq    $8, %rbx
         movq    %rax, (%rbx)
 	NEXT
-	.cfi_endproc
-.LFE79:
-	.size	code_sp_fetch, .-code_sp_fetch
-	.globl	header_sp_store
-	.section	.rodata
-.LC73:
-	.string	"SP!"
-	.data
-	.align 32
-	.type	header_sp_store, @object
-	.size	header_sp_store, 32
-header_sp_store:
-	.quad	header_sp_fetch
-	.quad	3
-	.quad	.LC73
-	.quad	code_sp_store
-	.globl	key_sp_store
-	.align 4
-	.type	key_sp_store, @object
-	.size	key_sp_store, 4
-key_sp_store:
-	.long	71
-	.text
-	.globl	code_sp_store
-	.type	code_sp_store, @function
-code_sp_store:
-.LFB80:
-	.cfi_startproc
+WORD_TAIL sp_fetch
+WORD_HDR sp_store, "SP!", 3, 71, header_sp_fetch
 	movq	(%rbx), %rbx
 	NEXT
-	.cfi_endproc
-.LFE80:
-	.size	code_sp_store, .-code_sp_store
-	.globl	header_rp_fetch
-	.section	.rodata
-.LC74:
-	.string	"RP@"
-	.data
-	.align 32
-	.type	header_rp_fetch, @object
-	.size	header_rp_fetch, 32
-header_rp_fetch:
-	.quad	header_sp_store
-	.quad	3
-	.quad	.LC74
-	.quad	code_rp_fetch
-	.globl	key_rp_fetch
-	.align 4
-	.type	key_rp_fetch, @object
-	.size	key_rp_fetch, 4
-key_rp_fetch:
-	.long	72
-	.text
-	.globl	code_rp_fetch
-	.type	code_rp_fetch, @function
-code_rp_fetch:
-.LFB81:
-	.cfi_startproc
+WORD_TAIL sp_store
+WORD_HDR rp_fetch, "RP@", 3, 72, header_sp_store
 	subq	$8, %rbx
 	movq	rsp(%rip), %rax
 	movq	%rax, (%rbx)
 	NEXT
-	.cfi_endproc
-.LFE81:
-	.size	code_rp_fetch, .-code_rp_fetch
-	.globl	header_rp_store
-	.section	.rodata
-.LC75:
-	.string	"RP!"
-	.data
-	.align 32
-	.type	header_rp_store, @object
-	.size	header_rp_store, 32
-header_rp_store:
-	.quad	header_rp_fetch
-	.quad	3
-	.quad	.LC75
-	.quad	code_rp_store
-	.globl	key_rp_store
-	.align 4
-	.type	key_rp_store, @object
-	.size	key_rp_store, 4
-key_rp_store:
-	.long	73
-	.text
-	.globl	code_rp_store
-	.type	code_rp_store, @function
-code_rp_store:
-.LFB82:
-	.cfi_startproc
+WORD_TAIL rp_fetch
+WORD_HDR rp_store, "RP!", 3, 73, header_rp_fetch
 	movq	(%rbx), %rax
         addq    $8, %rbx
 	movq	%rax, rsp(%rip)
 	NEXT
-	.cfi_endproc
-.LFE82:
-	.size	code_rp_store, .-code_rp_store
+WORD_TAIL rp_store
+
 	.section	.rodata
 .LC76:
 	.string	"[%ld] "
@@ -3584,40 +1735,18 @@ dot_s_:
 	.cfi_endproc
 .LFE83:
 	.size	dot_s_, .-dot_s_
-	.globl	header_dot_s
-	.section	.rodata
-.LC77:
-	.string	".S"
-	.data
-	.align 32
-	.type	header_dot_s, @object
-	.size	header_dot_s, 32
-header_dot_s:
-	.quad	header_rp_store
-	.quad	2
-	.quad	.LC77
-	.quad	code_dot_s
-	.globl	key_dot_s
-	.align 4
-	.type	key_dot_s, @object
-	.size	key_dot_s, 4
-key_dot_s:
-	.long	74
-	.text
-	.globl	code_dot_s
-	.type	code_dot_s, @function
-code_dot_s:
-.LFB84:
-	.cfi_startproc
+
+
+WORD_HDR dot_s, ".S", 2, 74, header_rp_store
 	call	dot_s_
 	NEXT
-	.cfi_endproc
-.LFE84:
-	.size	code_dot_s, .-code_dot_s
+WORD_TAIL dot_s
 	.section	.rodata
 .LC78:
 	.string	"%lx "
 	.text
+
+
 	.globl	u_dot_s_
 	.type	u_dot_s_, @function
 u_dot_s_:
@@ -3656,55 +1785,13 @@ u_dot_s_:
 	.cfi_endproc
 .LFE85:
 	.size	u_dot_s_, .-u_dot_s_
-	.globl	header_u_dot_s
-	.section	.rodata
-.LC79:
-	.string	"U.S"
-	.data
-	.align 32
-	.type	header_u_dot_s, @object
-	.size	header_u_dot_s, 32
-header_u_dot_s:
-	.quad	header_dot_s
-	.quad	3
-	.quad	.LC79
-	.quad	code_u_dot_s
-	.globl	key_u_dot_s
-	.align 4
-	.type	key_u_dot_s, @object
-	.size	key_u_dot_s, 4
-key_u_dot_s:
-	.long	75
-	.text
-	.globl	code_u_dot_s
-	.type	code_u_dot_s, @function
-code_u_dot_s:
-.LFB86:
-	.cfi_startproc
+
+
+WORD_HDR u_dot_s, "U.S", 3, 75, header_dot_s
 	call	u_dot_s_
 	NEXT
-	.cfi_endproc
-.LFE86:
-	.size	code_u_dot_s, .-code_u_dot_s
-	.globl	header_dump_file
-	.section	.rodata
-.LC80:
-	.string	"(DUMP-FILE)"
-	.data
-	.align 32
-	.type	header_dump_file, @object
-	.size	header_dump_file, 32
-header_dump_file:
-	.quad	header_u_dot_s
-	.quad	11
-	.quad	.LC80
-	.quad	code_dump_file
-	.globl	key_dump_file
-	.align 4
-	.type	key_dump_file, @object
-	.size	key_dump_file, 4
-key_dump_file:
-	.long	76
+WORD_TAIL u_dot_s
+
 	.section	.rodata
 .LC81:
 	.string	"wb"
@@ -3714,12 +1801,8 @@ key_dump_file:
 	.align 8
 .LC83:
 	.string	"(Dumped %ld of %ld bytes to %s)\n"
-	.text
-	.globl	code_dump_file
-	.type	code_dump_file, @function
-code_dump_file:
-.LFB87:
-	.cfi_startproc
+
+WORD_HDR dump_file, "(DUMP-FILE)", 11, 76, header_u_dot_s
 	movq    (%rbx), %rdx
 	movq    8(%rbx), %rsi
 	movl	$tempBuf, %edi
@@ -3757,9 +1840,8 @@ code_dump_file:
 	movq	$0, tempFile(%rip)
 .L175:
 	NEXT
-	.cfi_endproc
-.LFE87:
-	.size	code_dump_file, .-code_dump_file
+WORD_TAIL dump_file
+
 	.globl	key_call_
 	.data
 	.align 4
@@ -4234,185 +2316,32 @@ quit_:
 	.cfi_endproc
 .LFE94:
 	.size	quit_, .-quit_
-	.globl	header_quit
-	.section	.rodata
-.LC86:
-	.string	"QUIT"
-	.data
-	.align 32
-	.type	header_quit, @object
-	.size	header_quit, 32
-header_quit:
-	.quad	header_dump_file
-	.quad	4
-	.quad	.LC86
-	.quad	code_quit
-	.globl	key_quit
-	.align 4
-	.type	key_quit, @object
-	.size	key_quit, 4
-key_quit:
-	.long	77
-	.text
-	.globl	code_quit
-	.type	code_quit, @function
-code_quit:
-.LFB95:
-	.cfi_startproc
+
+WORD_HDR quit, "QUIT", 4, 77, header_dump_file
 	movq	$0, inputIndex(%rip)
 	call	quit_
 	NEXT
-	.cfi_endproc
-.LFE95:
-	.size	code_quit, .-code_quit
-	.globl	header_bye
-	.section	.rodata
-.LC87:
-	.string	"BYE"
-	.data
-	.align 32
-	.type	header_bye, @object
-	.size	header_bye, 32
-header_bye:
-	.quad	header_quit
-	.quad	3
-	.quad	.LC87
-	.quad	code_bye
-	.globl	key_bye
-	.align 4
-	.type	key_bye, @object
-	.size	key_bye, 4
-key_bye:
-	.long	78
-	.text
-	.globl	code_bye
-	.type	code_bye, @function
-code_bye:
-.LFB96:
-	.cfi_startproc
+WORD_TAIL quit
+WORD_HDR bye, "BYE", 3, 78, header_quit
 	movl	$0, %edi
 	call	exit
-	.cfi_endproc
-.LFE96:
-	.size	code_bye, .-code_bye
-	.globl	header_compile_comma
-	.section	.rodata
-.LC88:
-	.string	"COMPILE,"
-	.data
-	.align 32
-	.type	header_compile_comma, @object
-	.size	header_compile_comma, 32
-header_compile_comma:
-	.quad	header_bye
-	.quad	8
-	.quad	.LC88
-	.quad	code_compile_comma
-	.globl	key_compile_comma
-	.align 4
-	.type	key_compile_comma, @object
-	.size	key_compile_comma, 4
-key_compile_comma:
-	.long	79
-	.text
-	.globl	code_compile_comma
-	.type	code_compile_comma, @function
-code_compile_comma:
-.LFB97:
-	.cfi_startproc
+WORD_TAIL bye
+WORD_HDR compile_comma, "COMPILE,", 8, 79, header_bye
 	movl	$0, %eax
 	call	compile_
 	NEXT
-	.cfi_endproc
-.LFE97:
-	.size	code_compile_comma, .-code_compile_comma
-	.globl	header_literal
-	.section	.rodata
-.LC89:
-	.string	"LITERAL"
-	.data
-	.align 32
-	.type	header_literal, @object
-	.size	header_literal, 32
-header_literal:
-	.quad	header_compile_comma
-	.quad	519
-	.quad	.LC89
-	.quad	code_literal
-	.globl	key_literal
-	.align 4
-	.type	key_literal, @object
-	.size	key_literal, 4
-key_literal:
-	.long	101
-	.text
-	.globl	code_literal
-	.type	code_literal, @function
-code_literal:
-.LFB98:
-	.cfi_startproc
+WORD_TAIL compile_comma
+WORD_HDR literal, "LITERAL", 519, 101, header_compile_comma
 	movl	$0, %eax
 	call	compile_lit_
 	NEXT
-	.cfi_endproc
-.LFE98:
-	.size	code_literal, .-code_literal
-	.globl	header_compile_literal
-	.section	.rodata
-.LC90:
-	.string	"[LITERAL]"
-	.data
-	.align 32
-	.type	header_compile_literal, @object
-	.size	header_compile_literal, 32
-header_compile_literal:
-	.quad	header_literal
-	.quad	9
-	.quad	.LC90
-	.quad	code_compile_literal
-	.globl	key_compile_literal
-	.align 4
-	.type	key_compile_literal, @object
-	.size	key_compile_literal, 4
-key_compile_literal:
-	.long	102
-	.text
-	.globl	code_compile_literal
-	.type	code_compile_literal, @function
-code_compile_literal:
-.LFB99:
-	.cfi_startproc
+WORD_TAIL literal
+WORD_HDR compile_literal, "[LITERAL]", 9, 102, header_literal
 	movl	$0, %eax
 	call	compile_lit_
 	NEXT
-	.cfi_endproc
-.LFE99:
-	.size	code_compile_literal, .-code_compile_literal
-	.globl	header_compile_zbranch
-	.section	.rodata
-.LC91:
-	.string	"[0BRANCH]"
-	.data
-	.align 32
-	.type	header_compile_zbranch, @object
-	.size	header_compile_zbranch, 32
-header_compile_zbranch:
-	.quad	header_compile_literal
-	.quad	9
-	.quad	.LC91
-	.quad	code_compile_zbranch
-	.globl	key_compile_zbranch
-	.align 4
-	.type	key_compile_zbranch, @object
-	.size	key_compile_zbranch, 4
-key_compile_zbranch:
-	.long	103
-	.text
-	.globl	code_compile_zbranch
-	.type	code_compile_zbranch, @function
-code_compile_zbranch:
-.LFB100:
-	.cfi_startproc
+WORD_TAIL compile_literal
+WORD_HDR compile_zbranch, "[0BRANCH]", 9, 103, header_compile_literal
 	subq	$8, %rbx
 	movl	$header_zbranch+24, %eax
 	movq	%rax, (%rbx)
@@ -4432,34 +2361,8 @@ code_compile_zbranch:
         addq    $8, %rax
         movq    %rax, dsp(%rip)
 	NEXT
-	.cfi_endproc
-.LFE100:
-	.size	code_compile_zbranch, .-code_compile_zbranch
-	.globl	header_compile_branch
-	.section	.rodata
-.LC92:
-	.string	"[BRANCH]"
-	.data
-	.align 32
-	.type	header_compile_branch, @object
-	.size	header_compile_branch, 32
-header_compile_branch:
-	.quad	header_compile_zbranch
-	.quad	8
-	.quad	.LC92
-	.quad	code_compile_branch
-	.globl	key_compile_branch
-	.align 4
-	.type	key_compile_branch, @object
-	.size	key_compile_branch, 4
-key_compile_branch:
-	.long	104
-	.text
-	.globl	code_compile_branch
-	.type	code_compile_branch, @function
-code_compile_branch:
-.LFB101:
-	.cfi_startproc
+WORD_TAIL compile_zbranch
+WORD_HDR compile_branch, "[BRANCH]", 8, 104, header_compile_zbranch
 	subq	$8, %rbx
 	movl	$header_branch+24, %edx
 	movq	%rdx, (%rbx)
@@ -4480,34 +2383,8 @@ code_compile_branch:
 	movq	%rdx, dsp(%rip)
 	movq	$0, (%rax)
 	NEXT
-	.cfi_endproc
-.LFE101:
-	.size	code_compile_branch, .-code_compile_branch
-	.globl	header_control_flush
-	.section	.rodata
-.LC93:
-	.string	"(CONTROL-FLUSH)"
-	.data
-	.align 32
-	.type	header_control_flush, @object
-	.size	header_control_flush, 32
-header_control_flush:
-	.quad	header_compile_branch
-	.quad	15
-	.quad	.LC93
-	.quad	code_control_flush
-	.globl	key_control_flush
-	.align 4
-	.type	key_control_flush, @object
-	.size	key_control_flush, 4
-key_control_flush:
-	.long	105
-	.text
-	.globl	code_control_flush
-	.type	code_control_flush, @function
-code_control_flush:
-.LFB102:
-	.cfi_startproc
+WORD_TAIL compile_branch
+WORD_HDR control_flush, "(CONTROL-FLUSH)", 15, 105, header_compile_branch
 	jmp	.L252
 .L253:
 	call	drain_queue_
@@ -4516,63 +2393,11 @@ code_control_flush:
 	testl	%eax, %eax
 	jg	.L253
 	NEXT
-	.cfi_endproc
-.LFE102:
-	.size	code_control_flush, .-code_control_flush
-	.globl	header_debug_break
-	.section	.rodata
-.LC94:
-	.string	"(DEBUG)"
-	.data
-	.align 32
-	.type	header_debug_break, @object
-	.size	header_debug_break, 32
-header_debug_break:
-	.quad	header_control_flush
-	.quad	7
-	.quad	.LC94
-	.quad	code_debug_break
-	.globl	key_debug_break
-	.align 4
-	.type	key_debug_break, @object
-	.size	key_debug_break, 4
-key_debug_break:
-	.long	80
-	.text
-	.globl	code_debug_break
-	.type	code_debug_break, @function
-code_debug_break:
-.LFB103:
-	.cfi_startproc
+WORD_TAIL control_flush
+WORD_HDR debug_break, "(DEBUG)", 7, 80, header_control_flush
 	NEXT
-	.cfi_endproc
-.LFE103:
-	.size	code_debug_break, .-code_debug_break
-	.globl	header_close_file
-	.section	.rodata
-.LC95:
-	.string	"CLOSE-FILE"
-	.data
-	.align 32
-	.type	header_close_file, @object
-	.size	header_close_file, 32
-header_close_file:
-	.quad	header_debug_break
-	.quad	10
-	.quad	.LC95
-	.quad	code_close_file
-	.globl	key_close_file
-	.align 4
-	.type	key_close_file, @object
-	.size	key_close_file, 4
-key_close_file:
-	.long	81
-	.text
-	.globl	code_close_file
-	.type	code_close_file, @function
-code_close_file:
-.LFB104:
-	.cfi_startproc
+WORD_TAIL debug_break
+WORD_HDR close_file, "CLOSE-FILE", 10, 81, header_debug_break
 	movq	(%rbx), %rdi
 	call	fclose
 	cltq
@@ -4587,9 +2412,7 @@ code_close_file:
 .L257:
 	movq	%rax, (%rbx)
 	NEXT
-	.cfi_endproc
-.LFE104:
-	.size	code_close_file, .-code_close_file
+WORD_TAIL close_file
 	.globl	file_modes
 	.section	.rodata
 .LC96:
@@ -4627,31 +2450,9 @@ file_modes:
 	.quad	.LC102
 	.quad	.LC81
 	.quad	.LC102
-	.globl	header_create_file
-	.section	.rodata
-.LC103:
-	.string	"CREATE-FILE"
-	.data
-	.align 32
-	.type	header_create_file, @object
-	.size	header_create_file, 32
-header_create_file:
-	.quad	header_close_file
-	.quad	11
-	.quad	.LC103
-	.quad	code_create_file
-	.globl	key_create_file
-	.align 4
-	.type	key_create_file, @object
-	.size	key_create_file, 4
-key_create_file:
-	.long	82
-	.text
-	.globl	code_create_file
-	.type	code_create_file, @function
-code_create_file:
-.LFB105:
-	.cfi_startproc
+
+
+WORD_HDR create_file, "CREATE-FILE", 11, 82, header_close_file
 	movq    8(%rbx), %rdx
 	movq    16(%rbx), %rsi
 	movl	$tempBuf, %edi
@@ -4678,34 +2479,8 @@ code_create_file:
 .L261:
 	movq	%rax, (%rbx)
 	NEXT
-	.cfi_endproc
-.LFE105:
-	.size	code_create_file, .-code_create_file
-	.globl	header_open_file
-	.section	.rodata
-.LC104:
-	.string	"OPEN-FILE"
-	.data
-	.align 32
-	.type	header_open_file, @object
-	.size	header_open_file, 32
-header_open_file:
-	.quad	header_create_file
-	.quad	9
-	.quad	.LC104
-	.quad	code_open_file
-	.globl	key_open_file
-	.align 4
-	.type	key_open_file, @object
-	.size	key_open_file, 4
-key_open_file:
-	.long	83
-	.text
-	.globl	code_open_file
-	.type	code_open_file, @function
-code_open_file:
-.LFB106:
-	.cfi_startproc
+WORD_TAIL create_file
+WORD_HDR open_file, "OPEN-FILE", 9, 83, header_create_file
         movq    8(%rbx), %rdx
         movq    16(%rbx), %rsi
 	movl	$tempBuf, %edi
@@ -4745,34 +2520,8 @@ code_open_file:
 	addq	$8, %rbx
 	movq	%rax, (%rbx)
 	NEXT
-	.cfi_endproc
-.LFE106:
-	.size	code_open_file, .-code_open_file
-	.globl	header_delete_file
-	.section	.rodata
-.LC105:
-	.string	"DELETE-FILE"
-	.data
-	.align 32
-	.type	header_delete_file, @object
-	.size	header_delete_file, 32
-header_delete_file:
-	.quad	header_open_file
-	.quad	11
-	.quad	.LC105
-	.quad	code_delete_file
-	.globl	key_delete_file
-	.align 4
-	.type	key_delete_file, @object
-	.size	key_delete_file, 4
-key_delete_file:
-	.long	84
-	.text
-	.globl	code_delete_file
-	.type	code_delete_file, @function
-code_delete_file:
-.LFB107:
-	.cfi_startproc
+WORD_TAIL open_file
+WORD_HDR delete_file, "DELETE-FILE", 11, 84, header_open_file
         movq    (%rbx), %rdx
         movq    8(%rbx), %rsi
 	movl	$tempBuf, %edi
@@ -4792,34 +2541,8 @@ code_delete_file:
 	movq	%rax, (%rbx)
 .L269:
 	NEXT
-	.cfi_endproc
-.LFE107:
-	.size	code_delete_file, .-code_delete_file
-	.globl	header_file_position
-	.section	.rodata
-.LC106:
-	.string	"FILE-POSITION"
-	.data
-	.align 32
-	.type	header_file_position, @object
-	.size	header_file_position, 32
-header_file_position:
-	.quad	header_delete_file
-	.quad	13
-	.quad	.LC106
-	.quad	code_file_position
-	.globl	key_file_position
-	.align 4
-	.type	key_file_position, @object
-	.size	key_file_position, 4
-key_file_position:
-	.long	85
-	.text
-	.globl	code_file_position
-	.type	code_file_position, @function
-code_file_position:
-.LFB108:
-	.cfi_startproc
+WORD_TAIL delete_file
+WORD_HDR file_position, "FILE-POSITION", 13, 85, header_delete_file
 	subq	$16, %rbx
         movq    $0, 8(%rbx)
         movq    16(%rbx), %rdi
@@ -4836,34 +2559,8 @@ code_file_position:
 .L273:
 	movq	%rax, (%rbx)
 	NEXT
-	.cfi_endproc
-.LFE108:
-	.size	code_file_position, .-code_file_position
-	.globl	header_file_size
-	.section	.rodata
-.LC107:
-	.string	"FILE-SIZE"
-	.data
-	.align 32
-	.type	header_file_size, @object
-	.size	header_file_size, 32
-header_file_size:
-	.quad	header_file_position
-	.quad	9
-	.quad	.LC107
-	.quad	code_file_size
-	.globl	key_file_size
-	.align 4
-	.type	key_file_size, @object
-	.size	key_file_size, 4
-key_file_size:
-	.long	86
-	.text
-	.globl	code_file_size
-	.type	code_file_size, @function
-code_file_size:
-.LFB109:
-	.cfi_startproc
+WORD_TAIL file_position
+WORD_HDR file_size, "FILE-SIZE", 9, 86, header_file_position
 	subq	$16, %rbx
         movq    $0, 8(%rbx)
         movq    16(%rbx), %rdi
@@ -4907,34 +2604,8 @@ code_file_size:
 	movq	$0, (%rbx)
 .L277:
 	NEXT
-	.cfi_endproc
-.LFE109:
-	.size	code_file_size, .-code_file_size
-	.globl	header_include_file
-	.section	.rodata
-.LC108:
-	.string	"INCLUDE-FILE"
-	.data
-	.align 32
-	.type	header_include_file, @object
-	.size	header_include_file, 32
-header_include_file:
-	.quad	header_file_size
-	.quad	12
-	.quad	.LC108
-	.quad	code_include_file
-	.globl	key_include_file
-	.align 4
-	.type	key_include_file, @object
-	.size	key_include_file, 4
-key_include_file:
-	.long	87
-	.text
-	.globl	code_include_file
-	.type	code_include_file, @function
-code_include_file:
-.LFB110:
-	.cfi_startproc
+WORD_TAIL file_size
+WORD_HDR include_file, "INCLUDE-FILE", 12, 87, header_file_size
 	addq	$1, inputIndex(%rip)
 	movq	inputIndex(%rip), %rcx
 	movq	(%rbx), %rax
@@ -4959,34 +2630,8 @@ code_include_file:
 	addq	$inputSources+24, %rax
 	movq	%rdx, (%rax)
 	NEXT
-	.cfi_endproc
-.LFE110:
-	.size	code_include_file, .-code_include_file
-	.globl	header_read_file
-	.section	.rodata
-.LC109:
-	.string	"READ-FILE"
-	.data
-	.align 32
-	.type	header_read_file, @object
-	.size	header_read_file, 32
-header_read_file:
-	.quad	header_include_file
-	.quad	9
-	.quad	.LC109
-	.quad	code_read_file
-	.globl	key_read_file
-	.align 4
-	.type	key_read_file, @object
-	.size	key_read_file, 4
-key_read_file:
-	.long	88
-	.text
-	.globl	code_read_file
-	.type	code_read_file, @function
-code_read_file:
-.LFB111:
-	.cfi_startproc
+WORD_TAIL include_file
+WORD_HDR read_file, "READ-FILE", 9, 88, header_include_file
         movq    (%rbx), %rcx
         movq    8(%rbx), %rdx
 	movl	$1, %esi
@@ -5017,34 +2662,8 @@ code_read_file:
 	movq	$0, (%rbx)
 .L285:
 	NEXT
-	.cfi_endproc
-.LFE111:
-	.size	code_read_file, .-code_read_file
-	.globl	header_read_line
-	.section	.rodata
-.LC110:
-	.string	"READ-LINE"
-	.data
-	.align 32
-	.type	header_read_line, @object
-	.size	header_read_line, 32
-header_read_line:
-	.quad	header_read_file
-	.quad	9
-	.quad	.LC110
-	.quad	code_read_line
-	.globl	key_read_line
-	.align 4
-	.type	key_read_line, @object
-	.size	key_read_line, 4
-key_read_line:
-	.long	89
-	.text
-	.globl	code_read_line
-	.type	code_read_line, @function
-code_read_line:
-.LFB112:
-	.cfi_startproc
+WORD_TAIL read_file
+WORD_HDR read_line, "READ-LINE", 9, 89, header_read_file
 	movq	$0, str1(%rip)
 	movq	$0, tempSize(%rip)
 	movq	(%rbx), %rdx
@@ -5116,34 +2735,8 @@ code_read_line:
 	call	free
 .L293:
 	NEXT
-	.cfi_endproc
-.LFE112:
-	.size	code_read_line, .-code_read_line
-	.globl	header_reposition_file
-	.section	.rodata
-.LC111:
-	.string	"REPOSITION-FILE"
-	.data
-	.align 32
-	.type	header_reposition_file, @object
-	.size	header_reposition_file, 32
-header_reposition_file:
-	.quad	header_read_line
-	.quad	15
-	.quad	.LC111
-	.quad	code_reposition_file
-	.globl	key_reposition_file
-	.align 4
-	.type	key_reposition_file, @object
-	.size	key_reposition_file, 4
-key_reposition_file:
-	.long	90
-	.text
-	.globl	code_reposition_file
-	.type	code_reposition_file, @function
-code_reposition_file:
-.LFB113:
-	.cfi_startproc
+WORD_TAIL read_line
+WORD_HDR reposition_file, "REPOSITION-FILE", 15, 90, header_read_line
 	movq	16(%rbx), %rsi
 	movq	(%rbx), %rdi
 	movl	$0, %edx
@@ -5160,34 +2753,8 @@ code_reposition_file:
 	movq	%rax, (%rbx)
 .L296:
 	NEXT
-	.cfi_endproc
-.LFE113:
-	.size	code_reposition_file, .-code_reposition_file
-	.globl	header_resize_file
-	.section	.rodata
-.LC112:
-	.string	"RESIZE-FILE"
-	.data
-	.align 32
-	.type	header_resize_file, @object
-	.size	header_resize_file, 32
-header_resize_file:
-	.quad	header_reposition_file
-	.quad	11
-	.quad	.LC112
-	.quad	code_resize_file
-	.globl	key_resize_file
-	.align 4
-	.type	key_resize_file, @object
-	.size	key_resize_file, 4
-key_resize_file:
-	.long	91
-	.text
-	.globl	code_resize_file
-	.type	code_resize_file, @function
-code_resize_file:
-.LFB114:
-	.cfi_startproc
+WORD_TAIL reposition_file
+WORD_HDR resize_file, "RESIZE-FILE", 11, 91, header_reposition_file
         movq    (%rbx), %rdi
         call    fileno
         movl    %eax, %edi
@@ -5208,34 +2775,8 @@ code_resize_file:
 .L300:
 	movq	%rax, (%rbx)
 	NEXT
-	.cfi_endproc
-.LFE114:
-	.size	code_resize_file, .-code_resize_file
-	.globl	header_write_file
-	.section	.rodata
-.LC113:
-	.string	"WRITE-FILE"
-	.data
-	.align 32
-	.type	header_write_file, @object
-	.size	header_write_file, 32
-header_write_file:
-	.quad	header_resize_file
-	.quad	10
-	.quad	.LC113
-	.quad	code_write_file
-	.globl	key_write_file
-	.align 4
-	.type	key_write_file, @object
-	.size	key_write_file, 4
-key_write_file:
-	.long	92
-	.text
-	.globl	code_write_file
-	.type	code_write_file, @function
-code_write_file:
-.LFB115:
-	.cfi_startproc
+WORD_TAIL resize_file
+WORD_HDR write_file, "WRITE-FILE", 10, 92, header_resize_file
 	movq	(%rbx), %rcx
 	movq	8(%rbx), %rdx
 	movl	$1, %esi
@@ -5245,34 +2786,8 @@ code_write_file:
 	addq	$16, %rbx
 	movq	$0, (%rbx)
 	NEXT
-	.cfi_endproc
-.LFE115:
-	.size	code_write_file, .-code_write_file
-	.globl	header_write_line
-	.section	.rodata
-.LC114:
-	.string	"WRITE-LINE"
-	.data
-	.align 32
-	.type	header_write_line, @object
-	.size	header_write_line, 32
-header_write_line:
-	.quad	header_write_file
-	.quad	10
-	.quad	.LC114
-	.quad	code_write_line
-	.globl	key_write_line
-	.align 4
-	.type	key_write_line, @object
-	.size	key_write_line, 4
-key_write_line:
-	.long	93
-	.text
-	.globl	code_write_line
-	.type	code_write_line, @function
-code_write_line:
-.LFB116:
-	.cfi_startproc
+WORD_TAIL write_file
+WORD_HDR write_line, "WRITE-LINE", 10, 93, header_write_file
 	movq	8(%rbx), %rdx
 	movq	16(%rbx), %rsi
 	movl	$tempBuf, %edi
@@ -5288,34 +2803,8 @@ code_write_line:
 	addq	$16, %rbx
 	movq	$0, (%rbx)
 	NEXT
-	.cfi_endproc
-.LFE116:
-	.size	code_write_line, .-code_write_line
-	.globl	header_flush_file
-	.section	.rodata
-.LC115:
-	.string	"FLUSH-FILE"
-	.data
-	.align 32
-	.type	header_flush_file, @object
-	.size	header_flush_file, 32
-header_flush_file:
-	.quad	header_write_line
-	.quad	10
-	.quad	.LC115
-	.quad	code_flush_file
-	.globl	key_flush_file
-	.align 4
-	.type	key_flush_file, @object
-	.size	key_flush_file, 4
-key_flush_file:
-	.long	94
-	.text
-	.globl	code_flush_file
-	.type	code_flush_file, @function
-code_flush_file:
-.LFB117:
-	.cfi_startproc
+WORD_TAIL write_line
+WORD_HDR flush_file, "FLUSH-FILE", 10, 94, header_write_line
 	movq	(%rbx), %rdi
 	call	fileno
 	movl	%eax, %edi
@@ -5330,38 +2819,13 @@ code_flush_file:
 	movq	%rax, (%rbx)
 .L307:
 	NEXT
-	.cfi_endproc
-.LFE117:
-	.size	code_flush_file, .-code_flush_file
-	.globl	header_colon
-	.section	.rodata
-.LC116:
-	.string	":"
-	.data
-	.align 32
-	.type	header_colon, @object
-	.size	header_colon, 32
-header_colon:
-	.quad	header_flush_file
-	.quad	1
-	.quad	.LC116
-	.quad	code_colon
-	.globl	key_colon
-	.align 4
-	.type	key_colon, @object
-	.size	key_colon, 4
-key_colon:
-	.long	95
+WORD_TAIL flush_file
 	.section	.rodata
 	.align 8
 .LC117:
 	.string	"*** Colon definition with no name\n"
-	.text
-	.globl	code_colon
-	.type	code_colon, @function
-code_colon:
-.LFB118:
-	.cfi_startproc
+
+WORD_HDR colon, ":", 1, 95, header_flush_file
 	movq	dsp(%rip), %rax
 	addq	$7, %rax
 	andq	$-8, %rax
@@ -5404,34 +2868,8 @@ code_colon:
 	movq	%rax, lastWord(%rip)
 	movq	$1, state(%rip)
 	NEXT
-	.cfi_endproc
-.LFE118:
-	.size	code_colon, .-code_colon
-	.globl	header_colon_no_name
-	.section	.rodata
-.LC118:
-	.string	":NONAME"
-	.data
-	.align 32
-	.type	header_colon_no_name, @object
-	.size	header_colon_no_name, 32
-header_colon_no_name:
-	.quad	header_colon
-	.quad	7
-	.quad	.LC118
-	.quad	code_colon_no_name
-	.globl	key_colon_no_name
-	.align 4
-	.type	key_colon_no_name, @object
-	.size	key_colon_no_name, 4
-key_colon_no_name:
-	.long	96
-	.text
-	.globl	code_colon_no_name
-	.type	code_colon_no_name, @function
-code_colon_no_name:
-.LFB119:
-	.cfi_startproc
+WORD_TAIL colon
+WORD_HDR colon_no_name, ":NONAME", 7, 96, header_colon
 	movq	dsp(%rip), %rax
 	addq	$7, %rax
 	andq	$-8, %rax
@@ -5448,59 +2886,13 @@ code_colon_no_name:
 	movq	%rdx, (%rax)
 	movq	$1, state(%rip)
 	NEXT
-	.cfi_endproc
-.LFE119:
-	.size	code_colon_no_name, .-code_colon_no_name
-	.globl	header_exit
-	.section	.rodata
-.LC119:
-	.string	"EXIT"
-	.data
-	.align 32
-	.type	header_exit, @object
-	.size	header_exit, 32
-header_exit:
-	.quad	header_colon_no_name
-	.quad	4
-	.quad	.LC119
-	.quad	code_exit
-	.globl	key_exit
-	.align 4
-	.type	key_exit, @object
-	.size	key_exit, 4
-key_exit:
-	.long	97
-	.text
-	.globl	code_exit
-	.type	code_exit, @function
-code_exit:
-.LFB120:
-	.cfi_startproc
+WORD_TAIL colon_no_name
+WORD_HDR exit, "EXIT", 4, 97, header_colon_no_name
         # TODO: I think the below (equivalent to EXIT_NEXT macro) can be
         # shortened everywhere it appears. Replace it with a GAS macro?
 	EXIT_NEXT
-	.cfi_endproc
-.LFE120:
-	.size	code_exit, .-code_exit
-	.globl	header_see
-	.section	.rodata
-.LC120:
-	.string	"SEE"
-	.data
-	.align 32
-	.type	header_see, @object
-	.size	header_see, 32
-header_see:
-	.quad	header_exit
-	.quad	3
-	.quad	.LC120
-	.quad	code_see
-	.globl	key_see
-	.align 4
-	.type	key_see, @object
-	.size	key_see, 4
-key_see:
-	.long	98
+WORD_TAIL exit
+
 	.section	.rodata
 .LC121:
 	.string	"Decompiling "
@@ -5519,12 +2911,8 @@ key_see:
 	.string	"\"%s\"\n"
 .LC128:
 	.string	"%lu: "
-	.text
-	.globl	code_see
-	.type	code_see, @function
-code_see:
-.LFB121:
-	.cfi_startproc
+
+WORD_HDR see, "SEE", 3, 98, header_exit
 	call	parse_name_
 	movl	$.LC121, %edi
 	movl	$0, %eax
@@ -5667,34 +3055,8 @@ code_see:
 .L316:
 	addq	$16, %rbx
 	NEXT
-	.cfi_endproc
-.LFE121:
-	.size	code_see, .-code_see
-	.globl	header_utime
-	.section	.rodata
-.LC129:
-	.string	"UTIME"
-	.data
-	.align 32
-	.type	header_utime, @object
-	.size	header_utime, 32
-header_utime:
-	.quad	header_see
-	.quad	5
-	.quad	.LC129
-	.quad	code_utime
-	.globl	key_utime
-	.align 4
-	.type	key_utime, @object
-	.size	key_utime, 4
-key_utime:
-	.long	106
-	.text
-	.globl	code_utime
-	.type	code_utime, @function
-code_utime:
-.LFB122:
-	.cfi_startproc
+WORD_TAIL see
+WORD_HDR utime, "UTIME", 5, 106, header_see
 	movl	$0, %esi
 	movl	$timeVal, %edi
 	call	gettimeofday
@@ -5706,34 +3068,8 @@ code_utime:
 	movq	%rdx, 8(%rbx)
 	movq	$0, (%rbx)
 	NEXT
-	.cfi_endproc
-.LFE122:
-	.size	code_utime, .-code_utime
-	.globl	header_semicolon
-	.section	.rodata
-.LC130:
-	.string	";"
-	.data
-	.align 32
-	.type	header_semicolon, @object
-	.size	header_semicolon, 32
-header_semicolon:
-	.quad	header_utime
-	.quad	513
-	.quad	.LC130
-	.quad	code_semicolon
-	.globl	key_semicolon
-	.align 4
-	.type	key_semicolon, @object
-	.size	key_semicolon, 4
-key_semicolon:
-	.long	99
-	.text
-	.globl	code_semicolon
-	.type	code_semicolon, @function
-code_semicolon:
-.LFB123:
-	.cfi_startproc
+WORD_TAIL utime
+WORD_HDR semicolon, ";", 513, 99, header_utime
 	movq	compilationWordlist(%rip), %rax  # Pointer to the header
 	movq    (%rax), %rax  # The header itself.
 	movq	8(%rax), %rdx # The length word.
@@ -5753,35 +3089,9 @@ code_semicolon:
 	jne	.L331
 	movq	$0, state(%rip)
 	NEXT
-	.cfi_endproc
-.BSS001:
-	.size	code_semicolon, .-code_semicolon
-	.globl	header_loop_end
-	.section	.rodata
-        .align 8
-.BSS002:
-	.string	"(LOOP-END)"
-	.data
-	.align 32
-	.type	header_loop_end, @object
-	.size	header_loop_end, 32
-header_loop_end:
-	.quad	header_semicolon
-	.quad	10
-	.quad	.BSS002
-	.quad	code_loop_end
-	.globl	key_loop_end
-	.align 4
-	.type	key_loop_end, @object
-	.size	key_loop_end, 4
-key_loop_end:
-	.long	107
-	.text
-	.globl	code_loop_end
-	.type	code_loop_end, @function
-code_loop_end:
-.BSS003:
-	.cfi_startproc
+WORD_TAIL semicolon
+
+WORD_HDR loop_end, "(LOOP-END)", 10, 107, header_semicolon
         movq    rsp(%rip), %r9    # r9 holds the RSP
         movq    (%r9), %rcx       # rcx holds the index
         movq    %rcx, %rdx
@@ -5819,62 +3129,19 @@ code_loop_end:
         addq    %r10, %rcx
         movq    %rcx, (%r9)
 	NEXT
-	.cfi_endproc
+WORD_TAIL loop_end
 
 # Adding native words for calling C with return values.
 # The no-return versions of these are written in Forth, they just drop the nonce
 # return value.
 
-.BSS0101:
-        .string "CCALL0"
-        .data
-        .align 32
-        .type   header_ccall_0, @object
-        .size   header_ccall_0, 32
-header_ccall_0:
-        .quad   header_loop_end
-        .quad   6
-        .quad   .BSS0101
-        .quad   code_ccall_0
-        .globl  key_ccall_0
-        .align  4
-        .type   key_ccall_0, @object
-        .size   key_ccall_0, 4
-key_ccall_0:
-        .long   108
-        .text
-        .globl  code_ccall_0
-        .type   code_ccall_0, @function
-code_ccall_0:
-        .cfi_startproc
+WORD_HDR ccall_0, "CCALL0", 6, 108, header_loop_end
         movq    (%rbx), %rax  # Only argument is the C function address.
         call    *%rax
         movq    %rax, (%rbx)
         NEXT
-        .cfi_endproc
-
-.BSS0201:
-        .string "CCALL1"
-        .data
-        .align 32
-        .type   header_ccall_1, @object
-        .size   header_ccall_1, 32
-header_ccall_1:
-        .quad   header_ccall_0
-        .quad   6
-        .quad   .BSS0201
-        .quad   code_ccall_1
-        .globl  key_ccall_1
-        .align  4
-        .type   key_ccall_1, @object
-        .size   key_ccall_1, 4
-key_ccall_1:
-        .long   109
-        .text
-        .globl  code_ccall_1
-        .type   code_ccall_1, @function
-code_ccall_1:
-        .cfi_startproc
+WORD_TAIL ccall_0
+WORD_HDR ccall_1, "CCALL1", 6, 109, header_ccall_0
         movq    8(%rbx), %rdi # TOS = first argument
         movq    (%rbx), %rax
         subq    $8, %rsp
@@ -5883,30 +3150,8 @@ code_ccall_1:
         addq    $8, %rbx
         movq    %rax, (%rbx)
         NEXT
-        .cfi_endproc
-
-.BSS0301:
-        .string "CCALL2"
-        .data
-        .align 32
-        .type   header_ccall_2, @object
-        .size   header_ccall_2, 32
-header_ccall_2:
-        .quad   header_ccall_1
-        .quad   6
-        .quad   .BSS0301
-        .quad   code_ccall_2
-        .globl  key_ccall_2
-        .align  4
-        .type   key_ccall_2, @object
-        .size   key_ccall_2, 4
-key_ccall_2:
-        .long   110
-        .text
-        .globl  code_ccall_2
-        .type   code_ccall_2, @function
-code_ccall_2:
-        .cfi_startproc
+WORD_TAIL ccall_1
+WORD_HDR ccall_2, "CCALL2", 6, 110, header_ccall_1
         movq    16(%rbx), %rdi # sp[2] = first argument
         movq    8(%rbx), %rsi # TOS = second argument
         movq    (%rbx), %rax
@@ -5916,30 +3161,8 @@ code_ccall_2:
         addq    $16, %rbx
         movq    %rax, (%rbx)
         NEXT
-        .cfi_endproc
-
-.BSS0401:
-        .string "CCALL3"
-        .data
-        .align 32
-        .type   header_ccall_3, @object
-        .size   header_ccall_3, 32
-header_ccall_3:
-        .quad   header_ccall_2
-        .quad   6
-        .quad   .BSS0401
-        .quad   code_ccall_3
-        .globl  key_ccall_3
-        .align  4
-        .type   key_ccall_3, @object
-        .size   key_ccall_3, 4
-key_ccall_3:
-        .long   111
-        .text
-        .globl  code_ccall_3
-        .type   code_ccall_3, @function
-code_ccall_3:
-        .cfi_startproc
+WORD_TAIL ccall_2
+WORD_HDR ccall_3, "CCALL3", 6, 111, header_ccall_2
         movq    24(%rbx), %rdi # sp[3] = first argument
         movq    16(%rbx), %rsi # sp[2] = second argument
         movq    8(%rbx), %rdx # TOS = third argument
@@ -5950,31 +3173,8 @@ code_ccall_3:
         addq    $24, %rbx
         movq    %rax, (%rbx)
         NEXT
-        .cfi_endproc
-
-
-.BSS0501:
-        .string "CCALL4"
-        .data
-        .align 32
-        .type   header_ccall_4, @object
-        .size   header_ccall_4, 32
-header_ccall_4:
-        .quad   header_ccall_3
-        .quad   6
-        .quad   .BSS0501
-        .quad   code_ccall_4
-        .globl  key_ccall_4
-        .align  4
-        .type   key_ccall_4, @object
-        .size   key_ccall_4, 4
-key_ccall_4:
-        .long   112
-        .text
-        .globl  code_ccall_4
-        .type   code_ccall_4, @function
-code_ccall_4:
-        .cfi_startproc
+WORD_TAIL ccall_3
+WORD_HDR ccall_4, "CCALL4", 6, 112, header_ccall_3
         movq    32(%rbx), %rdi # sp[4] = first argument
         movq    24(%rbx), %rsi # sp[3] = second argument
         movq    16(%rbx), %rdx # sp[2] = third argument
@@ -5986,30 +3186,8 @@ code_ccall_4:
         addq    $32, %rbx
         movq    %rax, (%rbx)
         NEXT
-        .cfi_endproc
-
-.BSS0601:
-        .string "CCALL5"
-        .data
-        .align 32
-        .type   header_ccall_5, @object
-        .size   header_ccall_5, 32
-header_ccall_5:
-        .quad   header_ccall_4
-        .quad   6
-        .quad   .BSS0601
-        .quad   code_ccall_5
-        .globl  key_ccall_5
-        .align  4
-        .type   key_ccall_5, @object
-        .size   key_ccall_5, 4
-key_ccall_5:
-        .long   115
-        .text
-        .globl  code_ccall_5
-        .type   code_ccall_5, @function
-code_ccall_5:
-        .cfi_startproc
+WORD_TAIL ccall_4
+WORD_HDR ccall_5, "CCALL5", 6, 115, header_ccall_4
         movq    40(%rbx), %rdi # sp[5] = first argument
         movq    32(%rbx), %rsi # sp[4] = second argument
         movq    24(%rbx), %rdx # sp[3] = third argument
@@ -6022,30 +3200,8 @@ code_ccall_5:
         addq    $40, %rbx
         movq    %rax, (%rbx)
         NEXT
-        .cfi_endproc
-
-.BSS0701:
-        .string "CCALL6"
-        .data
-        .align 32
-        .type   header_ccall_6, @object
-        .size   header_ccall_6, 32
-header_ccall_6:
-        .quad   header_ccall_5
-        .quad   6
-        .quad   .BSS0701
-        .quad   code_ccall_6
-        .globl  key_ccall_6
-        .align  4
-        .type   key_ccall_6, @object
-        .size   key_ccall_6, 4
-key_ccall_6:
-        .long   116
-        .text
-        .globl  code_ccall_6
-        .type   code_ccall_6, @function
-code_ccall_6:
-        .cfi_startproc
+WORD_TAIL ccall_5
+WORD_HDR ccall_6, "CCALL6", 6, 116, header_ccall_5
         movq    48(%rbx), %rdi # sp[6] = first argument
         movq    40(%rbx), %rsi # sp[5] = second argument
         movq    32(%rbx), %rdx # sp[4] = third argument
@@ -6059,30 +3215,8 @@ code_ccall_6:
         addq    $48, %rbx
         movq    %rax, (%rbx)
         NEXT
-        .cfi_endproc
-
-.BSS0801:
-        .string "C-LIBRARY"
-        .data
-        .align 32
-        .type   header_c_library, @object
-        .size   header_c_library, 32
-header_c_library:
-        .quad   header_ccall_6
-        .quad   9
-        .quad   .BSS0801
-        .quad   code_c_library
-        .globl  key_c_library
-        .align  4
-        .type   key_c_library, @object
-        .size   key_c_library, 4
-key_c_library:
-        .long   113
-        .text
-        .globl  code_c_library
-        .type   code_c_library, @function
-code_c_library:
-        .cfi_startproc
+WORD_TAIL ccall_6
+WORD_HDR c_library, "C-LIBRARY", 9, 113, header_ccall_6
         # Expects a null-terminated C-style string on the stack, and dlopen()s
         # it, globally, so a generic dlsym() for it will work.
         movq    (%rbx), %rdi
@@ -6093,32 +3227,10 @@ code_c_library:
         movq    %rax, (%rbx) # Push the result. NULL = 0 indicates an error.
         # That's a negated Forth flag.
         NEXT
-        .cfi_endproc
-
-.BSS0901:
-        .string "C-SYMBOL"
-        .data
-        .align 32
-        .type   header_c_symbol, @object
-        .size   header_c_symbol, 32
-header_c_symbol:
-        .quad   header_c_library
-        .quad   8
-        .quad   .BSS0901
-        .quad   code_c_symbol
-        .globl  key_c_symbol
-        .align  4
-        .type   key_c_symbol, @object
-        .size   key_c_symbol, 4
-key_c_symbol:
-        .long   114
-        .text
-        .globl code_c_symbol
-        .type  code_c_symbol, @function
-code_c_symbol:
+WORD_TAIL c_library
+WORD_HDR c_symbol, "C-SYMBOL", 8, 114, header_c_library
         # Expects the C-style null-terminated string on the stack, and dlsym()s
         # it, returning the resulting pointer on the stack.
-        .cfi_startproc
         movq   (%rbx), %rsi
         movq   $0, %rdi      # 0 = RTLD_DEFAULT, searching everywhere.
         subq   $8, %rsp # Align rsp to 16 bytes
@@ -6126,7 +3238,7 @@ code_c_symbol:
         addq   $8, %rsp
         movq   %rax, (%rbx)  # Put the void* result onto the stack.
         NEXT
-        .cfi_endproc
+WORD_TAIL c_symbol
 
 
 .LFE123:
@@ -6434,1306 +3546,127 @@ main:
 init_primitives:
 .LFB125:
 	.cfi_startproc
-	movl	key_plus(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_plus(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_plus, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_minus(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_minus(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_minus, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_times(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_times(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_times, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_div(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_div(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_div, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_udiv(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_udiv(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_udiv, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_mod(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_mod(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_mod, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_umod(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_umod(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_umod, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_and(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_and(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_and, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_or(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_or(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_or, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_xor(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_xor(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_xor, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_lshift(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_lshift(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_lshift, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_rshift(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_rshift(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_rshift, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_base(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_base(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_base, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_less_than(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_less_than(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_less_than, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_less_than_unsigned(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_less_than_unsigned(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_less_than_unsigned, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_equal(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_equal(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_equal, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_dup(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_dup(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_dup, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_swap(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_swap(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_swap, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_drop(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_drop(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_drop, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_over(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_over(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_over, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_rot(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_rot(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_rot, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_neg_rot(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_neg_rot(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_neg_rot, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_two_drop(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_two_drop(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_two_drop, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_two_dup(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_two_dup(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_two_dup, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_two_swap(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_two_swap(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_two_swap, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_two_over(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_two_over(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_two_over, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_to_r(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_to_r(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_to_r, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_from_r(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_from_r(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_from_r, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_fetch(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_fetch(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_fetch, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_store(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_store(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_store, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_cfetch(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_cfetch(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_cfetch, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_cstore(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_cstore(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_cstore, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_raw_alloc(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_raw_alloc(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_raw_alloc, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_here_ptr(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_here_ptr(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_here_ptr, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_print_internal(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_print_internal(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_print_internal, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_state(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_state(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_state, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_branch(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_branch(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_branch, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_zbranch(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_zbranch(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_zbranch, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_execute(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_execute(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_execute, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_evaluate(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_evaluate(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_evaluate, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_refill(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_refill(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_refill, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_accept(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_accept(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_accept, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_key(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_key(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_key, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_latest(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_latest(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_latest, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_in_ptr(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_in_ptr(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_in_ptr, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_emit(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_emit(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_emit, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_source(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_source(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_source, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_source_id(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_source_id(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_source_id, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_size_cell(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_size_cell(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_size_cell, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_size_char(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_size_char(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_size_char, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_cells(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_cells(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_cells, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_chars(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_chars(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_chars, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_unit_bits(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_unit_bits(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_unit_bits, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_stack_cells(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_stack_cells(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_stack_cells, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_return_stack_cells(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_return_stack_cells(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_return_stack_cells, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_to_does(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_to_does(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_to_does, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_to_cfa(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_to_cfa(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_to_cfa, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_to_body(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_to_body(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_to_body, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_last_word(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_last_word(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_last_word, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_docol(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_docol(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_docol, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_dolit(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_dolit(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_dolit, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_dostring(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_dostring(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_dostring, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_dodoes(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_dodoes(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_dodoes, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_parse(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_parse(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_parse, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_parse_name(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_parse_name(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_parse_name, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_to_number(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_to_number(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_to_number, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_create(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_create(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_create, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_find(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_find(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_find, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_depth(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_depth(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_depth, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_sp_fetch(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_sp_fetch(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_sp_fetch, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_sp_store(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_sp_store(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_sp_store, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_rp_fetch(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_rp_fetch(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_rp_fetch, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_rp_store(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_rp_store(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_rp_store, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_dot_s(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_dot_s(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_dot_s, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_u_dot_s(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_u_dot_s(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_u_dot_s, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_dump_file(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_dump_file(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_dump_file, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_quit(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_quit(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_quit, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_bye(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_bye(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_bye, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_compile_comma(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_compile_comma(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_compile_comma, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_debug_break(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_debug_break(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_debug_break, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_close_file(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_close_file(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_close_file, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_create_file(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_create_file(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_create_file, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_open_file(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_open_file(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_open_file, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_delete_file(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_delete_file(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_delete_file, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_file_position(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_file_position(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_file_position, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_file_size(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_file_size(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_file_size, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_file_size(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_file_size(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_file_size, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_include_file(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_include_file(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_include_file, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_read_file(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_read_file(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_read_file, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_read_line(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_read_line(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_read_line, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_reposition_file(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_reposition_file(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_reposition_file, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_resize_file(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_resize_file(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_resize_file, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_write_file(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_write_file(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_write_file, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_write_line(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_write_line(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_write_line, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_flush_file(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_flush_file(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_flush_file, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_colon(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_colon(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_colon, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_colon_no_name(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_colon_no_name(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_colon_no_name, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_exit(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_exit(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_exit, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_see(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_see(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_see, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_semicolon(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_semicolon(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_semicolon, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_literal(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_literal(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_literal, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_compile_literal(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_compile_literal(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_compile_literal, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_compile_zbranch(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_compile_zbranch(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_compile_zbranch, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_compile_branch(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_compile_branch(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_compile_branch, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_control_flush(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_control_flush(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_control_flush, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_utime(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_utime(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_utime, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-	movl	key_loop_end(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_loop_end(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_loop_end, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
+	INIT_WORD plus
+	INIT_WORD minus
+	INIT_WORD times
+	INIT_WORD div
+	INIT_WORD udiv
+	INIT_WORD mod
+	INIT_WORD umod
+	INIT_WORD and
+	INIT_WORD or
+	INIT_WORD xor
+	INIT_WORD lshift
+	INIT_WORD rshift
+	INIT_WORD base
+	INIT_WORD less_than
+	INIT_WORD less_than_unsigned
+	INIT_WORD equal
+	INIT_WORD dup
+	INIT_WORD swap
+	INIT_WORD drop
+	INIT_WORD over
+	INIT_WORD rot
+	INIT_WORD neg_rot
+	INIT_WORD two_drop
+	INIT_WORD two_dup
+	INIT_WORD two_swap
+	INIT_WORD two_over
+	INIT_WORD to_r
+	INIT_WORD from_r
+	INIT_WORD fetch
+	INIT_WORD store
+	INIT_WORD cfetch
+	INIT_WORD cstore
+	INIT_WORD raw_alloc
+	INIT_WORD here_ptr
+	INIT_WORD print_internal
+	INIT_WORD state
+	INIT_WORD branch
+	INIT_WORD zbranch
+	INIT_WORD execute
+	INIT_WORD evaluate
+	INIT_WORD refill
+	INIT_WORD accept
+	INIT_WORD key
+	INIT_WORD latest
+	INIT_WORD in_ptr
+	INIT_WORD emit
+	INIT_WORD source
+	INIT_WORD source_id
+	INIT_WORD size_cell
+	INIT_WORD size_char
+	INIT_WORD cells
+	INIT_WORD chars
+	INIT_WORD unit_bits
+	INIT_WORD stack_cells
+	INIT_WORD return_stack_cells
+	INIT_WORD to_does
+	INIT_WORD to_cfa
+	INIT_WORD to_body
+	INIT_WORD last_word
+	INIT_WORD docol
+	INIT_WORD dolit
+	INIT_WORD dostring
+	INIT_WORD dodoes
+	INIT_WORD parse
+	INIT_WORD parse_name
+	INIT_WORD to_number
+	INIT_WORD create
+	INIT_WORD find
+	INIT_WORD depth
+	INIT_WORD sp_fetch
+	INIT_WORD sp_store
+	INIT_WORD rp_fetch
+	INIT_WORD rp_store
+	INIT_WORD dot_s
+	INIT_WORD u_dot_s
+	INIT_WORD dump_file
+	INIT_WORD quit
+	INIT_WORD bye
+	INIT_WORD compile_comma
+	INIT_WORD debug_break
+	INIT_WORD close_file
+	INIT_WORD create_file
+	INIT_WORD open_file
+	INIT_WORD delete_file
+	INIT_WORD file_position
+	INIT_WORD file_size
+	INIT_WORD file_size
+	INIT_WORD include_file
+	INIT_WORD read_file
+	INIT_WORD read_line
+	INIT_WORD reposition_file
+	INIT_WORD resize_file
+	INIT_WORD write_file
+	INIT_WORD write_line
+	INIT_WORD flush_file
+	INIT_WORD colon
+	INIT_WORD colon_no_name
+	INIT_WORD exit
+	INIT_WORD see
+	INIT_WORD semicolon
+	INIT_WORD literal
+	INIT_WORD compile_literal
+	INIT_WORD compile_zbranch
+	INIT_WORD compile_branch
+	INIT_WORD control_flush
+	INIT_WORD utime
+	INIT_WORD loop_end
 
-        # ccall0
-	movl	key_ccall_0(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_ccall_0(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_ccall_0, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-        # ccall1
-	movl	key_ccall_1(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_ccall_1(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_ccall_1, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-        # ccall2
-	movl	key_ccall_2(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_ccall_2(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_ccall_2, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-        # ccall3
-	movl	key_ccall_3(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_ccall_3(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_ccall_3, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-        # ccall4
-	movl	key_ccall_4(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_ccall_4(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_ccall_4, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-        # ccall5
-	movl	key_ccall_5(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_ccall_5(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_ccall_5, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-        # ccall6
-	movl	key_ccall_6(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_ccall_6(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_ccall_6, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
+	INIT_WORD ccall_0
+	INIT_WORD ccall_1
+	INIT_WORD ccall_2
+	INIT_WORD ccall_3
+	INIT_WORD ccall_4
+	INIT_WORD ccall_5
+	INIT_WORD ccall_6
+	INIT_WORD c_library
+	INIT_WORD c_symbol
 
-        # c-library
-	movl	key_c_library(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_c_library(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_c_library, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-        # c-symbol
-	movl	key_c_symbol(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_c_symbol(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_c_symbol, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
-
-        # dictionary_info
-	movl	key_dictionary_info(%rip), %eax
-	leal	-1(%rax), %edx
-	movl	key_dictionary_info(%rip), %eax
-	movl	%edx, %ecx
-	salq	$4, %rcx
-	addq	$primitives, %rcx
-	movq	$code_dictionary_info, (%rcx)
-	movl	%edx, %edx
-	salq	$4, %rdx
-	addq	$primitives+8, %rdx
-	movl	%eax, (%rdx)
+	INIT_WORD dictionary_info
+	INIT_WORD two_fetch
+	INIT_WORD two_store
 
 	nop
 	ret
