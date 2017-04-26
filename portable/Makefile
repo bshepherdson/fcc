@@ -5,7 +5,7 @@ FORTH_OBJECTS := $(FORTH_MODULES:%.fs=%.o)
 LIBS=-lreadline -ldl
 INCLUDES=-Iinclude
 
-BENCHMARKS=bubble-sort fib matrix-mult mm-rtcg sieve
+BENCHMARKS=bubble-sort fib matrix-mult mm-rtcg sieve 1mloop bpsieve loop-nest
 
 CC?=gcc
 
@@ -87,7 +87,7 @@ test: forth FORCE
 bench: FORCE forth
 	@for a in $(BENCHMARKS); do \
 	echo =======   $$a   ======== ; \
-	time ./forth bench/$$a.fs ; \
+	time $(FORTH) bench/$$a.fs ; \
 	done
 
 bench-baseline: FORCE
