@@ -38,9 +38,9 @@ CREATE regs 8 cells allot
 : sp- ( u -- ) 8 * S"   subq   $" ,asm   lit> ,asm  S" , %rbx" ,asm-l ;
 
 : peek-at-raw ( c-addr u index -- )
-  S"    movq   " ,asm   lit> ,asm   S" (%rbx), " ,asm   ,asm-l
+  S"   movq   " ,asm   8 * lit> ,asm   S" (%rbx), " ,asm   ,asm-l
 ;
-: peek-raw ( c-addr u -- ) S"    movq   (%rbx), " ,asm   ,asm-l ;
+: peek-raw ( c-addr u -- ) S"   movq   (%rbx), " ,asm   ,asm-l ;
 : peek ( reg -- ) reg> peek-raw ;
 
 : pop-raw ( c-addr u -- )
@@ -57,7 +57,9 @@ CREATE regs 8 cells allot
 
 
 : push-raw ( c-addr u -- )
-  S"   movq   " ,asm   ,asm   S" , (%rbx)" ,asm-l ;
+  S"   subq   $8, %rbx" ,asm-l
+  S"   movq   " ,asm   ,asm   S" , (%rbx)" ,asm-l
+;
 : push ( reg -- ) reg> push-raw ;
 
 
@@ -73,8 +75,8 @@ CREATE regs 8 cells allot
 : ,label   ( -- ) word-label 2@ ,asm ;
 : ,label-l ( -- ) word-label 2@ ,asm-l ;
 
-: WORD: ( number c-addr-label u-label "name" -- )
-  ( parse-name )   word-label 2!
+: WORD: ( number "label name" -- )
+  parse-name   word-label 2!
   parse-name   word-name  2!
   drop \ TODO Use the key numbers properly.
 
@@ -115,7 +117,7 @@ CREATE regs 8 cells allot
 : ,next ( -- )
   S"   movq   (%rbp), %rax" ,asm-l
   S"   addq   $8, %rbp" ,asm-l
-  S"   jmp *%rax" ,asm-l
+  S"   jmp    *%rax" ,asm-l
 ;
 
 \ Called at the end of each primitive definition.
