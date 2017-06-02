@@ -28,3 +28,11 @@
 5 WORD: udiv U/
   udiv
 ;WORD
+
+6 WORD: mod MOD
+  mod
+;WORD
+
+7 WORD: umod UMOD
+  umod
+;WORD

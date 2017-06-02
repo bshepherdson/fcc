@@ -131,21 +131,26 @@ VARIABLE last-word-len   0 last-word-len !
 
 
 
-\ Specialized funops for div and udiv, since those vary wildly.
-: div ( -- )
+\ Specialized funops for division, since those vary wildly.
+: (div-signed) ( c-addr u -- )
   S"   movq   (%rbx), %rsi" ,asm-l
   S"   addq   $8, %rbx" ,asm-l
   S"   movq   (%rbx), %rax" ,asm-l
   S"   cqto" ,asm-l
   S"   idivq  %rsi" ,asm-l
-  S"   movq   %rax, (%rbx)" ,asm-l
+  S"   movq   " ,asm   ,asm  S" , (%rbx)" ,asm-l
 ;
+: div ( -- ) S" %rax" (div-signed) ;
+: mod ( -- ) S" %rdx" (div-signed) ;
 
-: udiv ( -- )
+: (div-unsigned) ( -- )
   S"   movq   (%rbx), %rsi" ,asm-l
   S"   addq   $8, %rbx" ,asm-l
   S"   movq   (%rbx), %rax" ,asm-l
   S"   movl   $0, %edx" ,asm-l
   S"   divq   %rsi" ,asm-l
-  S"   movq   %rax, (%rbx)" ,asm-l
+  S"   movq   " ,asm  ,asm  S" , (%rbx)" ,asm-l
 ;
+: udiv ( -- ) S" %rax" (div-unsigned) ;
+: umod ( -- ) S" %rdx" (div-unsigned) ;
+
