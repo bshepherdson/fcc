@@ -53,7 +53,7 @@ CREATE regs 8 cells allot
 \ The registers are given in the same order as they appear in stack diagrams:
 \ Lower in the stack is lower in the stack.
 : pop2-raw ( c-addr u c-addr u -- ) peek-raw   1 peek-at-raw   2 sp+ ;
-: pop2 ( r1 r2 -- ) >r reg> r> reg>   .s cr pop2-raw ;
+: pop2 ( r1 r2 -- ) >r reg> r> reg>   pop2-raw ;
 
 
 : push-raw ( c-addr u -- )
@@ -68,7 +68,9 @@ CREATE regs 8 cells allot
 \ Expects a unique number, which is defined in the engine so that they can be
 \ universal and shared. These are currently dropped, but they can be used for
 \ superinstruction processing.
-2VARIABLE last-word   0 0 last-word 2!
+CREATE last-word-buffer 64 allot
+VARIABLE last-word-len   0 last-word-len !
+
 2VARIABLE word-label
 2VARIABLE word-name
 
@@ -87,7 +89,8 @@ CREATE regs 8 cells allot
       [char] " asm-emit
       word-name 2@ ,asm
       [char] " asm-emit
-      0 0 ,asm-l
+      asm-nl
+
   S"   .data" ,asm-l
   S"   .align 32" ,asm-l
   S"   .type   header_" ,asm   ,label   S" , @object" ,asm-l
@@ -95,9 +98,9 @@ CREATE regs 8 cells allot
 
   S" header_" ,asm   ,label   S" :" ,asm-l
   S"   .quad " ,asm
-      last-word 2@ dup IF \ Last word is defined, put header_last_word in.
-          S" header_" ,asm  ,asm-l
-      ELSE 2drop S" 0" ,asm-l THEN
+      last-word-len @ IF \ Last word is defined, put header_last_word in.
+          S" header_" ,asm   last-word-buffer last-word-len @ ,asm-l
+      ELSE S" 0" ,asm-l THEN
 
   S"   .quad " ,asm   word-name 2@ lit> ,asm-l drop
   S"   .quad .str_" ,asm  ,label-l
@@ -109,7 +112,9 @@ CREATE regs 8 cells allot
   S"   .type  code_" ,asm  ,label   S" , @function" ,asm-l
   S" code_" ,asm   ,label S" :" ,asm-l
 
-  word-label 2@   last-word 2!
+  \ Copy the label into the last-word buffer.
+  word-label 2@   last-word-buffer swap move
+  word-label 2@   last-word-len ! drop
 ;
 
 
@@ -124,3 +129,23 @@ CREATE regs 8 cells allot
 : ;WORD ( -- ) ,next ;
 
 
+
+
+\ Specialized funops for div and udiv, since those vary wildly.
+: div ( -- )
+  S"   movq   (%rbx), %rsi" ,asm-l
+  S"   addq   $8, %rbx" ,asm-l
+  S"   movq   (%rbx), %rax" ,asm-l
+  S"   cqto" ,asm-l
+  S"   idivq  %rsi" ,asm-l
+  S"   movq   %rax, (%rbx)" ,asm-l
+;
+
+: udiv ( -- )
+  S"   movq   (%rbx), %rsi" ,asm-l
+  S"   addq   $8, %rbx" ,asm-l
+  S"   movq   (%rbx), %rax" ,asm-l
+  S"   movl   $0, %edx" ,asm-l
+  S"   divq   %rsi" ,asm-l
+  S"   movq   %rax, (%rbx)" ,asm-l
+;
