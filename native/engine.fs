@@ -60,3 +60,24 @@
   0 push
 ;WORD
 
+: conditional ( xt -- )
+  >R
+  0 1 pop2 \ Checking if r0 < r1.
+  0 1 mklabel dup R> swap >R execute R> ( label-true )
+  0 zero
+  mklabel dup jmp ( label-true label-false )
+  swap resolve   ( label-false )
+  -1 0 -lit
+  resolve ( )
+  0 push
+;
+
+14 WORD: less_than <
+  ' jlt   conditional
+;WORD
+15 WORD: less_than_unsigned U<
+  ' jlt-unsigned   conditional
+;WORD
+16 WORD: equal =
+  ' jeq   conditional
+;WORD

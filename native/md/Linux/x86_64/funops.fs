@@ -31,7 +31,8 @@ CREATE regs 8 cells allot
 
 : #scratch ( -- u ) 4 ; \ TODO Figure out scratch registers.
 
-: lit> ( u -- c-addr u ) s>d <# #s #> ;
+: lit>  (  u -- c-addr u ) s>d <# #s #> ;
+: -lit> ( -n -- c-addr u ) negate   s>d <# #s   [char] - hold #> ;
 
 
 : sp+ ( u -- ) 8 * S"   addq   $" ,asm   lit> ,asm  S" , %rbx" ,asm-l ;
@@ -74,17 +75,17 @@ VARIABLE last-word-len   0 last-word-len !
 2VARIABLE word-label
 2VARIABLE word-name
 
-: ,label   ( -- ) word-label 2@ ,asm ;
-: ,label-l ( -- ) word-label 2@ ,asm-l ;
+: ,word-label   ( -- ) word-label 2@ ,asm ;
+: ,word-label-l ( -- ) word-label 2@ ,asm-l ;
 
 : WORD: ( number "label name" -- )
   parse-name   word-label 2!
   parse-name   word-name  2!
   drop \ TODO Use the key numbers properly.
 
-  S"   .globl  header_" ,asm   ,label-l
+  S"   .globl  header_" ,asm   ,word-label-l
   S"   .section    .rodata" ,asm-l
-  S" .str_" ,asm   ,label   S" :" ,asm-l
+  S" .str_" ,asm   ,word-label   S" :" ,asm-l
   S"   .string " ,asm
       [char] " asm-emit
       word-name 2@ ,asm
@@ -93,24 +94,24 @@ VARIABLE last-word-len   0 last-word-len !
 
   S"   .data" ,asm-l
   S"   .align 32" ,asm-l
-  S"   .type   header_" ,asm   ,label   S" , @object" ,asm-l
-  S"   .size   header_" ,asm   ,label   S" , 32" ,asm-l
+  S"   .type   header_" ,asm   ,word-label   S" , @object" ,asm-l
+  S"   .size   header_" ,asm   ,word-label   S" , 32" ,asm-l
 
-  S" header_" ,asm   ,label   S" :" ,asm-l
+  S" header_" ,asm   ,word-label   S" :" ,asm-l
   S"   .quad " ,asm
       last-word-len @ IF \ Last word is defined, put header_last_word in.
           S" header_" ,asm   last-word-buffer last-word-len @ ,asm-l
       ELSE S" 0" ,asm-l THEN
 
   S"   .quad " ,asm   word-name 2@ lit> ,asm-l drop
-  S"   .quad .str_" ,asm  ,label-l
-  S"   .quad .code_" ,asm  ,label-l
+  S"   .quad .str_" ,asm  ,word-label-l
+  S"   .quad .code_" ,asm  ,word-label-l
   \ TODO Keys would go here, if we were declaring those.
 
   S"   .text" ,asm-l
-  S"   .globl  code_" ,asm  ,label-l
-  S"   .type  code_" ,asm  ,label   S" , @function" ,asm-l
-  S" code_" ,asm   ,label S" :" ,asm-l
+  S"   .globl  code_" ,asm  ,word-label-l
+  S"   .type  code_" ,asm  ,word-label   S" , @function" ,asm-l
+  S" code_" ,asm   ,word-label S" :" ,asm-l
 
   \ Copy the label into the last-word buffer.
   word-label 2@   last-word-buffer swap move
@@ -187,4 +188,48 @@ VARIABLE last-word-len   0 last-word-len !
 ;
 : udiv ( -- ) S" %rax" (div-unsigned) ;
 : umod ( -- ) S" %rdx" (div-unsigned) ;
+
+
+
+\ Branches and conditionals.
+\ Labels are represented as numbers, and rendered in the code with ".Lnnn".
+
+VARIABLE next-label    1 next-label !
+
+: ,label ( label -- )  S" .L" ,asm   lit> ,asm ;
+: mklabel ( -- label ) next-label @    1 next-label +! ;
+: resolve ( label -- ) ,label   S" :" ,asm-l ;
+
+\ Renders a cmpq and a conditional jump.
+: (branch) ( r0 r1 label c-addr u -- )
+  >r >r >r swap
+  S"   cmpq " ,asm reg> ,asm S" , " ,asm reg> ,asm-l
+  r> r> r> S"   " ,asm ,asm   S"    " ,asm ,label asm-nl
+;
+
+: jlt ( r0 r1 label -- ) S" jl" (branch) ;
+: jlt-unsigned ( r0 r1 label -- ) S" jb" (branch) ;
+: jeq ( r0 r1 label -- ) S" je" (branch) ;
+
+\ Unconditional jump.
+: jmp ( label -- ) S"   jmp    " ,asm ,label asm-nl ;
+
+
+
+\ Loads the literal into the register.
+: lit ( lit reg -- )
+  swap S"   movq   $" ,asm lit> ,asm S" , " ,asm reg> ,asm-l ;
+: -lit ( lit reg -- )
+  swap S"   movq   $" ,asm -lit> ,asm S" , " ,asm reg> ,asm-l ;
+
+\ Zeroes the register. Often more efficient with alternative instructions.
+\ x86_64 it just XORs with itself.
+: zero ( reg -- )
+  reg> 2dup
+  S"   xorq   " ,asm ,asm S" , " ,asm ,asm-l
+;
+
+\ Inverts all the bits in the given register.
+: op-invert ( reg -- )  S" xorq   $-1, " ,asm reg> ,asm-l ;
+
 
