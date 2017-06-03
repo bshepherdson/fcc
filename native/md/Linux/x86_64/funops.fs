@@ -131,6 +131,40 @@ VARIABLE last-word-len   0 last-word-len !
 
 
 
+
+: binop-rr ( rd rs c-addr u -- )
+  >r >r   >r reg> r>   reg> r> r>
+  S"   " ,asm ,asm   S"   " ,asm ,asm S" , " ,asm ,asm-l
+;
+
+: plus   ( rd rs -- ) S" addq"  binop-rr ;
+: minus  ( rd rs -- ) S" subq"  binop-rr ;
+: times  ( rd rs -- ) S" imulq" binop-rr ;
+
+: op-and ( rd rs -- ) S" andq"  binop-rr ;
+: op-or  ( rd rs -- ) S" orq"   binop-rr ;
+: op-xor ( rd rs -- ) S" xorq"  binop-rr ;
+
+
+: (shift) ( c-addr u -- )
+  S"   movq   (%rbx), %rcx" ,asm-l
+  S"   addq   $8, %rbx" ,asm-l
+  S"   movq   (%rbx), %rsi" ,asm-l
+  S"   " ,asm ,asm S"    %cl, %rsi" ,asm-l
+  S"   movq   %rsi, (%rbx)" ,asm-l
+;
+: op-lshift ( -- ) S" salq" (shift) ;
+: op-rshift ( -- ) S" shrq" (shift) ;
+
+
+
+\ Loads the *address* of the global variable whose name is given into the given
+\ register.
+: ,*var ( reg c-addr u -- )
+  S"   movq   $" ,asm ,asm   reg> S" , " ,asm ,asm-l
+;
+
+
 \ Specialized funops for division, since those vary wildly.
 : (div-signed) ( c-addr u -- )
   S"   movq   (%rbx), %rsi" ,asm-l

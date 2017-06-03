@@ -1,22 +1,18 @@
 \ Uses the machine-dependent macros (already loaded) to assemble a binary for
 \ the target platform.
 
+: eng-binop ( xt -- ) >r   0 1 pop2   0 1 r> execute   0 push ;
+
 1 WORD: plus +
-  0 1 pop2
-  S"   addq   " ,asm   0 reg,  S" , " ,asm   1 reg,  asm-nl
-  1 push
+  ' plus   eng-binop
 ;WORD
 
 2 WORD: minus -
-  0 1 pop2
-  S"   subq   " ,asm   1 reg,  S" , " ,asm   0 reg,  asm-nl
-  0 push
+  ' minus   eng-binop
 ;WORD
 
 3 WORD: times *
-  0 1 pop2
-  S"   imulq  " ,asm   0 reg,  S" , " ,asm   1 reg,  asm-nl
-  1 push
+  ' times   eng-binop
 ;WORD
 
 \ Div and Udiv are special, because division varies wildly across architectures.
@@ -36,3 +32,31 @@
 7 WORD: umod UMOD
   umod
 ;WORD
+
+8 WORD: and AND
+  ' op-and   eng-binop
+;WORD
+
+9 WORD: or OR
+  ' op-or   eng-binop
+;WORD
+
+10 WORD: xor XOR
+  ' op-xor   eng-binop
+;WORD
+
+\ x86_64 is dumb and can't handle wide operands for shifts.
+\ So we let the machine-dependent engine handle shifts, like division.
+11 WORD: lshift LSHIFT
+  op-lshift
+;WORD
+12 WORD: rshift RSHIFT
+  op-rshift
+;WORD
+
+
+13 WORD: base BASE
+  0 S" base" ,*var
+  0 push
+;WORD
+
