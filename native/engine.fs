@@ -81,3 +81,59 @@
 16 WORD: equal =
   ' jeq   conditional
 ;WORD
+
+
+\ Stack manopulation.
+17 WORD: dup DUP    0 peek   0 push   ;WORD
+\ TODO Make these more efficient.
+18 WORD: swap SWAP  0 1 pop2   1 push   0 push ;WORD
+19 WORD: drop DROP  1 sp+ ;WORD
+20 WORD: over OVER  0 1 peek-at   0 push ;WORD
+
+21 WORD: rot ROT
+  0 pop  1 pop   2 pop   ( 2 1 0 -- 1 0 2 )
+  1 push   0 push   2 push
+;WORD
+
+22 WORD: neg_rot -ROT
+  0 pop  1 pop   2 pop   ( 2 1 0 -- 0 2 1 )
+  0 push 2 push  1 push
+;WORD
+
+23 WORD: two_drop 2DROP   2 sp+ ;WORD
+
+24 WORD: two_dup 2DUP
+  0 1 peek-at   1 peek
+  0 push   1 push
+;WORD
+
+
+\ Skipped: 2SWAP 25
+\ Skipped: 2OVER 26
+
+27 WORD: to_r >R   0 pop   0 pushrsp ;WORD
+28 WORD: from_r R>   0 poprsp   0 push ;WORD
+
+
+\ Memory
+29 WORD: fetch @   0 peek   0 0 read   0 peek! ;WORD
+30 WORD: store !   0 1 pop2   0 1 write ;WORD
+
+31 WORD: cfetch C@  0 peek  0 0 cread  0 peek! ;WORD
+32 WORD: cstore C!  0 1 pop2  0 1 cwrite ;WORD
+
+118 WORD: two_fetch 2@
+  0 pop
+  1 0 1 read-indexed
+  2 0   read
+  2 push
+  1 push
+;WORD
+
+119 WORD: two_store 2!
+  2 pop   \ Pointer
+  0 1 pop2
+  1 2 write
+  0 2 1 write-indexed
+;WORD
+

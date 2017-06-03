@@ -41,8 +41,13 @@ CREATE regs 8 cells allot
 : peek-at-raw ( c-addr u index -- )
   S"   movq   " ,asm   8 * lit> ,asm   S" (%rbx), " ,asm   ,asm-l
 ;
+: peek-at ( reg index -- ) >r reg> r> peek-at-raw ;
+
 : peek-raw ( c-addr u -- ) S"   movq   (%rbx), " ,asm   ,asm-l ;
 : peek ( reg -- ) reg> peek-raw ;
+
+: peek!-raw ( c-addr u -- ) S"   movq   " ,asm ,asm S" , (%rbx)" ,asm-l ;
+: peek! ( reg -- ) reg> peek!-raw ;
 
 : pop-raw ( c-addr u -- )
   peek-raw
@@ -63,6 +68,46 @@ CREATE regs 8 cells allot
 ;
 : push ( reg -- ) reg> push-raw ;
 
+
+\ Dealing with RSP.
+: poprsp ( reg -- )
+  >r
+  S"   movq   rsp(%rip), " ,asm   r@ reg> ,asm-l
+  S"   movq   (" ,asm   r@ reg> ,asm  S" ), " ,asm   r> reg> ,asm-l
+  S"   addq   $8, rsp(%rip)" ,asm-l
+;
+
+\ Uses r14 for scratch.
+: pushrsp ( reg -- )
+  S"   movq   rsp(%rip), %r15" ,asm-l
+  S"   subq   $8, %r15" ,asm-l
+  S"   movq   %r15, rsp(%rip)" ,asm-l
+  S"   movq   " ,asm reg> ,asm   S" , (%r15)" ,asm-l
+;
+
+
+\ Dereferences a pointer into a register.
+: read  ( rd ptr -- )
+  S"   movq   (" ,asm reg> ,asm  S" ), " ,asm reg> ,asm-l ;
+\ Stores a value into a pointer held in a register.
+: write ( rs ptr -- )
+  swap S"   movq   " ,asm reg> ,asm  S" , (" ,asm reg> ,asm S" )" ,asm-l ;
+
+: read-indexed ( rd ptr i -- )
+  8 *
+  S"   movq   " ,asm lit> ,asm S" (" ,asm reg> ,asm S" ), " ,asm reg> ,asm-l ;
+
+: write-indexed ( rs ptr i -- )
+  8 *   >r swap
+  S"   movq   " ,asm reg> ,asm S" , " ,asm   r> lit> ,asm S" (" ,asm
+      reg> ,asm   S" )" ,asm-l
+;
+
+: cread ( rd ptr -- )
+  S"   movzbq   (" ,asm reg> ,asm S" ), " ,asm reg> ,asm-l ;
+: cwrite ( rs ptr -- )
+  swap ABORT" x86_64 can only cwrite with rs = 0"
+  S"   movb   %al" ,asm   S" , (" ,asm reg> ,asm S" )" ,asm-l ;
 
 
 \ Declares a new primitive word, with its label and Forth name.
