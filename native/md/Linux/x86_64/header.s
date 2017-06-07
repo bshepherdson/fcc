@@ -74,7 +74,6 @@ quitTopPtr:
 	.comm	numBuf,16,16
 	.comm	tempFile,8,8
 	.comm	tempStat,144,32
-	.comm	quit_inner,8,8
 	.comm	timeVal,16,16
 	.comm	i64,8,8
 	.comm	old_tio,60,32

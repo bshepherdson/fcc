@@ -137,3 +137,46 @@
   0 2 1 write-indexed
 ;WORD
 
+33 WORD: raw_alloc (ALLOCATE)
+  1 args
+  0 pop-arg
+  S" malloc" call
+  0 push
+;WORD
+
+34 WORD: here_ptr (>HERE)   0 S" dsp" ,*var   0 push ;WORD
+\ Skipped (PRINT) 35
+
+36 WORD: state STATE   0 S" state" ,*var   0 push ;WORD
+
+37 WORD: branch  (BRANCH)    op-branch  ;WORD
+38 WORD: zbranch (0BRANCH)   op-zbranch ;WORD
+
+39 WORD: execute EXECUTE
+  0 pop
+  1 S" cfa" ,*var
+  0 1 write
+  0 0 read
+  1 S" ca" ,*var
+  0 1 write
+;WORD-RAW
+
+
+40 WORD: evaluate EVALUATE
+  0 input-index++
+  0 pop   \ Length
+  2 input-source
+  0  2   src-length write-indexed
+  0  pop  \ String
+  0  2   src-buffer write-indexed
+  -1 0   -lit   \ Type = EVALUATE
+  0  2   src-type write-indexed
+  0  0   lit    \ Index into buffer
+  0  2   src-index write-indexed
+  pushrsp-ip
+  eval-jmp  \ This is a unique instruction, so it's directly written.
+;WORD-RAW
+
+
+\ START HERE: refill_
+

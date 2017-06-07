@@ -2226,8 +2226,9 @@ quit_:
 	jne	.L219
 	movq	$0, inputIndex(%rip)
 .L219:
-	movq	$.L220, quit_inner(%rip)
+	movq	$.L220, quit_inner(%rip)  # quit_inner. Set it up natively.
 	call	refill_
+
 .L220:
 	call	parse_name_
 	movq	(%rbx), %rax

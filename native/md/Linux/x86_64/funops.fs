@@ -70,20 +70,23 @@ CREATE regs 8 cells allot
 
 
 \ Dealing with RSP.
-: poprsp ( reg -- )
-  >r
-  S"   movq   rsp(%rip), " ,asm   r@ reg> ,asm-l
-  S"   movq   (" ,asm   r@ reg> ,asm  S" ), " ,asm   r> reg> ,asm-l
+: poprsp-raw ( c-addr u -- )
+  S"   movq   rsp(%rip), " ,asm   2dup ,asm-l
+  S"   movq   (" ,asm   2dup ,asm  S" ), " ,asm   ,asm-l
   S"   addq   $8, rsp(%rip)" ,asm-l
 ;
+: poprsp ( reg -- ) reg> poprsp-raw ;
+: poprsp-ip ( -- ) S" %rbp" poprsp-raw ;
 
-\ Uses r14 for scratch.
-: pushrsp ( reg -- )
+\ Uses r15 for scratch.
+: pushrsp-raw ( c-addr u -- )
   S"   movq   rsp(%rip), %r15" ,asm-l
   S"   subq   $8, %r15" ,asm-l
   S"   movq   %r15, rsp(%rip)" ,asm-l
-  S"   movq   " ,asm reg> ,asm   S" , (%r15)" ,asm-l
+  S"   movq   " ,asm  ,asm   S" , (%r15)" ,asm-l
 ;
+: pushrsp ( reg -- ) reg> pushrsp-raw ;
+: pushrsp-ip ( -- ) S" %rbp" pushrsp-raw ;
 
 
 \ Dereferences a pointer into a register.
@@ -174,6 +177,9 @@ VARIABLE last-word-len   0 last-word-len !
 \ Called at the end of each primitive definition.
 : ;WORD ( -- ) ,next ;
 
+\ Just jumps to reg 0.
+: ;WORD-RAW ( -- ) S"   jmp    *%rax" ,asm-l ;
+
 
 
 
@@ -246,19 +252,41 @@ VARIABLE next-label    1 next-label !
 : resolve ( label -- ) ,label   S" :" ,asm-l ;
 
 \ Renders a cmpq and a conditional jump.
-: (branch) ( r0 r1 label c-addr u -- )
+: (op-branch) ( r0 r1 label c-addr u -- )
   >r >r >r swap
   S"   cmpq " ,asm reg> ,asm S" , " ,asm reg> ,asm-l
   r> r> r> S"   " ,asm ,asm   S"    " ,asm ,label asm-nl
 ;
 
-: jlt ( r0 r1 label -- ) S" jl" (branch) ;
-: jlt-unsigned ( r0 r1 label -- ) S" jb" (branch) ;
-: jeq ( r0 r1 label -- ) S" je" (branch) ;
+: jlt ( r0 r1 label -- ) S" jl" (op-branch) ;
+: jlt-unsigned ( r0 r1 label -- ) S" jb" (op-branch) ;
+: jeq ( r0 r1 label -- ) S" je" (op-branch) ;
 
 \ Unconditional jump.
 : jmp ( label -- ) S"   jmp    " ,asm ,label asm-nl ;
 
+
+\ Forth's own branch operations. These are common and tricky, so they're
+\ standalone funops.
+: op-branch ( -- )
+  S"   movq   (%rbp), %rax" ,asm-l
+  S"   addq   (%rax), %rbp" ,asm-l
+;
+
+: op-zbranch ( -- )
+  S"   movq   (%rbx), %rax" ,asm-l
+  S"   addq   $8, %rbx" ,asm-l
+  S"   testq  %rax, %rax" ,asm-l
+  mklabel ( false )
+  S"   jne    " ,asm dup ,label
+  S"   movq  (%rbp), %rax" ,asm-l
+  mklabel ( false true )
+  S"   jmp    " ,asm dup ,label
+  swap resolve   ( true )
+  S"   movl   $8, %eax" ,asm-l
+  resolve
+  S"   addq   %rax, %rbp" ,asm-l
+;
 
 
 \ Loads the literal into the register.
@@ -277,4 +305,50 @@ VARIABLE next-label    1 next-label !
 \ Inverts all the bits in the given register.
 : op-invert ( reg -- )  S" xorq   $-1, " ,asm reg> ,asm-l ;
 
+
+
+\ Function calls to C functions.
+\ Prepares for a function with N arguments.
+: args ( n -- ) drop ;
+
+CREATE (args) 8 cells allot
+: (init-args)
+  S" %rdi"         (args)   2!
+  S" %rsi" 2 cells (args) + 2!
+  S" %rdx" 4 cells (args) + 2!
+  S" %rcx" 6 cells (args) + 2!
+;
+(init-args)
+
+\ Moves the value in reg to the numbered arg.
+: arg  ( reg arg -- )
+  >r   S"   movq   " ,asm reg> ,asm S" , " ,asm r>   2 * cells (args) + 2@ ,asm-l
+;
+: pop-arg ( arg -- ) 2 * cells (args) + 2@   pop-raw ;
+
+: call ( c-addr u -- ) S"   call   " ,asm ,asm-l ;
+
+
+\ Input buffer handling
+\ Register is a temporary for platforms that need it; x86_64 discards it.
+: input-index++ ( reg -- ) drop S"   addq   $1, inputIndex($rip)" ,asm-l ;
+: input-index-- ( reg -- ) drop S"   subq   $1, inputIndex($rip)" ,asm-l ;
+
+\ Puts the pointer to the current input source structure into the register.
+: input-source ( rd -- )
+  S"   movq   inputIndex(%rip), " ,asm   dup reg> ,asm-l
+  S"   salq   $5, " ,asm  dup reg> ,asm-l
+  S"   addq   $inputSources, " ,asm   reg> ,asm-l
+;
+
+\ Offsets into the structure. These are the same across platforms, just adjusted
+\ for the cell size.
+: src-length ( -- offset )  0 ;
+: src-index  ( -- offset )  8 ;
+: src-type   ( -- offset ) 16 ;
+: src-buffer ( -- offset ) 24 ;
+
+
+\ Unique instruction only found at the end of EVALUATE.
+: eval-jmp ( -- ) S"   jmp    quit_inner" ,asm-l ;
 
