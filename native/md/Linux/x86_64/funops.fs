@@ -367,7 +367,7 @@ VARIABLE next-label    1 next-label !
 
 \ Renders a cmpq and a conditional jump.
 : (op-branch) ( r0 r1 label c-addr u -- )
-  >r >r >r >r reg r> ( lhs rhs ) [op] cmp
+  >r >r >r >r reg r> reg ( lhs rhs ) [op] cmp
   r> label   r> r>   unop-raw ( )
 ;
 
@@ -375,6 +375,12 @@ VARIABLE next-label    1 next-label !
 : jlt-unsigned ( r0 r1 label -- ) S" jb" (op-branch) ;
 : jeq ( r0 r1 label -- ) S" je" (op-branch) ;
 : jne ( r0 r1 label -- ) S" jne" (op-branch) ;
+
+\ Jump when zero, since that's a common operation.
+: jz  ( r0 label -- )
+  >r   reg dup [op] test
+  S" je" ,asm r> label ,operand asm-nl
+;
 
 \ Unconditional jump.
 : jmp ( label -- ) S"   jmp    " ,asm   label ,operand   asm-nl ;
@@ -428,13 +434,21 @@ VARIABLE next-label    1 next-label !
 \ Indirected, these point to registers by index.
 CREATE (args)    4 , 3 , 2 , 1 ,  \ rdi, rsi, rdx and rcx
 
-\ Moves the value in reg to the numbered arg.
-: arg  ( reg arg -- )
-  >r reg r>   cells (args) + @ reg   [op] mov ;
-
-: pop-arg ( arg -- ) cells (args) + @   pop ;
+\ Returns the reg number for the nth arg.
+: arg ( arg -- reg ) cells (args) + @ ;
+: >arg ( reg arg -- ) >r reg r>   arg reg   [op] mov ;
+: pop-arg ( arg -- ) arg pop ;
 
 : call ( c-addr u -- ) S"   call   " ,asm ,asm-l ;
+
+: return-void ( -- ) [op] ret ;
+
+\ Sets the return value to that held in reg.
+: return ( reg -- )
+  ?dup IF reg   0 reg   [op] mov THEN
+  return-void
+;
+
 
 
 \ Input buffer handling

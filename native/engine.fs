@@ -182,7 +182,104 @@
 S" refill_:" ,asm-l
 2 input-source
 0 2 src-type   read-indexed
-src-type
+-1 1 -lit   \ type of -1 means EVALUATE
+0 1 mklabel dup >r ( not-eval ) jne r> ( not-eval )
 
-\ START HERE. Keep wrangling refill.
+\ If we didn't jump, this is an EVALUATE. We bump the source, poprsp, and NEXT.
+0 input-index--
+poprsp-ip
+,next
+
+( not-eval ) resolve
+
+\ First, check the type again. 0 = keyboard, otherwise a file.
+2 input-source
+0 2 src-type  read-indexed
+0 1 lit
+0 1 mklabel dup >r ( not-keyboard ) jne r> ( not-keyboard )
+
+\ Still here: keyboard. Call to readline, or equivalent.
+\ Readline gives a C string in a scratch buffer I need to free().
+\ So we get its length, strncpy it into the parse buffer, set the pointer to 0
+\ and continue.
+0 readline \ 0 = c-str
+0 push   \ Save the string.
+
+\ Now call strlen
+1 args
+0 0 >arg  \ Prepare the next call.
+
+S" strlen" call
+
+2 input-source
+0 2 src-length write-indexed  \ Save the length to the source.
+
+\ Call to strncpy
+3 args
+0 arg   2 src-buffer   read-indexed \ arg 0: src buffer
+1 arg   peek                        \ arg 1: input string
+0 2 >arg                            \ arg 2: length
+S" strncpy" call
+
+2 input-source
+0 0 lit
+0 2 src-index write-indexed \ Set the index to 0.
+
+
+1 args
+0 pop-arg     \ Pop the input string.
+S" free" call \ And free() it.
+
+-1 0 -lit
+0 return
+
+
+
+\ This is where we jump for a file or pseudofile.
+( not-keyboard ) resolve
+
+2 input-source
+0 2 src-type read-indexed
+1 1 lit    \ If the least significant bit is set, this is an inline pseudofile.
+0 1 op-and \ 0 holds the and.
+0 mklabel ( real-file ) dup >r   jz   r> ( real-file )
+
+\ If we're still here, it's a pseudofile.
+\ Mask off the bottom bit.
+3  2 src-type read-indexed
+-2 1 -lit
+1 3 op-and \ 3 is the actual address of the external_source struct.
+
+1 3 read            \ 1 = current
+2 3 1 read-indexed  \ 2 = end
+1 2 mklabel dup >r jlt-unsigned r> ( real-file not-empty )
+
+\ We've run out of this pseudofile, so return.
+input-index--
+0 zero
+0 return
+
+\ Not an empty pseudofile yet.
+resolve ( real-file )
+\ Scan for either hitting the end, or a newline.
+0 3 read           \ 0 = current
+2 3 1 read-indexed \ 2 = end
+mklabel ( real-file loop-condition )
+dup jmp
+
+mklabel dup resolve ( real-file loop-condition loop-top )
+1 1 lit    \ TODO Optimize, most architectures can increment in one op!
+1 0 plus
+swap resolve ( real-file loop-top )
+
+0 2 \ START HERE
+
+
+\ struct {
+\   char *current;
+\   char *end
+\ };
+
+
+
 
