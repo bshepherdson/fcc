@@ -1,7 +1,7 @@
 \ Uses the machine-dependent macros (already loaded) to assemble a binary for
 \ the target platform.
 
-: eng-binop ( xt -- ) >r   0 1 pop2   0 1 r> execute   0 push ;
+: eng-binop ( xt -- ) >r   1 0 pop2   1 0 r> execute   0 push ;
 
 1 WORD: plus +
   ' plus   eng-binop
@@ -179,4 +179,10 @@
 
 
 \ START HERE: refill_
+S" refill_:" ,asm-l
+2 input-source
+0 2 src-type   read-indexed
+src-type
+
+\ START HERE. Keep wrangling refill.
 
