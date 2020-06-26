@@ -2,14 +2,14 @@ MODULE_DIR=core
 FORTH_MODULES=$(shell find $(MODULE_DIR) -name "*.fs")
 FORTH_OBJECTS := $(FORTH_MODULES:%.fs=%.o)
 
-LIBS=-lreadline -ldl
+LIBS=-leditline -ldl
 INCLUDES=-Iinclude
 
 BENCHMARKS=bubble-sort fib matrix-mult mm-rtcg sieve 1mloop bpsieve loop-nest
 
 CC?=gcc
 
-CFLAGS+=-std=c99 -Wall -Wextra -fomit-frame-pointer
+CFLAGS+=-std=c99 -Wall -Wextra -fomit-frame-pointer -no-pie -fno-pie
 ifeq ($(ACCOUNTING), yes)
   CFLAGS+=-DACCOUNTING
   SUPERINSTRUCTIONS=no

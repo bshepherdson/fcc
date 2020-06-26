@@ -211,13 +211,13 @@ print:
 	movq	(%rsp), %rax
 	addq	$1, %rax
 	movq	%rax, %rdi
-	call	malloc
+	call	malloc@PLT
 	movq	%rax, str1(%rip)
 	movq	(%rsp), %rdx
 	movq	8(%rsp), %rax
 	movq	%rax, %rsi
 	movq	str1(%rip), %rdi
-	call	strncpy
+	call	strncpy@PLT
 	movq	str1(%rip), %rdx
 	movq	(%rsp), %rax
 	addq	%rdx, %rax
@@ -225,9 +225,9 @@ print:
 	movq	str1(%rip), %rsi
 	movl	$.LC0, %edi
 	movl	$0, %eax
-	call	printf
+	call	printf@PLT
 	movq	str1(%rip), %rdi
-	call	free
+	call	free@PLT
 	nop
 	addq	$24, %rsp
 	.cfi_def_cfa_offset 8
@@ -516,7 +516,7 @@ WORD_TAIL two_store
 WORD_HDR raw_alloc, "(ALLOCATE)", 10, 33, header_two_store
 	movq	(%rbx), %rax
 	movq	%rax, %rdi
-	call	malloc
+	call	malloc@PLT
 	movq	%rax, (%rbx)
 	NEXT
 WORD_TAIL raw_alloc
@@ -534,7 +534,7 @@ WORD_HDR print_internal, "(PRINT)", 7, 35, header_here_ptr
 	movq	(%rbx), %rsi
 	movl	$.LC36, %edi
 	movl	$0, %eax
-	call	printf
+	call	printf@PLT
 	addq	$8, %rbx
 	NEXT
 WORD_TAIL print_internal
@@ -602,6 +602,7 @@ WORD_TAIL evaluate
 
 
 	.section	.rodata
+	.align 16
 .LC42:
 	.string	"> "
 	.text
@@ -635,11 +636,24 @@ refill_:
 	testq	%rax, %rax
 	jne	.L55
 	movl	$.LC42, %edi
-	call	readline
-	movq	%rax, str1(%rip)
+
+	# readline uses xmm0 kinds of instructions, which requires the
+	# target (the stack in this case) be 16-byte aligned.
+	# So I move the stack here and save its value in %r14, which is
+	# callee-saved.
+	movq    %rsp, %r14
+	movq    $15, %rax
+	notq    %rax
+	andq    %rax, %rsp
+
+	call	readline@PLT
+	movq    %rax, str1(%rip)
+	# Restore %rsp
+	movq    %r14, %rsp
+
 	movq	inputIndex(%rip), %r12
 	movq	str1(%rip), %rdi
-	call	strlen
+	call	strlen@PLT
 	movq	%rax, %rdx
 	movq	%r12, %rax
 	salq	$5, %rax
@@ -655,13 +669,13 @@ refill_:
 	movq	%rax, %rdx
 	movq	str1(%rip), %rsi
 	movq	(%rcx), %rdi
-	call	strncpy
+	call	strncpy@PLT
 	movq	inputIndex(%rip), %rax
 	salq	$5, %rax
 	addq	$inputSources+8, %rax
 	movq	$0, (%rax)
 	movq	str1(%rip), %rdi
-	call	free
+	call	free@PLT
 	movq	$-1, %rax
 	jmp	.L56
 .L55:
@@ -725,7 +739,7 @@ refill_:
 	addq	$inputSources+24, %rcx
 	movq	%rax, %rsi
 	movq	(%rcx), %rdi
-	call	strncpy
+	call	strncpy@PLT
 	movq	inputIndex(%rip), %rax
 	salq	$5, %rax
 	addq	$inputSources+8, %rax
@@ -756,7 +770,7 @@ refill_:
 	movq	%rax, %rdx
 	movl	$tempSize, %esi
 	movl	$str1, %edi
-	call	getline
+	call	getline@PLT
 	movq	%rax, c1(%rip)
 	movq	c1(%rip), %rax
 	cmpq	$-1, %rax
@@ -780,9 +794,9 @@ refill_:
 	movq	c1(%rip), %rdx
 	movq	str1(%rip), %rsi
 	movq	(%rax), %rdi
-	call	strncpy
+	call	strncpy@PLT
 	movq	str1(%rip), %rdi
-	call	free
+	call	free@PLT
 	movq	inputIndex(%rip), %rax
 	salq	$5, %rax
 	leaq	inputSources(%rax), %rdx
@@ -818,17 +832,17 @@ WORD_HDR refill, "REFILL", 6, 41, header_evaluate
 	jmp	.L70
 .L69:
 	subq	$8, %rbx
-	call	refill_
+	call	refill_@PLT
 	movq	%rax, (%rbx)
 .L70:
 	NEXT
 WORD_TAIL refill
 WORD_HDR accept, "ACCEPT", 6, 42, header_refill
 	movl	$0, %edi
-	call	readline
+	call	readline@PLT
 	movq	%rax, str1(%rip)
 	movq	str1(%rip), %rdi
-	call	strlen
+	call	strlen@PLT
 	movq	%rax, c1(%rip)
 	movq	(%rbx), %rdx
 	movq	c1(%rip), %rax
@@ -841,18 +855,18 @@ WORD_HDR accept, "ACCEPT", 6, 42, header_refill
 	movq	c1(%rip), %rdx
 	movq	str1(%rip), %rsi
 	movq	%rax, %rdi
-	call	strncpy
+	call	strncpy@PLT
 	movq	c1(%rip), %rax
 	addq	$8, %rbx
 	movq	%rax, (%rbx)
 	movq	str1(%rip), %rdi
-	call	free
+	call	free@PLT
 	NEXT
 WORD_TAIL accept
 WORD_HDR key, "KEY", 3, 43, header_accept
 	movl	$old_tio, %esi
 	movl	$0, %edi
-	call	tcgetattr
+	call	tcgetattr@PLT
 	movq	old_tio(%rip), %rax
 	movq	%rax, new_tio(%rip)
 	movq	old_tio+8(%rip), %rax
@@ -873,15 +887,15 @@ WORD_HDR key, "KEY", 3, 43, header_accept
 	movl	$new_tio, %edx
 	movl	$0, %esi
 	movl	$0, %edi
-	call	tcsetattr
+	call	tcsetattr@PLT
 	subq	$8, %rbx
-	call	getchar
+	call	getchar@PLT
 	cltq
 	movq	%rax, (%rbx)
 	movl	$old_tio, %edx
 	movl	$0, %esi
 	movl	$0, %edi
-	call	tcsetattr
+	call	tcsetattr@PLT
 	NEXT
 WORD_TAIL key
 WORD_HDR latest, "(LATEST)", 8, 44, header_key
@@ -915,7 +929,7 @@ WORD_HDR emit, "EMIT", 4, 46, header_in_ptr
         addq    $8, %rbx
 	movq	%rdx, %rsi
 	movl	%eax, %edi
-	call	fputc
+	call	fputc@PLT
 	NEXT
 WORD_TAIL emit
 WORD_HDR source, "SOURCE", 6, 47, header_emit
@@ -1439,7 +1453,7 @@ to_number_:
 	movq	%rax, tempSize(%rip)
 	movq	8(%rbx), %rax
 	movq	%rax, str1(%rip)
-	call	to_number_int_
+	call	to_number_int_@PLT
 	nop
 	ret
 	.cfi_endproc
@@ -1509,7 +1523,7 @@ parse_number_:
 	addq	$1, str1(%rip)
 	movb	$1, ch1(%rip)
 .L140:
-	call	to_number_int_
+	call	to_number_int_@PLT
 	movzbl	ch1(%rip), %eax
 	testb	%al, %al
 	je	.L131
@@ -1556,7 +1570,7 @@ find_debug:
 
 	# %rsp needs to be aligned to 16 bytes for C calls, but it already is,
 	# because find_ is a C call itself.
-	call strncasecmp
+	call strncasecmp@PLT
 	testl   %eax, %eax  # ZF=1 when the response was 0, meaning equal.
 	jne  .LF152  # If it's not equal, we didn't find it.
 
@@ -1606,20 +1620,20 @@ find_found:
 
 
 WORD_HDR parse, "PARSE", 5, 64, header_dodoes
-	call	parse_
+	call	parse_@PLT
 	NEXT
 WORD_TAIL parse
 WORD_HDR parse_name, "PARSE-NAME", 10, 65, header_parse
-	call	parse_name_
+	call	parse_name_@PLT
 	NEXT
 WORD_TAIL parse_name
 WORD_HDR to_number, ">NUMBER", 7, 66, header_parse_name
-	call	to_number_
+	call	to_number_@PLT
 	NEXT
 WORD_TAIL to_number
 WORD_HDR create, "CREATE", 6, 67, header_to_number
         # TODO: Optimize. Low priority, CREATE is not very hot.
-	call	parse_name_
+	call	parse_name_@PLT
 	movq	dsp(%rip), %rax
 	addq	$7, %rax
 	andq	$-8, %rax
@@ -1641,13 +1655,13 @@ WORD_HDR create, "CREATE", 6, 67, header_to_number
 
 	movq	tempHeader(%rip), %r12
 	movq	(%rbx), %rdi
-	call	malloc
+	call	malloc@PLT
 	movq	%rax, 16(%r12)
 	movq	(%rbx), %rdx
 	movq	8(%rbx), %rsi
 	movq	16(%r12), %rax
 	movq	%rax, %rdi
-	call	strncpy
+	call	strncpy@PLT
 	addq	$16, %rbx
 
 	movq	tempHeader(%rip), %rax
@@ -1659,7 +1673,7 @@ WORD_HDR create, "CREATE", 6, 67, header_to_number
 	NEXT
 WORD_TAIL create
 WORD_HDR find, "(FIND)", 6, 68, header_create
-	call	find_
+	call	find_@PLT
 	NEXT
 WORD_TAIL find
 WORD_HDR depth, "DEPTH", 5, 69, header_find
@@ -1710,7 +1724,7 @@ dot_s_:
 	movq	%rax, %rsi
 	movl	$.LC76, %edi
 	movl	$0, %eax
-	call	printf
+	call	printf@PLT
 	movq	spTop(%rip), %rax
 	subq	$8, %rax
 	movq	%rax, c1(%rip)
@@ -1720,14 +1734,14 @@ dot_s_:
 	movq	(%rax), %rsi
 	movl	$.LC36, %edi
 	movl	$0, %eax
-	call	printf
+	call	printf@PLT
 	subq	$8, c1(%rip)
 .L162:
 	movq	c1(%rip), %rdx
 	cmpq	%rbx, %rdx
 	jge	.L163
 	movl	$10, %edi
-	call	putchar
+	call	putchar@PLT
 	nop
 	addq	$8, %rsp
 	.cfi_def_cfa_offset 8
@@ -1738,7 +1752,7 @@ dot_s_:
 
 
 WORD_HDR dot_s, ".S", 2, 74, header_rp_store
-	call	dot_s_
+	call	dot_s_@PLT
 	NEXT
 WORD_TAIL dot_s
 	.section	.rodata
@@ -1760,7 +1774,7 @@ u_dot_s_:
 	movq	%rax, %rsi
 	movl	$.LC76, %edi
 	movl	$0, %eax
-	call	printf
+	call	printf@PLT
 	movq	spTop(%rip), %rax
 	subq	$8, %rax
 	movq	%rax, c1(%rip)
@@ -1770,14 +1784,14 @@ u_dot_s_:
 	movq	(%rax), %rsi
 	movl	$.LC78, %edi
 	movl	$0, %eax
-	call	printf
+	call	printf@PLT
 	subq	$8, c1(%rip)
 .L168:
 	movq	c1(%rip), %rdx
 	cmpq	%rbx, %rdx
 	jge	.L169
 	movl	$10, %edi
-	call	putchar
+	call	putchar@PLT
 	nop
 	addq	$8, %rsp
 	.cfi_def_cfa_offset 8
@@ -1788,7 +1802,7 @@ u_dot_s_:
 
 
 WORD_HDR u_dot_s, "U.S", 3, 75, header_dot_s
-	call	u_dot_s_
+	call	u_dot_s_@PLT
 	NEXT
 WORD_TAIL u_dot_s
 
@@ -1806,12 +1820,12 @@ WORD_HDR dump_file, "(DUMP-FILE)", 11, 76, header_u_dot_s
 	movq    (%rbx), %rdx
 	movq    8(%rbx), %rsi
 	movl	$tempBuf, %edi
-	call	strncpy
+	call	strncpy@PLT
 	movq	(%rbx), %rax
 	movb	$0, tempBuf(%rax)
 	movl	$.LC81, %esi
 	movl	$tempBuf, %edi
-	call	fopen
+	call	fopen@PLT
 	movq	%rax, tempFile(%rip)
 	movq	tempFile(%rip), %rax
 	testq	%rax, %rax
@@ -1820,23 +1834,23 @@ WORD_HDR dump_file, "(DUMP-FILE)", 11, 76, header_u_dot_s
 	movl	$.LC82, %esi
 	movq	stderr(%rip), %rdi
 	movl	$0, %eax
-	call	fprintf
+	call	fprintf@PLT
 	jmp	.L175
 .L174:
         movq    16(%rbx), %rdx
         movq    24(%rbx), %rdi
 	movq	tempFile(%rip), %rcx
 	movl	$1, %esi
-	call	fwrite
+	call	fwrite@PLT
 	movq	%rax, c1(%rip)
         movq    16(%rbx), %rdx
 	movl	$tempBuf, %ecx
 	movq	c1(%rip), %rsi
 	movl	$.LC83, %edi
 	movl	$0, %eax
-	call	printf
+	call	printf@PLT
 	movq	tempFile(%rip), %rdi
-	call	fclose
+	call	fclose@PLT
 	movq	$0, tempFile(%rip)
 .L175:
 	NEXT
@@ -1898,7 +1912,7 @@ lookup_primitive:
 	subq	$8, %rsp
 	.cfi_def_cfa_offset 16
 	movl	$40, %edi
-	call	exit
+	call	exit@PLT
 .L183:
 	.cfi_def_cfa_offset 8
 	ret
@@ -2090,10 +2104,10 @@ compile_:
 	movl	queue_length(%rip), %eax
 	cmpl	$3, %eax
 	jle	.L207
-	call	drain_queue_
+	call	drain_queue_@PLT
 .L207:
 	movl	$0, %eax
-	call	bump_queue_tail_
+	call	bump_queue_tail_@PLT
 	movq	(%rbx), %rax
 	movq	(%rax), %rax
 	cmpq	$code_docol, %rax
@@ -2134,10 +2148,10 @@ compile_:
 	movl	queue_length(%rip), %eax
 	cmpl	$4, %eax
 	jne	.L212
-	call	drain_queue_
+	call	drain_queue_@PLT
 .L212:
 	movl	$0, %eax
-	call	bump_queue_tail_
+	call	bump_queue_tail_@PLT
 	movq	queueTail(%rip), %rax
 	movq	$call_, (%rax)
 	movb	$1, 8(%rax)
@@ -2156,7 +2170,7 @@ compile_:
 	movq	(%rax), %rax
 	movq	%rax, c1(%rip)
 	movl	$0, %eax
-	call	lookup_primitive
+	call	lookup_primitive@PLT
 	movq	queueTail(%rip), %rax
 	movq	c1(%rip), %rdx
 	movq	%rdx, (%rax)
@@ -2181,10 +2195,10 @@ compile_lit_:
 	movl	queue_length(%rip), %eax
 	cmpl	$3, %eax
 	jle	.L216
-	call	drain_queue_
+	call	drain_queue_@PLT
 .L216:
 	movl	$0, %eax
-	call	bump_queue_tail_
+	call	bump_queue_tail_@PLT
 	movq	queueTail(%rip), %rax
 	movq	$code_dolit, (%rax)
 	movq	queueTail(%rip), %rax
@@ -2227,9 +2241,9 @@ quit_:
 	movq	$0, inputIndex(%rip)
 .L219:
 	movq	$.L220, quit_inner(%rip)
-	call	refill_
+	call	refill_@PLT
 .L220:
-	call	parse_name_
+	call	parse_name_@PLT
 	movq	(%rbx), %rax
 	testq	%rax, %rax
 	jne	.L233
@@ -2240,10 +2254,10 @@ quit_:
 	testq	%rax, %rax
 	jne	.L223
 	movl	$.LC84, %edi
-	call	puts
+	call	puts@PLT
 .L223:
 	addq	$16, %rbx
-	call	refill_
+	call	refill_@PLT
 	jmp	.L220
 .L233:
 	nop
@@ -2251,7 +2265,7 @@ quit_:
 	movq	%rax, savedString(%rip)
 	movq	(%rbx), %rax
 	movq	%rax, savedLength(%rip)
-	call	find_
+	call	find_@PLT
 	movq	(%rbx), %rax
 	testq	%rax, %rax
 	jne	.L224
@@ -2260,7 +2274,7 @@ quit_:
 	movq	%rax, (%rbx)
 	movq	savedString(%rip), %rax
 	movq	%rax, 8(%rbx)
-	call	parse_number_
+	call	parse_number_@PLT
 	movq	(%rbx), %rax
 	testq	%rax, %rax
 	jne	.L225
@@ -2269,7 +2283,7 @@ quit_:
 	jne	.L226
 	addq	$24, %rbx
 	movl	$0, %eax
-	call	compile_lit_
+	call	compile_lit_@PLT
 	jmp	.L220
 .L226:
 	addq	$24, %rbx
@@ -2278,14 +2292,14 @@ quit_:
 	movq	savedLength(%rip), %rdx
 	movq	savedString(%rip), %rsi
 	movl	$tempBuf, %edi
-	call	strncpy
+	call	strncpy@PLT
 	movq	savedLength(%rip), %rax
 	movb	$0, tempBuf(%rax)
 	movl	$tempBuf, %edx
 	movl	$.LC85, %esi
 	movq	stderr(%rip), %rdi
 	movl	$0, %eax
-	call	fprintf
+	call	fprintf@PLT
 	jmp	.L218
 .L224:
 	movq	(%rbx), %rax
@@ -2311,7 +2325,7 @@ quit_:
 .L230:
 	addq	$8, %rbx
 	movl	$0, %eax
-	call	compile_
+	call	compile_@PLT
 	jmp	.L220
 	.cfi_endproc
 .LFE94:
@@ -2319,26 +2333,26 @@ quit_:
 
 WORD_HDR quit, "QUIT", 4, 77, header_dump_file
 	movq	$0, inputIndex(%rip)
-	call	quit_
+	call	quit_@PLT
 	NEXT
 WORD_TAIL quit
 WORD_HDR bye, "BYE", 3, 78, header_quit
 	movl	$0, %edi
-	call	exit
+	call	exit@PLT
 WORD_TAIL bye
 WORD_HDR compile_comma, "COMPILE,", 8, 79, header_bye
 	movl	$0, %eax
-	call	compile_
+	call	compile_@PLT
 	NEXT
 WORD_TAIL compile_comma
 WORD_HDR literal, "LITERAL", 519, 101, header_compile_comma
 	movl	$0, %eax
-	call	compile_lit_
+	call	compile_lit_@PLT
 	NEXT
 WORD_TAIL literal
 WORD_HDR compile_literal, "[LITERAL]", 9, 102, header_literal
 	movl	$0, %eax
-	call	compile_lit_
+	call	compile_lit_@PLT
 	NEXT
 WORD_TAIL compile_literal
 WORD_HDR compile_zbranch, "[0BRANCH]", 9, 103, header_compile_literal
@@ -2346,10 +2360,10 @@ WORD_HDR compile_zbranch, "[0BRANCH]", 9, 103, header_compile_literal
 	movl	$header_zbranch+24, %eax
 	movq	%rax, (%rbx)
 	movl	$0, %eax
-	call	compile_
+	call	compile_@PLT
 	jmp	.L244
 .L245:
-	call	drain_queue_
+	call	drain_queue_@PLT
 .L244:
 	movl	queue_length(%rip), %eax
 	testl	%eax, %eax
@@ -2367,10 +2381,10 @@ WORD_HDR compile_branch, "[BRANCH]", 8, 104, header_compile_zbranch
 	movl	$header_branch+24, %edx
 	movq	%rdx, (%rbx)
 	movl	$0, %eax
-	call	compile_
+	call	compile_@PLT
 	jmp	.L248
 .L249:
-	call	drain_queue_
+	call	drain_queue_@PLT
 .L248:
 	movl	queue_length(%rip), %eax
 	testl	%eax, %eax
@@ -2387,7 +2401,7 @@ WORD_TAIL compile_branch
 WORD_HDR control_flush, "(CONTROL-FLUSH)", 15, 105, header_compile_branch
 	jmp	.L252
 .L253:
-	call	drain_queue_
+	call	drain_queue_@PLT
 .L252:
 	movl	queue_length(%rip), %eax
 	testl	%eax, %eax
@@ -2399,11 +2413,11 @@ WORD_HDR debug_break, "(DEBUG)", 7, 80, header_control_flush
 WORD_TAIL debug_break
 WORD_HDR close_file, "CLOSE-FILE", 10, 81, header_debug_break
 	movq	(%rbx), %rdi
-	call	fclose
+	call	fclose@PLT
 	cltq
 	testq	%rax, %rax
 	je	.L256
-	call	__errno_location
+	call	__errno_location@PLT
 	movl	(%rax), %eax
 	cltq
 	jmp	.L257
@@ -2456,7 +2470,7 @@ WORD_HDR create_file, "CREATE-FILE", 11, 82, header_close_file
 	movq    8(%rbx), %rdx
 	movq    16(%rbx), %rsi
 	movl	$tempBuf, %edi
-	call	strncpy
+	call	strncpy@PLT
 	movq	8(%rbx), %rax
 	movb	$0, tempBuf(%rax)
 	addq	$8, %rbx
@@ -2466,11 +2480,11 @@ WORD_HDR create_file, "CREATE-FILE", 11, 82, header_close_file
 	movq	file_modes(,%rax,8), %rax
 	movq	%rax, %rsi
 	movl	$tempBuf, %edi
-	call	fopen
+	call	fopen@PLT
 	movq	%rax, 8(%rbx)
 	testq	%rax, %rax
 	jne	.L260
-	call	__errno_location
+	call	__errno_location@PLT
 	movl	(%rax), %eax
 	cltq
 	jmp	.L261
@@ -2484,14 +2498,14 @@ WORD_HDR open_file, "OPEN-FILE", 9, 83, header_create_file
         movq    8(%rbx), %rdx
         movq    16(%rbx), %rsi
 	movl	$tempBuf, %edi
-	call	strncpy
+	call	strncpy@PLT
 	movq	8(%rbx), %rax
 	movb	$0, tempBuf(%rax)
 	movq	(%rbx), %rax
 	movq	file_modes(,%rax,8), %rax
 	movq	%rax, %rsi
 	movl	$tempBuf, %edi
-	call	fopen
+	call	fopen@PLT
 	movq	%rax, 16(%rbx)
 	testq	%rax, %rax
 	jne	.L264
@@ -2504,13 +2518,13 @@ WORD_HDR open_file, "OPEN-FILE", 9, 83, header_create_file
 	movq	file_modes(,%rax,8), %rax
 	movq	%rax, %rsi
 	movl	$tempBuf, %edi
-	call	fopen
+	call	fopen@PLT
 	movq	%rax, 16(%rbx)
 .L264:
 	movq	16(%rbx), %rax
 	testq	%rax, %rax
 	jne	.L265
-	call	__errno_location
+	call	__errno_location@PLT
 	movl	(%rax), %eax
 	cltq
 	jmp	.L266
@@ -2525,17 +2539,17 @@ WORD_HDR delete_file, "DELETE-FILE", 11, 84, header_open_file
         movq    (%rbx), %rdx
         movq    8(%rbx), %rsi
 	movl	$tempBuf, %edi
-	call	strncpy
+	call	strncpy@PLT
 	movq	(%rbx), %rax
 	movb	$0, tempBuf(%rax)
 	addq	$8, %rbx
 	movl	$tempBuf, %edi
-	call	remove
+	call	remove@PLT
 	cltq
 	movq	%rax, (%rbx)
 	cmpq	$-1, %rax
 	jne	.L269
-	call	__errno_location
+	call	__errno_location@PLT
 	movl	(%rax), %eax
 	cltq
 	movq	%rax, (%rbx)
@@ -2546,11 +2560,11 @@ WORD_HDR file_position, "FILE-POSITION", 13, 85, header_delete_file
 	subq	$16, %rbx
         movq    $0, 8(%rbx)
         movq    16(%rbx), %rdi
-	call	ftell
+	call	ftell@PLT
 	movq	%rax, 16(%rbx)
 	cmpq	$-1, %rax
 	jne	.L272
-	call	__errno_location
+	call	__errno_location@PLT
 	movl	(%rax), %eax
 	cltq
 	jmp	.L273
@@ -2564,11 +2578,11 @@ WORD_HDR file_size, "FILE-SIZE", 9, 86, header_file_position
 	subq	$16, %rbx
         movq    $0, 8(%rbx)
         movq    16(%rbx), %rdi
-	call	ftell
+	call	ftell@PLT
 	movq	%rax, c1(%rip)
 	testq	%rax, %rax
 	jns	.L276
-	call	__errno_location
+	call	__errno_location@PLT
 	movl	(%rax), %eax
 	cltq
 	movq	%rax, (%rbx)
@@ -2577,28 +2591,28 @@ WORD_HDR file_size, "FILE-SIZE", 9, 86, header_file_position
 	movl	$2, %edx
 	movl	$0, %esi
 	movq	16(%rbx), %rdi
-	call	fseek
+	call	fseek@PLT
 	cltq
 	movq	%rax, c2(%rip)
 	testq	%rax, %rax
 	jns	.L278
-	call	__errno_location
+	call	__errno_location@PLT
 	movl	(%rax), %eax
 	cltq
 	movq	%rax, (%rbx)
 	movq	16(%rbx), %rdi
 	movl	$0, %edx
 	movq	c1(%rip), %rsi
-	call	fseek
+	call	fseek@PLT
 	jmp	.L277
 .L278:
 	movq	16(%rbx), %rdi
-	call	ftell
+	call	ftell@PLT
 	movq	%rax, c2(%rip)
 	movq	16(%rbx), %rdi
 	movl	$0, %edx
 	movq	c1(%rip), %rsi
-	call	fseek
+	call	fseek@PLT
 	movq	c2(%rip), %rax
 	movq	%rax, 16(%rbx)
 	movq	$0, (%rbx)
@@ -2636,12 +2650,12 @@ WORD_HDR read_file, "READ-FILE", 9, 88, header_include_file
         movq    8(%rbx), %rdx
 	movl	$1, %esi
 	movq	16(%rbx), %rdi
-	call	fread
+	call	fread@PLT
 	movq	%rax, c1(%rip)
 	testq	%rax, %rax
 	jne	.L282
 	movq	(%rbx), %rdi
-	call	feof
+	call	feof@PLT
 	testl	%eax, %eax
 	je	.L283
 	addq	$8, %rbx
@@ -2650,7 +2664,7 @@ WORD_HDR read_file, "READ-FILE", 9, 88, header_include_file
 	jmp	.L285
 .L283:
 	movq	(%rbx), %rdi
-	call	ferror
+	call	ferror@PLT
 	cltq
 	movq	%rax, 8(%rbx)
 	movq	$0, 16(%rbx)
@@ -2669,11 +2683,11 @@ WORD_HDR read_line, "READ-LINE", 9, 89, header_read_file
 	movq	(%rbx), %rdx
 	movl	$tempSize, %esi
 	movl	$str1, %edi
-	call	getline
+	call	getline@PLT
 	movq	%rax, c1(%rip)
 	cmpq	$-1, %rax
 	jne	.L288
-	call	__errno_location
+	call	__errno_location@PLT
 	movl	(%rax), %eax
 	cltq
 	movq	%rax, (%rbx)
@@ -2701,7 +2715,7 @@ WORD_HDR read_line, "READ-LINE", 9, 89, header_read_file
 	movl	$1, %edx
 	movq	%rcx, %rsi
 	movq	%rax, %rdi
-	call	fseek
+	call	fseek@PLT
 	movq	8(%rbx), %rax
 	addq	$1, %rax
 	movq	%rax, c1(%rip)
@@ -2721,7 +2735,7 @@ WORD_HDR read_line, "READ-LINE", 9, 89, header_read_file
 	movq	16(%rbx), %rax
 	movq	str1(%rip), %rsi
 	movq	%rax, %rdi
-	call	strncpy
+	call	strncpy@PLT
 	movq	$0, (%rbx)
 	movq	$-1, 8(%rbx)
 	movq	c1(%rip), %rax
@@ -2732,7 +2746,7 @@ WORD_HDR read_line, "READ-LINE", 9, 89, header_read_file
 	testq	%rax, %rax
 	je	.L293
 	movq	str1(%rip), %rdi
-	call	free
+	call	free@PLT
 .L293:
 	NEXT
 WORD_TAIL read_line
@@ -2740,14 +2754,14 @@ WORD_HDR reposition_file, "REPOSITION-FILE", 15, 90, header_read_line
 	movq	16(%rbx), %rsi
 	movq	(%rbx), %rdi
 	movl	$0, %edx
-	call	fseek
+	call	fseek@PLT
 	cltq
 	movq	%rax, 16(%rbx)
 	addq	$16, %rbx
 	movq	(%rbx), %rax
 	cmpq	$-1, %rax
 	jne	.L296
-	call	__errno_location
+	call	__errno_location@PLT
 	movl	(%rax), %eax
 	cltq
 	movq	%rax, (%rbx)
@@ -2756,17 +2770,17 @@ WORD_HDR reposition_file, "REPOSITION-FILE", 15, 90, header_read_line
 WORD_TAIL reposition_file
 WORD_HDR resize_file, "RESIZE-FILE", 11, 91, header_reposition_file
         movq    (%rbx), %rdi
-        call    fileno
+        call    fileno@PLT
         movl    %eax, %edi
         movq    16(%rbx), %rsi
-	call	ftruncate
+	call	ftruncate@PLT
 	cltq
 	movq	%rax, 16(%rbx)
 	addq	$16, %rbx
 	movq	(%rbx), %rax
 	cmpq	$-1, %rax
 	jne	.L299
-	call	__errno_location
+	call	__errno_location@PLT
 	movl	(%rax), %eax
 	cltq
 	jmp	.L300
@@ -2781,7 +2795,7 @@ WORD_HDR write_file, "WRITE-FILE", 10, 92, header_resize_file
 	movq	8(%rbx), %rdx
 	movl	$1, %esi
 	movq	16(%rbx), %rdi
-	call	fwrite
+	call	fwrite@PLT
 	movq	%rax, c1(%rip)
 	addq	$16, %rbx
 	movq	$0, (%rbx)
@@ -2791,7 +2805,7 @@ WORD_HDR write_line, "WRITE-LINE", 10, 93, header_write_file
 	movq	8(%rbx), %rdx
 	movq	16(%rbx), %rsi
 	movl	$tempBuf, %edi
-	call	strncpy
+	call	strncpy@PLT
 	movq	8(%rbx), %rax
 	movb	$10, tempBuf(%rax)
 	movq	(%rbx), %rcx
@@ -2799,21 +2813,21 @@ WORD_HDR write_line, "WRITE-LINE", 10, 93, header_write_file
         addq    $1, %rdx
         movl    $1, %esi
 	movl	$tempBuf, %edi
-	call	fwrite
+	call	fwrite@PLT
 	addq	$16, %rbx
 	movq	$0, (%rbx)
 	NEXT
 WORD_TAIL write_line
 WORD_HDR flush_file, "FLUSH-FILE", 10, 94, header_write_line
 	movq	(%rbx), %rdi
-	call	fileno
+	call	fileno@PLT
 	movl	%eax, %edi
-	call	fsync
+	call	fsync@PLT
 	cltq
 	movq	%rax, (%rbx)
 	cmpq	$-1, %rax
 	jne	.L307
-	call	__errno_location
+	call	__errno_location@PLT
 	movl	(%rax), %eax
 	cltq
 	movq	%rax, (%rbx)
@@ -2837,7 +2851,7 @@ WORD_HDR colon, ":", 1, 95, header_flush_file
 	movq    (%rdx), %rcx   # The actual previous head.
 	movq	%rcx, (%rax)   # Written to the new header.
 	movq    %rax, (%rdx)   # And the new one into the compilation list
-	call	parse_name_
+	call	parse_name_@PLT
 	movq	(%rbx), %rax
 	testq	%rax, %rax
 	jne	.L310
@@ -2845,17 +2859,17 @@ WORD_HDR colon, ":", 1, 95, header_flush_file
 	movl	$34, %edx
 	movl	$1, %esi
 	movl	$.LC117, %edi
-	call	fwrite
-	call	code_quit
+	call	fwrite@PLT
+	call	code_quit@PLT
 .L310:
 	movq	tempHeader(%rip), %r12
 	movq	(%rbx), %rdi
-	call	malloc
+	call	malloc@PLT
 	movq	%rax, 16(%r12)
 	movq	(%rbx), %rdx
 	movq	8(%rbx), %rsi
 	movq	%rax, %rdi
-	call	strncpy
+	call	strncpy@PLT
 	movq	tempHeader(%rip), %rax
 	movq	(%rbx), %rdx
 	orb	$1, %dh
@@ -2913,22 +2927,22 @@ WORD_TAIL exit
 	.string	"%lu: "
 
 WORD_HDR see, "SEE", 3, 98, header_exit
-	call	parse_name_
+	call	parse_name_@PLT
 	movl	$.LC121, %edi
 	movl	$0, %eax
-	call	printf
+	call	printf@PLT
 	movq	8(%rbx), %rax
 	movq	(%rbx), %rsi
 	movq	%rax, %rdi
-	call	print
+	call	print@PLT
 	movl	$10, %edi
-	call	putchar
-	call	find_
+	call	putchar@PLT
+	call	find_@PLT
 	movq	(%rbx), %rax
 	testq	%rax, %rax
 	jne	.L315
 	movl	$.LC122, %edi
-	call	puts
+	call	puts@PLT
 	jmp	.L316
 .L315:
 	movq	8(%rbx), %rax
@@ -2938,7 +2952,7 @@ WORD_HDR see, "SEE", 3, 98, header_exit
 	cmpq	$code_docol, %rax
 	je	.L317
 	movl	$.LC123, %edi
-	call	puts
+	call	puts@PLT
 	jmp	.L316
 .L317:
 	movq	$0, tempHeader(%rip)
@@ -2955,7 +2969,7 @@ WORD_HDR see, "SEE", 3, 98, header_exit
 	movq	cfa(%rip), %rsi
 	movl	$.LC124, %edi
 	movl	$0, %eax
-	call	printf
+	call	printf@PLT
 	jmp	.L319
 .L318:
 	movq	tempHeader(%rip), %rax
@@ -2980,7 +2994,7 @@ WORD_HDR see, "SEE", 3, 98, header_exit
 	movq	cfa(%rip), %rsi
 	movl	$.LC125, %edi
 	movl	$0, %eax
-	call	printf
+	call	printf@PLT
 	jmp	.L319
 .L321:
 	movq	tempHeader(%rip), %rax
@@ -2997,7 +3011,7 @@ WORD_HDR see, "SEE", 3, 98, header_exit
 	movq	c1(%rip), %rdx
 	movq	str1(%rip), %rsi
 	movl	$tempBuf, %edi
-	call	strncpy
+	call	strncpy@PLT
 	movq	c1(%rip), %rax
 	movb	$0, tempBuf(%rax)
 	jmp	.L323
@@ -3008,7 +3022,7 @@ WORD_HDR see, "SEE", 3, 98, header_exit
 	movl	%eax, %esi
 	movl	$.LC126, %edi
 	movl	$0, %eax
-	call	printf
+	call	printf@PLT
 	addq	$1, str1(%rip)
 	subq	$1, c1(%rip)
 .L323:
@@ -3018,7 +3032,7 @@ WORD_HDR see, "SEE", 3, 98, header_exit
 	movl	$tempBuf, %esi
 	movl	$.LC127, %edi
 	movl	$0, %eax
-	call	printf
+	call	printf@PLT
 	movq	str1(%rip), %rax
 	addq	$7, %rax
 	andq	$-8, %rax
@@ -3034,7 +3048,7 @@ WORD_HDR see, "SEE", 3, 98, header_exit
 	movq	cfa(%rip), %rsi
 	movl	$.LC128, %edi
 	movl	$0, %eax
-	call	printf
+	call	printf@PLT
 	movq	tempHeader(%rip), %rax
 	movq	8(%rax), %rdx
 	movq	tempHeader(%rip), %rax
@@ -3042,9 +3056,9 @@ WORD_HDR see, "SEE", 3, 98, header_exit
 	movq	16(%rax), %rax
 	movq	%rdx, %rsi
 	movq	%rax, %rdi
-	call	print
+	call	print@PLT
 	movl	$10, %edi
-	call	putchar
+	call	putchar@PLT
 .L319:
 	movq	cfa(%rip), %rax
 	movq	(%rax), %rax
@@ -3059,7 +3073,7 @@ WORD_TAIL see
 WORD_HDR utime, "UTIME", 5, 106, header_see
 	movl	$0, %esi
 	movl	$timeVal, %edi
-	call	gettimeofday
+	call	gettimeofday@PLT
 	subq	$16, %rbx
 	movq	timeVal(%rip), %rdx
 	imulq	$1000000, %rdx, %rdx
@@ -3079,10 +3093,10 @@ WORD_HDR semicolon, ";", 513, 99, header_utime
 	movq	$header_exit+24, %rdx
 	movq	%rdx, (%rbx)
 	movl	$0, %eax
-	call	compile_
+	call	compile_@PLT
 	jmp	.L330
 .L331:
-	call	drain_queue_
+	call	drain_queue_@PLT
 .L330:
 	movl	queue_length(%rip), %eax
 	testl	%eax, %eax
@@ -3222,7 +3236,7 @@ WORD_HDR c_library, "C-LIBRARY", 9, 113, header_ccall_6
         movq    (%rbx), %rdi
         movq    $258, %rsi  # That's RTLD_NOW | RTLD_GLOBAL.
         subq    $8, %rsp # Align rsp to 16 bytes
-        call    dlopen
+        call    dlopen@PLT
         addq    $8, %rsp
         movq    %rax, (%rbx) # Push the result. NULL = 0 indicates an error.
         # That's a negated Forth flag.
@@ -3234,7 +3248,7 @@ WORD_HDR c_symbol, "C-SYMBOL", 8, 114, header_c_library
         movq   (%rbx), %rsi
         movq   $0, %rdi      # 0 = RTLD_DEFAULT, searching everywhere.
         subq   $8, %rsp # Align rsp to 16 bytes
-        call   dlsym
+        call   dlsym@PLT
         addq   $8, %rsp
         movq   %rax, (%rbx)  # Put the void* result onto the stack.
         NEXT
@@ -3311,7 +3325,7 @@ main:
 	addq	%rdx, %rax
 	movl	$.LC96, %esi
 	movq	(%rax), %rdi
-	call	fopen
+	call	fopen@PLT
 	movq	%rax, %rdx
 	movq	%rbx, %rax
 	salq	$5, %rax
@@ -3332,9 +3346,9 @@ main:
 	movl	$.LC131, %esi
 	movq	stderr(%rip), %rdi
 	movl	$0, %eax
-	call	fprintf
+	call	fprintf@PLT
 	movl	$1, %edi
-	call	exit
+	call	exit@PLT
 .L335:
 	movq	inputIndex(%rip), %rax
 	salq	$5, %rax
@@ -3357,7 +3371,7 @@ main:
 	jg	.L336
 	addq	$1, inputIndex(%rip)
 	movl	$16, %edi
-	call	malloc
+	call	malloc@PLT
 	movq	%rax, 24(%rsp)
 	movq	24(%rsp), %rax
 	movq	$_binary_core_file_fs_start, (%rax)
@@ -3386,7 +3400,7 @@ main:
 	movq	%rdx, (%rax)
 	addq	$1, inputIndex(%rip)
 	movl	$16, %edi
-	call	malloc
+	call	malloc@PLT
 	movq	%rax, 24(%rsp)
 	movq	24(%rsp), %rax
 	movq	$_binary_core_facility_fs_start, (%rax)
@@ -3415,7 +3429,7 @@ main:
 	movq	%rdx, (%rax)
 	addq	$1, inputIndex(%rip)
 	movl	$16, %edi
-	call	malloc
+	call	malloc@PLT
 	movq	%rax, 24(%rsp)
 	movq	24(%rsp), %rax
 	movq	$_binary_core_tools_fs_start, (%rax)
@@ -3444,7 +3458,7 @@ main:
 	movq	%rdx, (%rax)
 	addq	$1, inputIndex(%rip)
 	movl	$16, %edi
-	call	malloc
+	call	malloc@PLT
 	movq	%rax, 24(%rsp)
 	movq	24(%rsp), %rax
 	movq	$_binary_core_exception_fs_start, (%rax)
@@ -3473,7 +3487,7 @@ main:
 	movq	%rdx, (%rax)
 	addq	$1, inputIndex(%rip)
 	movl	$16, %edi
-	call	malloc
+	call	malloc@PLT
 	movq	%rax, 24(%rsp)
 	movq	24(%rsp), %rax
 	movq	$_binary_core_ext_fs_start, (%rax)
@@ -3502,7 +3516,7 @@ main:
 	movq	%rdx, (%rax)
 	addq	$1, inputIndex(%rip)
 	movl	$16, %edi
-	call	malloc
+	call	malloc@PLT
 	movq	%rax, 24(%rsp)
 	movq	24(%rsp), %rax
 	movq	$_binary_core_core_fs_start, (%rax)
@@ -3529,9 +3543,9 @@ main:
 	salq	$5, %rax
 	addq	$inputSources+24, %rax
 	movq	%rdx, (%rax)
-	call	init_primitives
-	call	init_superinstructions
-	call	quit_
+	call	init_primitives@PLT
+	call	init_superinstructions@PLT
+	call	quit_@PLT
 	movl	$0, %eax
 	addq	$32, %rsp
 	.cfi_def_cfa_offset 16
