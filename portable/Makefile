@@ -68,6 +68,14 @@ forth: vm.o $(FORTH_OBJECTS)
 	$(CC) $(CFLAGS) $(CFLAGS_NORMAL) $(INCLUDES) -o forth vm.o \
 	  $(FORTH_OBJECTS) $(LIBS)
 
+portable.o: vm.c
+	$(CC) $(CFLAGS) $(INCLUDES) -c vm.c -o portable.o $(LIBS)
+
+portable: portable.o $(FORTH_OBJECTS)
+	$(CC) $(CFLAGS) $(CFLAGS_NORMAL) $(INCLUDES) -o portable portable.o \
+	  $(FORTH_OBJECTS) $(LIBS)
+
+
 all: forth
 
 clean: FORCE
@@ -81,7 +89,7 @@ test: forth FORCE
 	  test/files.fs \
 	  test/final.fs \
 	  > test.out < test/test.in
-	cmp -s test.out $(TEST_GOLD) || (echo Tests failed, output does not match gold && rm -f fatest*.txt test.out && exit 1)
+	cmp -s test.out $(TEST_GOLD) || (echo Tests failed, output does not match gold && diff test.out $(TEST_GOLD) && rm -f fatest*.txt test.out && exit 1)
 	rm -f fatest*.txt test.out
 
 bench: FORCE forth

@@ -27,9 +27,9 @@
   F(core)
 
 // How external files are imported.
-// The linker includes them as symbols like _binary_lib_exception_fs.
+// The linker includes them as symbols like _binary_core_exception_fs.
 // The "extern char" references here are not pointers, they're the actual
-// character at position 0. Therefore we take &_binary_lib_exception_fs and use
+// character at position 0. Therefore we take &_binary_core_exception_fs and use
 // that as the input pointer.
 // In order to distinguish these pointers from the FILE* inputs used by
 // command-line arguments or INCLUDE and friends, I add EXTERN_SYMBOL_FLAG to
@@ -38,8 +38,8 @@
 #define EXTERNAL_SYMBOL_FLAG (1)
 #define EXTERNAL_SYMBOL_MASK (~1)
 
-#define EXTERNAL_START(name) _binary_lib_ ## name ## _fs_start
-#define EXTERNAL_END(name) _binary_lib_ ## name ## _fs_end
+#define EXTERNAL_START(name) _binary_core_ ## name ## _fs_start
+#define EXTERNAL_END(name) _binary_core_ ## name ## _fs_end
 #define FORTH_EXTERN(name) \
   extern char EXTERNAL_START(name);\
   extern char EXTERNAL_END(name);
