@@ -19,17 +19,26 @@ HEX
 ;
 DECIMAL
 
+\ Given a nt returns the string of the name.
+: NAME>STRING ( nt -- c-addr u )
+  \ nt points at the link pointer, next is the metadata+length cell, then the
+  \ string address. 2@ reads TOS, NOS.
+  cell+ 2@    ( c-addr metadata )
+  255 and     ( c-addr len )
+;
+
+: (name>link) ( nt -- nt' )
+  @ \ nt already points at the link.
+;
+
 \ This is married to the structure of a dictionary header, and the dictionary
 \ table in the portable VM. If either of those change, this needs to change too.
 \ TODO Should this be hiding the hidden words? Internal words?
 : WORDS ( -- )
   (LATEST) @
   BEGIN ?dup WHILE
-    dup cell+ @ ( hdr metadata )
-    255 and ( hdr len )
-    over 2 cells + @ ( hdr len name-addr )
-    swap type cr ( hdr )
-    @ ( next-hdr )
+    dup name>string type cr
+    (name>link)
   REPEAT
 ;
 
@@ -72,4 +81,13 @@ VARIABLE (saved-return-address)
 
 : [DEFINED] ( "<spaces>name" -- defined? ) bl word find nip 0<> ; IMMEDIATE
 : [UNDEFINED] ( "<spaces>name" -- undefined? ) bl word find nip 0= ; IMMEDIATE
+
+: FIND-NAME ( c-addr u -- nt|0 )
+  (LATEST) @ BEGIN dup WHILE ( c-addr u nt )
+    >R 2dup R@ name>string compare-ic 0= IF
+      2drop R> EXIT THEN
+    R> (name>link)
+  REPEAT
+  >R 2drop R> ( 0 )
+;
 
