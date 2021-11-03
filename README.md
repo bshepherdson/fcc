@@ -62,7 +62,9 @@ Providing `.(`, `.R`, `0<>`, `0>`, `2>R`, `2R>`, `2R@`, `:NONAME`, `<>`, `?DO`,
 
 ### Tools
 
-Providing the Tools word set.
+Providing `.S`, `?`, `DUMP`, and `WORDS` from the Tools word set.
+
+(Everything but `SEE`.)
 
 Providing `AHEAD`, `SYNONYM`, `N>R`, `NR>`, `[DEFINED]`, and `[UNDEFINED]` from
 the Tools Extensions word set.

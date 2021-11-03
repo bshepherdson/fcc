@@ -1,5 +1,5 @@
 \ TOOLS word set.
-\ .S is provided in the VM, as is SEE.
+\ .S is provided in the VM.
 \ Also BYE and STATE.
 
 : ? ( a-addr -- ) @ U. ;
