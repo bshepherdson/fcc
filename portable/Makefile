@@ -8,6 +8,7 @@ INCLUDES=-Iinclude
 BENCHMARKS=bubble-sort fib matrix-mult mm-rtcg sieve 1mloop bpsieve loop-nest
 
 CC?=gcc
+NODEJS?=node
 
 CFLAGS+=-std=c99 -Wall -Wextra -fomit-frame-pointer -no-pie -fno-pie
 ifeq ($(ACCOUNTING), yes)
@@ -64,8 +65,8 @@ $(MODULE_DIR)/%.o: $(MODULE_DIR)/%.fs
 	objcopy --input binary --output $(ELF_FORMAT) \
 	  --binary-architecture $(ELF_ARCH) $< $@
 
-forth: vm.o $(FORTH_OBJECTS)
-	$(CC) $(CFLAGS) $(CFLAGS_NORMAL) $(INCLUDES) -o forth vm.o \
+classic_forth: vm.o $(FORTH_OBJECTS)
+	$(CC) $(CFLAGS) $(CFLAGS_NORMAL) $(INCLUDES) -o classic-forth vm.o \
 	  $(FORTH_OBJECTS) $(LIBS)
 
 portable.o: vm.c
@@ -75,11 +76,20 @@ portable: portable.o $(FORTH_OBJECTS)
 	$(CC) $(CFLAGS) $(CFLAGS_NORMAL) $(INCLUDES) -o portable portable.o \
 	  $(FORTH_OBJECTS) $(LIBS)
 
+common.s: common/*.js
+	$(NODEJS) common/core.js $(ARCH) common.s
+
+common.o: common.s
+	$(CC) $(CFLAGS) $(INCLUDES) -c common.s $(LIBS)
+
+forth: common.o $(FORTH_OBJECTS)
+	$(CC) $(CFLAGS) $(CFLAGS_NORMAL) $(INCLUDES) -o forth common.o \
+		$(FORTH_OBJECTS) $(LIBS)
 
 all: forth
 
 clean: FORCE
-	rm -f *.o $(MODULE_DIR)/*.o forth
+	rm -f *.o $(MODULE_DIR)/*.o forth forth_common portable
 
 test: forth FORCE
 	./forth \

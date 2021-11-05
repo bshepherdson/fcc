@@ -131,7 +131,6 @@ in `(...)` are internal, nonstandard words.
 - Portability: `CELLS`, `CHARS`
 - Internals: `(/CELL)`, `(/CHAR)`, `(ADDRESS-UNIT-BITS)`, `(STACK-CELLS)`,
   `(RETURN-STACK-CELLS)`, `(>DOES)`, `(>CFA)`
-- Debugging: `SEE` (optional)
 
 ### Nonstandard words:
 

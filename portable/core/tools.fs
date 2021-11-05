@@ -91,3 +91,10 @@ VARIABLE (saved-return-address)
   >R 2drop R> ( 0 )
 ;
 
+: .S ( -- )
+  \ First bit: _<D>_
+  space [char] < emit   depth S>D <# #S #> type  [char] > emit space
+  depth 0= IF EXIT THEN
+  0 depth 2 - DO i pick . -1 +LOOP
+;
+

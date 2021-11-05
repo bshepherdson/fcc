@@ -3523,6 +3523,12 @@ init_primitives:
 	.cfi_endproc
 .LFE125:
 	.size	init_primitives, .-init_primitives
+
+
+
+
+
+
 	.globl	code_superinstruction_from_r_from_r
 	.type	code_superinstruction_from_r_from_r, @function
 code_superinstruction_from_r_from_r:
@@ -4153,6 +4159,10 @@ code_superinstruction_from_r_from_r_two_dup_minus:
 	.cfi_endproc
 .LFE167:
 	.size	code_superinstruction_from_r_from_r_two_dup_minus, .-code_superinstruction_from_r_from_r_two_dup_minus
+
+
+
+
 	.globl	init_superinstructions
 	.type	init_superinstructions, @function
 init_superinstructions:
@@ -4852,12 +4862,3 @@ init_superinstructions:
 	salq	$4, %rax
 	addq	$superinstructions, %rax
 	movq	$code_superinstruction_from_r_from_r_two_dup_minus, (%rax)
-	nop
-	ret
-	.cfi_endproc
-.LFE168:
-	.size	init_superinstructions, .-init_superinstructions
-	.ident	"GCC: (GNU) 6.1.1 20160602"
-	.section	.note.GNU-stack,"",@progbits
-        # TODO: Optimize the superinstructions - many of them are very
-        # shortenable.
