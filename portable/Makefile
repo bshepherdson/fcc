@@ -79,7 +79,11 @@ portable: portable.o $(FORTH_OBJECTS)
 common.s: common/*.js
 	$(NODEJS) common/core.js $(ARCH) common.s
 
-common.o: common.s
+common/support.s: common/support.c
+	$(CC) $(CFLAGS) $(CFLAGS_NORMAL) $(INCLUDES) \
+		-S common/support.c -o common/support.s
+
+common.o: common.s common/support.s
 	$(CC) $(CFLAGS) $(INCLUDES) -c common.s $(LIBS)
 
 forth: common.o $(FORTH_OBJECTS)
@@ -89,7 +93,9 @@ forth: common.o $(FORTH_OBJECTS)
 all: forth
 
 clean: FORCE
-	rm -f *.o $(MODULE_DIR)/*.o forth forth_common portable
+	rm -f *.o $(MODULE_DIR)/*.o \
+		common/*.o common/support.s common.s common.o \
+		forth forth_common portable
 
 test: forth FORCE
 	./forth \

@@ -1,153 +1,4 @@
-.file	"vm.c"
-.comm	_stack_data,131072,64
-.globl	spTop
-.data
-.align 8
-.type	spTop, @object
-.size	spTop, 8
-spTop:
-.quad	_stack_data+131072
-.comm	sp,8,8
-.comm	_stack_return,8192,64
-.globl	rspTop
-.align 8
-.type	rspTop, @object
-.size	rspTop, 8
-rspTop:
-.quad	_stack_return+8192
-.comm	rsp,8,8
-.comm	ip,8,8
-.comm	cfa,8,8
-.comm	ca,8,8
-.globl	firstQuit
-.type	firstQuit, @object
-.size	firstQuit, 1
-firstQuit:
-.byte	1
-.globl	quitTop
-.bss
-.align 8
-.type	quitTop, @object
-.size	quitTop, 8
-quitTop:
-.zero	8
-.globl	quitTopPtr
-.data
-.align 8
-.type	quitTopPtr, @object
-.size	quitTopPtr, 8
-quitTopPtr:
-.quad	quitTop
-.comm	dsp,8,8
-.comm	state,8,8
-.comm	base,8,8
-.comm   searchArray,128,8
-.comm   searchIndex,8,8
-.comm   compilationWordlist,8,8
-.comm   forthWordlist,8,8
-.comm   lastWord,8,8
-.comm	parseBuffers,8192,32
-.comm	inputSources,1024,32
-.comm	inputIndex,8,8
-.comm	c1,8,8
-.comm	c2,8,8
-.comm	c3,8,8
-.comm	ch1,1,1
-.comm	str1,8,8
-.comm	strptr1,8,8
-.comm	tempSize,8,8
-.comm	tempHeader,8,8
-.comm	tempBuf,256,32
-.comm	numBuf,16,16
-.comm	tempFile,8,8
-.comm	tempStat,144,32
-.comm	quit_inner,8,8
-.comm	timeVal,16,16
-.comm	i64,8,8
-.comm	old_tio,60,32
-.comm	new_tio,60,32
-.globl	primitive_count
-.align 4
-.type	primitive_count, @object
-.size	primitive_count, 4
-primitive_count:
-.long	120
-.globl	queue
-.bss
-.align 8
-.type	queue, @object
-.size	queue, 8
-queue:
-.zero	8
-.globl	queueTail
-.align 8
-.type	queueTail, @object
-.size	queueTail, 8
-queueTail:
-.zero	8
-.comm	tempQueue,8,8
-.comm	queueSource,160,32
-.globl	next_queue_source
-.align 4
-.type	next_queue_source, @object
-.size	next_queue_source, 4
-next_queue_source:
-.zero	4
-.globl	queue_length
-.align 4
-.type	queue_length, @object
-.size	queue_length, 4
-queue_length:
-.zero	4
-.comm	primitives,4096,32
-.comm	superinstructions,4096,32
-.globl	nextSuperinstruction
-.align 4
-.type	nextSuperinstruction, @object
-.size	nextSuperinstruction, 4
-nextSuperinstruction:
-.zero	4
-.comm	key1,4,4
-.section	.rodata
-.LC0:
-.string	"%s"
-.text
-.globl	print
-.type	print, @function
-print:
-.LFB2:
-.cfi_startproc
-subq	$24, %rsp
-.cfi_def_cfa_offset 32
-movq	%rdi, 8(%rsp)
-movq	%rsi, (%rsp)
-movq	(%rsp), %rax
-addq	$1, %rax
-movq	%rax, %rdi
-call	malloc@PLT
-movq	%rax, str1(%rip)
-movq	(%rsp), %rdx
-movq	8(%rsp), %rax
-movq	%rax, %rsi
-movq	str1(%rip), %rdi
-call	strncpy@PLT
-movq	str1(%rip), %rdx
-movq	(%rsp), %rax
-addq	%rdx, %rax
-movb	$0, (%rax)
-movq	str1(%rip), %rsi
-movl	$.LC0, %edi
-movl	$0, %eax
-call	printf@PLT
-movq	str1(%rip), %rdi
-call	free@PLT
-nop
-addq	$24, %rsp
-.cfi_def_cfa_offset 8
-ret
-.cfi_endproc
-.LFE2:
-.size	print, .-print
+.include "common/support.s"
 .section	.rodata
 .align 16
 .LC42:
@@ -185,12 +36,17 @@ movq	(%rax), %rax
 testq	%rax, %rax
 jne	.L55
 movl	$.LC42, %edi
+# readline uses xmm0 kinds of instructions, which requires the
+# target (the stack in this case) be 16-byte aligned.
+# So I move the stack here and save its value in %r14, which is
+# callee-saved.
 movq    %rsp, %r14
 movq    $15, %rax
 notq    %rax
 andq    %rax, %rsp
 call	readline@PLT
 movq    %rax, str1(%rip)
+# Restore %rsp
 movq    %r14, %rsp
 movq	inputIndex(%rip), %r12
 movq	str1(%rip), %rdi
@@ -358,240 +214,28 @@ ret
 .cfi_endproc
 .LFE43:
 .size	refill_, .-refill_
-.globl	parse_
-.type	parse_, @function
-parse_:
-.LFB67:
+.globl parse_name_stacked
+.type	parse_name_stacked, @function
 .cfi_startproc
-movq	inputIndex(%rip), %rax
-salq	$5, %rax
-addq	$inputSources+8, %rax
-movq	(%rax), %rdx
-movq	inputIndex(%rip), %rax
-salq	$5, %rax
-addq	$inputSources, %rax
-movq	(%rax), %rax
-cmpq	%rax, %rdx
-jl	.L100
-movq	$0, (%rbx)
-subq	$8, %rbx
-movq	$0, (%rbx)
-jmp	.L106
-.L100:
-movq	(%rbx), %rax
-movb	%al, ch1(%rip)
-movq	inputIndex(%rip), %rax
-salq	$5, %rax
-addq	$inputSources+24, %rax
-movq	(%rax), %rdx
-movq	inputIndex(%rip), %rax
-salq	$5, %rax
-addq	$inputSources+8, %rax
-movq	(%rax), %rax
-addq	%rdx, %rax
-movq	%rax, str1(%rip)
-movq	$0, c1(%rip)
-jmp	.L102
-.L104:
-movq	inputIndex(%rip), %rax
-movq	%rax, %rdx
-salq	$5, %rdx
-addq	$inputSources+8, %rdx
-movq	(%rdx), %rdx
-salq	$5, %rax
-addq	$inputSources+8, %rax
-addq	$1, %rdx
-movq	%rdx, (%rax)
-addq	$1, c1(%rip)
-.L102:
-movq	inputIndex(%rip), %rax
-salq	$5, %rax
-addq	$inputSources+8, %rax
-movq	(%rax), %rdx
-movq	inputIndex(%rip), %rax
-salq	$5, %rax
-addq	$inputSources, %rax
-movq	(%rax), %rax
-cmpq	%rax, %rdx
-jge	.L103
-movq	inputIndex(%rip), %rax
-salq	$5, %rax
-addq	$inputSources+24, %rax
-movq	(%rax), %rdx
-movq	inputIndex(%rip), %rax
-salq	$5, %rax
-addq	$inputSources+8, %rax
-movq	(%rax), %rax
-movzbl	(%rdx,%rax), %edx
-movzbl	ch1(%rip), %eax
-cmpb	%al, %dl
-jne	.L104
-.L103:
-movq	inputIndex(%rip), %rax
-salq	$5, %rax
-addq	$inputSources+8, %rax
-movq	(%rax), %rdx
-movq	inputIndex(%rip), %rax
-salq	$5, %rax
-addq	$inputSources, %rax
-movq	(%rax), %rax
-cmpq	%rax, %rdx
-jge	.L105
-movq	inputIndex(%rip), %rax
-movq	%rax, %rdx
-salq	$5, %rdx
-addq	$inputSources+8, %rdx
-movq	(%rdx), %rdx
-salq	$5, %rax
-addq	$inputSources+8, %rax
-addq	$1, %rdx
-movq	%rdx, (%rax)
-.L105:
-movq	str1(%rip), %rdx
-movq	%rdx, (%rbx)
-subq	$8, %rbx
-movq	c1(%rip), %rax
-movq	%rax, (%rbx)
-.L106:
+parse_name_stacked:
+call parse_name_@PLT
+subq $16, %rbx
+movq str1(%rip), %rax
+movq %rax, 8(%rbx)
+movq c1(%rip), %rax
+movq %rax, (%rbx)
 nop
 ret
 .cfi_endproc
-.LFE67:
-.size	parse_, .-parse_
-.globl	parse_name_
-.type	parse_name_, @function
-parse_name_:
-.LFB68:
-.cfi_startproc
-jmp	.L108
-.L110:
-movq	inputIndex(%rip), %rax
-movq	%rax, %rdx
-salq	$5, %rdx
-addq	$inputSources+8, %rdx
-movq	(%rdx), %rdx
-salq	$5, %rax
-addq	$inputSources+8, %rax
-addq	$1, %rdx
-movq	%rdx, (%rax)
-.L108:
-movq	inputIndex(%rip), %rax
-salq	$5, %rax
-addq	$inputSources+8, %rax
-movq	(%rax), %rdx
-movq	inputIndex(%rip), %rax
-salq	$5, %rax
-addq	$inputSources, %rax
-movq	(%rax), %rax
-cmpq	%rax, %rdx
-jge	.L109
-movq	inputIndex(%rip), %rax
-salq	$5, %rax
-addq	$inputSources+24, %rax
-movq	(%rax), %rdx
-movq	inputIndex(%rip), %rax
-salq	$5, %rax
-addq	$inputSources+8, %rax
-movq	(%rax), %rax
-movzbl	(%rdx,%rax), %eax
-cmpb	$32, %al
-je	.L110
-movq	inputIndex(%rip), %rax
-salq	$5, %rax
-addq	$inputSources+24, %rax
-movq	(%rax), %rdx
-movq	inputIndex(%rip), %rax
-salq	$5, %rax
-addq	$inputSources+8, %rax
-movq	(%rax), %rax
-movzbl	(%rdx,%rax), %eax
-cmpb	$9, %al
-je	.L110
-.L109:
-movq	$0, c1(%rip)
-movq	inputIndex(%rip), %rax
-salq	$5, %rax
-addq	$inputSources+24, %rax
-movq	(%rax), %rdx
-movq	inputIndex(%rip), %rax
-salq	$5, %rax
-addq	$inputSources+8, %rax
-movq	(%rax), %rax
-addq	%rdx, %rax
-movq	%rax, str1(%rip)
-jmp	.L111
-.L113:
-movq	inputIndex(%rip), %rax
-movq	%rax, %rdx
-salq	$5, %rdx
-addq	$inputSources+8, %rdx
-movq	(%rdx), %rdx
-salq	$5, %rax
-addq	$inputSources+8, %rax
-addq	$1, %rdx
-movq	%rdx, (%rax)
-addq	$1, c1(%rip)
-.L111:
-movq	inputIndex(%rip), %rax
-salq	$5, %rax
-addq	$inputSources+8, %rax
-movq	(%rax), %rdx
-movq	inputIndex(%rip), %rax
-salq	$5, %rax
-addq	$inputSources, %rax
-movq	(%rax), %rax
-cmpq	%rax, %rdx
-jge	.L112
-movq	inputIndex(%rip), %rax
-salq	$5, %rax
-addq	$inputSources+24, %rax
-movq	(%rax), %rdx
-movq	inputIndex(%rip), %rax
-salq	$5, %rax
-addq	$inputSources+8, %rax
-movq	(%rax), %rax
-movzbl	(%rdx,%rax), %eax
-cmpb	$32, %al
-jne	.L113
-.L112:
-movq	inputIndex(%rip), %rax
-salq	$5, %rax
-addq	$inputSources+8, %rax
-movq	(%rax), %rdx
-movq	inputIndex(%rip), %rax
-salq	$5, %rax
-addq	$inputSources, %rax
-movq	(%rax), %rax
-cmpq	%rax, %rdx
-jge	.L114
-movq	inputIndex(%rip), %rax
-movq	%rax, %rdx
-salq	$5, %rdx
-addq	$inputSources+8, %rdx
-movq	(%rdx), %rdx
-salq	$5, %rax
-addq	$inputSources+8, %rax
-addq	$1, %rdx
-movq	%rdx, (%rax)
-.L114:
-subq    $16, %rbx
-movq	str1(%rip), %rax
-movq	%rax, 8(%rbx)
-movq	c1(%rip), %rax
-movq	%rax, (%rbx)
-nop
-ret
-.cfi_endproc
-.LFE68:
-.size	parse_name_, .-parse_name_
+.size	parse_name_stacked, .-parse_name_stacked
 .globl	to_number_int_
 .type	to_number_int_, @function
 to_number_int_:
-.LFB69:
+.LmdFB69:
 .cfi_startproc
 movq	$0, c1(%rip)
-jmp	.L116
-.L117:
+jmp	.Lmd116
+.Lmd117:
 movq	c1(%rip), %rax
 movq	24(%rbx), %rsi
 movq	c1(%rip), %rdx
@@ -611,53 +255,53 @@ shrq	%cl, %rsi
 movq	%rsi, %rdx
 movb	%dl, numBuf(%rax)
 addq	$1, c1(%rip)
-.L116:
+.Lmd116:
 movq	c1(%rip), %rax
 cmpq	$7, %rax
-jle	.L117
-jmp	.L118
-.L126:
+jle	.Lmd117
+jmp	.Lmd118
+.Lmd126:
 movq	str1(%rip), %rax
 movzbl	(%rax), %eax
 movsbq	%al, %rax
 movq	%rax, c1(%rip)
 movq	c1(%rip), %rax
 cmpq	$47, %rax
-jle	.L119
+jle	.Lmd119
 movq	c1(%rip), %rax
 cmpq	$57, %rax
-jg	.L119
+jg	.Lmd119
 subq	$48, c1(%rip)
-jmp	.L120
-.L119:
+jmp	.Lmd120
+.Lmd119:
 movq	c1(%rip), %rax
 cmpq	$64, %rax
-jle	.L121
+jle	.Lmd121
 movq	c1(%rip), %rax
 cmpq	$90, %rax
-jg	.L121
+jg	.Lmd121
 movq	c1(%rip), %rax
 subq	$55, %rax
 movq	%rax, c1(%rip)
-jmp	.L120
-.L121:
+jmp	.Lmd120
+.Lmd121:
 movq	c1(%rip), %rax
 cmpq	$96, %rax
-jle	.L122
+jle	.Lmd122
 movq	c1(%rip), %rax
 cmpq	$122, %rax
-jg	.L122
+jg	.Lmd122
 movq	c1(%rip), %rax
 subq	$87, %rax
 movq	%rax, c1(%rip)
-.L120:
+.Lmd120:
 movq	c1(%rip), %rdx
 movq	tempSize(%rip), %rax
 cmpq	%rax, %rdx
-jge	.L129
+jge	.Lmd129
 movq	$0, c3(%rip)
-jmp	.L124
-.L125:
+jmp	.Lmd124
+.Lmd125:
 movq	c3(%rip), %rax
 addq	$numBuf, %rax
 movzbl	(%rax), %eax
@@ -675,27 +319,27 @@ sarq	$8, %rax
 movzbl	%al, %eax
 movq	%rax, c1(%rip)
 addq	$1, c3(%rip)
-.L124:
+.Lmd124:
 movq	c3(%rip), %rax
 cmpq	$15, %rax
-jle	.L125
+jle	.Lmd125
 movq	(%rbx), %rax
 subq	$1, %rax
 movq	%rax, (%rbx)
 addq	$1, str1(%rip)
-.L118:
+.Lmd118:
 movq	(%rbx), %rax
 testq	%rax, %rax
-jg	.L126
-jmp	.L122
-.L129:
+jg	.Lmd126
+jmp	.Lmd122
+.Lmd129:
 nop
-.L122:
+.Lmd122:
 movq	$0, 16(%rbx)
 movq	$0, 24(%rbx)
 movq	$0, c1(%rip)
-jmp	.L127
-.L128:
+jmp	.Lmd127
+.Lmd128:
 movq	c1(%rip), %rax
 addq	$numBuf, %rax
 movzbl	(%rax), %eax
@@ -719,21 +363,21 @@ movq	%rdx, %rax
 movq	%rax, %rcx
 orq     %rcx, 16(%rbx)
 addq	$1, c1(%rip)
-.L127:
+.Lmd127:
 movq	c1(%rip), %rax
 cmpq	$7, %rax
-jle	.L128
+jle	.Lmd128
 movq	str1(%rip), %rax
 movq	%rax, 8(%rbx)
 nop
 ret
 .cfi_endproc
-.LFE69:
+.LmdFE69:
 .size	to_number_int_, .-to_number_int_
 .globl	to_number_
 .type	to_number_, @function
 to_number_:
-.LFB70:
+.LmdFB70:
 .cfi_startproc
 movq	base(%rip), %rax
 movq	%rax, tempSize(%rip)
@@ -743,12 +387,12 @@ call	to_number_int_@PLT
 nop
 ret
 .cfi_endproc
-.LFE70:
+.LmdFE70:
 .size	to_number_, .-to_number_
 .globl	parse_number_
 .type	parse_number_, @function
 parse_number_:
-.LFB71:
+.LmdFB71:
 .cfi_startproc
 movq	8(%rbx), %rax
 movq	%rax, str1(%rip)
@@ -757,92 +401,92 @@ movq	%rax, tempSize(%rip)
 movq	str1(%rip), %rax
 movzbl	(%rax), %eax
 cmpb	$36, %al
-je	.L132
+je	.Lmd132
 movq	str1(%rip), %rax
 movzbl	(%rax), %eax
 cmpb	$35, %al
-je	.L132
+je	.Lmd132
 movq	str1(%rip), %rax
 movzbl	(%rax), %eax
 cmpb	$37, %al
-jne	.L133
-.L132:
+jne	.Lmd133
+.Lmd132:
 movq	str1(%rip), %rax
 movzbl	(%rax), %eax
 cmpb	$36, %al
-je	.L134
+je	.Lmd134
 movq	str1(%rip), %rax
 movzbl	(%rax), %eax
 cmpb	$35, %al
-jne	.L135
+jne	.Lmd135
 movl	$10, %eax
-jmp	.L137
-.L135:
+jmp	.Lmd137
+.Lmd135:
 movl	$2, %eax
-jmp	.L137
-.L134:
+jmp	.Lmd137
+.Lmd134:
 movl	$16, %eax
-.L137:
+.Lmd137:
 movq	%rax, tempSize(%rip)
 addq	$1, str1(%rip)
 subq	$1, (%rbx)
-jmp	.L138
-.L133:
+jmp	.Lmd138
+.Lmd133:
 movq	str1(%rip), %rax
 movzbl	(%rax), %eax
 cmpb	$39, %al
-jne	.L138
+jne	.Lmd138
 subq    $3, (%rbx)
 addq    $3, 8(%rbx)
 movq	str1(%rip), %rax
 addq	$1, %rax
 movsbq	(%rax), %rax
 movq	%rax, 24(%rbx)
-jmp	.L131
-.L138:
+jmp	.Lmd131
+.Lmd138:
 movb	$0, ch1(%rip)
 movq	str1(%rip), %rax
 movzbl	(%rax), %eax
 cmpb	$45, %al
-jne	.L140
+jne	.Lmd140
 subq    $1, (%rbx)
 addq	$1, str1(%rip)
 movb	$1, ch1(%rip)
-.L140:
+.Lmd140:
 call	to_number_int_@PLT
 movzbl	ch1(%rip), %eax
 testb	%al, %al
-je	.L131
+je	.Lmd131
 notq    16(%rbx)
 movq    24(%rbx), %rax
 notq    %rax
 addq    $1, %rax
 movq    %rax, 24(%rbx)
 testq	%rax, %rax
-jne	.L131
+jne	.Lmd131
 addq	$1, 16(%rbx)
-.L131:
+.Lmd131:
 ret
 .cfi_endproc
-.LFE71:
+.LmdFE71:
 .size	parse_number_, .-parse_number_
 .globl	find_
 .type	find_, @function
 find_:
 movq    searchIndex(%rip), %r12    # r12 is reserved for the index.
-.LF159:
+.LmdF159:
 leaq    searchArray(%rip), %rax
 movq    (%rax,%r12,8), %rax
 movq    (%rax), %rax
 movq    %rax, tempHeader(%rip)   # Store it in tempHeader.
-jmp     .LF151
-.LF156:
+jmp     .LmdF151
+.LmdF156:
 movq    tempHeader(%rip), %rax
 movq    8(%rax), %rax  # The length word.
 andl	$511, %eax     # The length/hidden mask
 movq    (%rbx), %rcx
 cmpq    %rcx, %rax
-jne     .LF152
+jne     .LmdF152
 # If we're still here, they're the same length and not hidden.
 find_debug:
 movq    tempHeader(%rip), %rax
@@ -853,7 +497,7 @@ movq    (%rbx), %rdx    # 3rd arg: length.
 # because find_ is a C call itself.
 call strncasecmp@PLT
 testl   %eax, %eax  # ZF=1 when the response was 0, meaning equal.
-jne  .LF152  # If it's not equal, we didn't find it.
+jne  .LmdF152  # If it's not equal, we didn't find it.
 # If they are equal, we found it.
 find_found:
 movq    tempHeader(%rip), %rax
@@ -863,34 +507,34 @@ movq    tempHeader(%rip), %rax
 movq    8(%rax), %rax   # Length
 andl    $512, %eax      # Immediate flag
 testl   %eax, %eax      # ZF=1 when not immediate
-jne     .LF153          # Set 1 when immediate
+jne     .LmdF153          # Set 1 when immediate
 movq    $-1, %rax
-jmp     .LF154
-.LF153:
+jmp     .LmdF154
+.LmdF153:
 movq    $1, %rax
-.LF154:
+.LmdF154:
 movq    %rax, (%rbx)
-jmp     .LF149
-.LF152: # Mismatch, keep searching this linked list.
+jmp     .LmdF149
+.LmdF152: # Mismatch, keep searching this linked list.
 movq    tempHeader(%rip), %rax
 movq    (%rax), %rax
 movq    %rax, tempHeader(%rip)
-.LF151:
+.LmdF151:
 movq    tempHeader(%rip), %rax
 testq   %rax, %rax
-jne     .LF156  # Nonzero, so loop back.
-.LF150: # Reached the end of a wordlist. Try the next one, if any.
+jne     .LmdF156  # Nonzero, so loop back.
+.LmdF150: # Reached the end of a wordlist. Try the next one, if any.
 testq   %r12, %r12
-je      .LF158  # Index = 0, bail.
+je      .LmdF158  # Index = 0, bail.
 subq    $1, %r12 # If nonzero, subtract and loop.
-jmp     .LF159
-.LF160:
+jmp     .LmdF159
+.LmdF160:
 nop
-.LF158: # Run out of wordlists too.
+.LmdF158: # Run out of wordlists too.
 movq $0, %rax
 movq %rax, 8(%rbx) # 0 underneath
 movq %rax, (%rbx)  # 0 on top
-.LF149: # Returning
+.LmdF149: # Returning
 ret
 .size	find_, .-find_
 .globl	key_call_
@@ -904,7 +548,7 @@ key_call_:
 .globl	call_
 .type	call_, @function
 call_:
-.LFB88:
+.LmdFB88:
 .cfi_startproc
 movq	(%rbp), %rax
 addq    $8, %rbp
@@ -917,58 +561,58 @@ movq (%rbp), %rax
 addq $8, %rbp
 jmp *%rax
 .cfi_endproc
-.LFE88:
+.LmdFE88:
 .size	call_, .-call_
 .globl	lookup_primitive
 .type	lookup_primitive, @function
 lookup_primitive:
-.LFB89:
+.LmdFB89:
 .cfi_startproc
 movq	$0, c2(%rip)
-jmp	.L179
-.L182:
+jmp	.Lmd179
+.Lmd182:
 movq	c2(%rip), %rax
 salq	$4, %rax
 addq	$primitives, %rax
 movq	(%rax), %rdx
 movq	c1(%rip), %rax
 cmpq	%rax, %rdx
-jne	.L180
+jne	.Lmd180
 movq	c2(%rip), %rax
 salq	$4, %rax
 addq	$primitives+8, %rax
 movl	(%rax), %eax
 movl	%eax, key1(%rip)
-jmp	.L183
-.L180:
+jmp	.Lmd183
+.Lmd180:
 addq	$1, c2(%rip)
-.L179:
+.Lmd179:
 movl	primitive_count(%rip), %eax
 movslq	%eax, %rdx
 movq	c2(%rip), %rax
 cmpq	%rax, %rdx
-jg	.L182
+jg	.Lmd182
 subq	$8, %rsp
 .cfi_def_cfa_offset 16
 movl	$40, %edi
 call	exit@PLT
-.L183:
+.Lmd183:
 .cfi_def_cfa_offset 8
 ret
 .cfi_endproc
-.LFE89:
+.LmdFE89:
 .size	lookup_primitive, .-lookup_primitive
 .globl	drain_queue_
 .type	drain_queue_, @function
 drain_queue_:
-.LFB90:
+.LmdFB90:
 .cfi_startproc
 movl	$0, key1(%rip)
 movq	queue(%rip), %rax
 movq	%rax, tempQueue(%rip)
 movq	$0, c1(%rip)
-jmp	.L188
-.L189:
+jmp	.Lmd188
+.Lmd189:
 movq	tempQueue(%rip), %rax
 movl	24(%rax), %edx
 movq	c1(%rip), %rax
@@ -981,22 +625,22 @@ addq	$1, c1(%rip)
 movq	tempQueue(%rip), %rax
 movq	32(%rax), %rax
 movq	%rax, tempQueue(%rip)
-.L188:
+.Lmd188:
 movq	tempQueue(%rip), %rax
 testq	%rax, %rax
-jne	.L189
-jmp	.L190
-.L199:
+jne	.Lmd189
+jmp	.Lmd190
+.Lmd199:
 movq	$0, c2(%rip)
-jmp	.L191
-.L198:
+jmp	.Lmd191
+.Lmd198:
 movq	c2(%rip), %rax
 salq	$4, %rax
 addq	$superinstructions+8, %rax
 movl	(%rax), %edx
 movl	key1(%rip), %eax
 cmpl	%eax, %edx
-jne	.L192
+jne	.Lmd192
 movq	dsp(%rip), %rax
 leaq	8(%rax), %rdx
 movq	%rdx, dsp(%rip)
@@ -1005,41 +649,41 @@ salq	$4, %rdx
 addq	$superinstructions, %rdx
 movq	(%rdx), %rdx
 movq	%rdx, (%rax)
-jmp	.L193
-.L195:
+jmp	.Lmd193
+.Lmd195:
 movq	queue(%rip), %rax
 movzbl	8(%rax), %eax
 testb	%al, %al
-je	.L194
+je	.Lmd194
 movq	dsp(%rip), %rax
 leaq	8(%rax), %rdx
 movq	%rdx, dsp(%rip)
 movq	queue(%rip), %rdx
 movq	16(%rdx), %rdx
 movq	%rdx, (%rax)
-.L194:
+.Lmd194:
 movq	queue(%rip), %rax
 movq	32(%rax), %rax
 movq	%rax, queue(%rip)
 subl	$1, queue_length(%rip)
 subq	$1, c1(%rip)
-.L193:
+.Lmd193:
 movq	c1(%rip), %rax
 testq	%rax, %rax
-jg	.L195
+jg	.Lmd195
 movq	queue(%rip), %rax
 testq	%rax, %rax
-jne	.L202
+jne	.Lmd202
 movq	$0, queueTail(%rip)
-jmp	.L202
-.L192:
+jmp	.Lmd202
+.Lmd192:
 addq	$1, c2(%rip)
-.L191:
+.Lmd191:
 movl	nextSuperinstruction(%rip), %eax
 movslq	%eax, %rdx
 movq	c2(%rip), %rax
 cmpq	%rax, %rdx
-jg	.L198
+jg	.Lmd198
 subq	$1, c1(%rip)
 movl	$4, %eax
 subq	c1(%rip), %rax
@@ -1049,10 +693,10 @@ movl	%eax, %ecx
 shrl	%cl, %edx
 movl	%edx, %eax
 andl	%eax, key1(%rip)
-.L190:
+.Lmd190:
 movq	c1(%rip), %rax
 cmpq	$1, %rax
-jg	.L199
+jg	.Lmd199
 movq	dsp(%rip), %rax
 leaq	8(%rax), %rdx
 movq	%rdx, dsp(%rip)
@@ -1062,39 +706,39 @@ movq	%rdx, (%rax)
 movq	queue(%rip), %rax
 movzbl	8(%rax), %eax
 testb	%al, %al
-je	.L200
+je	.Lmd200
 movq	dsp(%rip), %rax
 leaq	8(%rax), %rdx
 movq	%rdx, dsp(%rip)
 movq	queue(%rip), %rdx
 movq	16(%rdx), %rdx
 movq	%rdx, (%rax)
-.L200:
+.Lmd200:
 movq	queue(%rip), %rax
 movq	32(%rax), %rax
 movq	%rax, queue(%rip)
 movq	queue(%rip), %rax
 testq	%rax, %rax
-jne	.L201
+jne	.Lmd201
 movq	$0, queueTail(%rip)
-.L201:
+.Lmd201:
 subl	$1, queue_length(%rip)
-jmp	.L187
-.L202:
+jmp	.Lmd187
+.Lmd202:
 nop
-.L187:
+.Lmd187:
 ret
 .cfi_endproc
-.LFE90:
+.LmdFE90:
 .size	drain_queue_, .-drain_queue_
 .globl	bump_queue_tail_
 .type	bump_queue_tail_, @function
 bump_queue_tail_:
-.LFB91:
+.LmdFB91:
 .cfi_startproc
 movq	queueTail(%rip), %rax
 testq	%rax, %rax
-jne	.L204
+jne	.Lmd204
 movl	next_queue_source(%rip), %eax
 leal	1(%rax), %edx
 movl	%edx, next_queue_source(%rip)
@@ -1107,8 +751,8 @@ addq	$queueSource, %rax
 movq	%rax, queueTail(%rip)
 movq	queueTail(%rip), %rax
 movq	%rax, queue(%rip)
-jmp	.L205
-.L204:
+jmp	.Lmd205
+.Lmd204:
 movq	queueTail(%rip), %rcx
 movl	next_queue_source(%rip), %eax
 leal	1(%rax), %edx
@@ -1123,7 +767,7 @@ movq	%rax, 32(%rcx)
 movq	queueTail(%rip), %rax
 movq	32(%rax), %rax
 movq	%rax, queueTail(%rip)
-.L205:
+.Lmd205:
 movq	queueTail(%rip), %rax
 movq	$0, 32(%rax)
 andl	$3, next_queue_source(%rip)
@@ -1131,26 +775,26 @@ addl	$1, queue_length(%rip)
 nop
 ret
 .cfi_endproc
-.LFE91:
+.LmdFE91:
 .size	bump_queue_tail_, .-bump_queue_tail_
 .globl	compile_
 .type	compile_, @function
 compile_:
-.LFB92:
+.LmdFB92:
 .cfi_startproc
 subq	$8, %rsp
 .cfi_def_cfa_offset 16
 movl	queue_length(%rip), %eax
 cmpl	$3, %eax
-jle	.L207
+jle	.Lmd207
 call	drain_queue_@PLT
-.L207:
+.Lmd207:
 movl	$0, %eax
 call	bump_queue_tail_@PLT
 movq	(%rbx), %rax
 movq	(%rax), %rax
 cmpq	$code_docol, %rax
-jne	.L208
+jne	.Lmd208
 movq	queueTail(%rip), %rax
 movq	$call_, (%rax)
 movb	$1, 8(%rax)
@@ -1162,12 +806,12 @@ movq	%rax, 16(%rdx)
 movq	queueTail(%rip), %rax
 movl	key_call_(%rip), %edx
 movl	%edx, 24(%rax)
-jmp	.L213
-.L208:
+jmp	.Lmd213
+.Lmd208:
 movq	(%rbx), %rax
 movq	(%rax), %rax
 cmpq	$code_dodoes, %rax
-jne	.L210
+jne	.Lmd210
 movq	queueTail(%rip), %rax
 movq	$code_dolit, (%rax)
 movb	$1, 8(%rax)
@@ -1180,12 +824,12 @@ movq	(%rbx), %rax
 addq	$8, %rax
 movq	(%rax), %rax
 testq	%rax, %rax
-je	.L211
+je	.Lmd211
 movl	queue_length(%rip), %eax
 cmpl	$4, %eax
-jne	.L212
+jne	.Lmd212
 call	drain_queue_@PLT
-.L212:
+.Lmd212:
 movl	$0, %eax
 call	bump_queue_tail_@PLT
 movq	queueTail(%rip), %rax
@@ -1197,10 +841,10 @@ movq	(%rdx), %rdx
 movq	%rdx, 16(%rax)
 movl	key_call_(%rip), %edx
 movl	%edx, 24(%rax)
-.L211:
+.Lmd211:
 addq	$8, %rbx
-jmp	.L213
-.L210:
+jmp	.Lmd213
+.Lmd210:
 movq    (%rbx), %rax
 addq    $8, %rbx
 movq	(%rax), %rax
@@ -1215,24 +859,24 @@ movb	$0, 8(%rax)
 movq	queueTail(%rip), %rax
 movl	key1(%rip), %edx
 movl	%edx, 24(%rax)
-.L213:
+.Lmd213:
 nop
 addq	$8, %rsp
 .cfi_def_cfa_offset 8
 ret
 .cfi_endproc
-.LFE92:
+.LmdFE92:
 .size	compile_, .-compile_
 .globl	compile_lit_
 .type	compile_lit_, @function
 compile_lit_:
-.LFB93:
+.LmdFB93:
 .cfi_startproc
 movl	queue_length(%rip), %eax
 cmpl	$3, %eax
-jle	.L216
+jle	.Lmd216
 call	drain_queue_@PLT
-.L216:
+.Lmd216:
 movl	$0, %eax
 call	bump_queue_tail_@PLT
 movq	queueTail(%rip), %rax
@@ -1249,53 +893,53 @@ movl	%edx, 24(%rax)
 nop
 ret
 .cfi_endproc
-.LFE93:
+.LmdFE93:
 .size	compile_lit_, .-compile_lit_
 .comm	savedString,8,8
 .comm	savedLength,8,8
 .section	.rodata
-.LC84:
+.LmdC84:
 .string	"  ok"
-.LC85:
+.LmdC85:
 .string	"*** Unrecognized word: %s\n"
 .text
 .globl	quit_
 .type	quit_, @function
 quit_:
-.LFB94:
+.LmdFB94:
 .cfi_startproc
 subq	$8, %rsp
 .cfi_def_cfa_offset 16
-.L218:
+.Lmd218:
 movq	spTop(%rip), %rbx
 movq	rspTop(%rip), %rax
 movq	%rax, rsp(%rip)
 movq	$0, state(%rip)
 movzbl	firstQuit(%rip), %eax
 testb	%al, %al
-jne	.L219
+jne	.Lmd219
 movq	$0, inputIndex(%rip)
-.L219:
-movq	$.L220, quit_inner(%rip)
+.Lmd219:
+movq	$.Lmd220, quit_inner(%rip)
 call	refill_@PLT
-.L220:
-call	parse_name_@PLT
+.Lmd220:
+call	parse_name_stacked@PLT
 movq	(%rbx), %rax
 testq	%rax, %rax
-jne	.L233
+jne	.Lmd233
 movq	inputIndex(%rip), %rax
 salq	$5, %rax
 addq	$inputSources+16, %rax
 movq	(%rax), %rax
 testq	%rax, %rax
-jne	.L223
-movl	$.LC84, %edi
+jne	.Lmd223
+movl	$.LmdC84, %edi
 call	puts@PLT
-.L223:
+.Lmd223:
 addq	$16, %rbx
 call	refill_@PLT
-jmp	.L220
-.L233:
+jmp	.Lmd220
+.Lmd233:
 nop
 movq	8(%rbx), %rax
 movq	%rax, savedString(%rip)
@@ -1304,7 +948,7 @@ movq	%rax, savedLength(%rip)
 call	find_@PLT
 movq	(%rbx), %rax
 testq	%rax, %rax
-jne	.L224
+jne	.Lmd224
 subq	$16, %rbx
 movq	savedLength(%rip), %rax
 movq	%rax, (%rbx)
@@ -1313,18 +957,18 @@ movq	%rax, 8(%rbx)
 call	parse_number_@PLT
 movq	(%rbx), %rax
 testq	%rax, %rax
-jne	.L225
+jne	.Lmd225
 movq	state(%rip), %rax
 cmpq	$1, %rax
-jne	.L226
+jne	.Lmd226
 addq	$24, %rbx
 movl	$0, %eax
 call	compile_lit_@PLT
-jmp	.L220
-.L226:
+jmp	.Lmd220
+.Lmd226:
 addq	$24, %rbx
-jmp	.L220
-.L225:
+jmp	.Lmd220
+.Lmd225:
 movq	savedLength(%rip), %rdx
 movq	savedString(%rip), %rsi
 movl	$tempBuf, %edi
@@ -1332,20 +976,20 @@ call	strncpy@PLT
 movq	savedLength(%rip), %rax
 movb	$0, tempBuf(%rax)
 movl	$tempBuf, %edx
-movl	$.LC85, %esi
+movl	$.LmdC85, %esi
 movq	stderr(%rip), %rdi
 movl	$0, %eax
 call	fprintf@PLT
-jmp	.L218
-.L224:
+jmp	.Lmd218
+.Lmd224:
 movq	(%rbx), %rax
 cmpq	$1, %rax
-je	.L229
+je	.Lmd229
 movq	state(%rip), %rax
 testq	%rax, %rax
-jne	.L230
-.L229:
-movl	$.L220, %eax
+jne	.Lmd230
+.Lmd229:
+movl	$.Lmd220, %eax
 movq	%rax, quitTop(%rip)
 movq	$quitTop, %rbp
 movq	8(%rbx), %rax
@@ -1358,29 +1002,29 @@ movq	(%rax), %rax
 jmpq *%rax
 # 0 "" 2
 #NO_APP
-.L230:
+.Lmd230:
 addq	$8, %rbx
 movl	$0, %eax
 call	compile_@PLT
-jmp	.L220
+jmp	.Lmd220
 .cfi_endproc
-.LFE94:
+.LmdFE94:
 .size	quit_, .-quit_
 .globl	file_modes
 .section	.rodata
-.LC96:
+.LmdC96:
 .string	"r"
-.LC97:
+.LmdC97:
 .string	"r+"
-.LC98:
+.LmdC98:
 .string	"rb"
-.LC99:
+.LmdC99:
 .string	"r+b"
-.LC100:
+.LmdC100:
 .string	"w+"
-.LC101:
+.LmdC101:
 .string	"w"
-.LC102:
+.LmdC102:
 .string	"w+b"
 .data
 .align 32
@@ -1388,40 +1032,40 @@ jmp	.L220
 .size	file_modes, 128
 file_modes:
 .quad	0
-.quad	.LC96
-.quad	.LC97
-.quad	.LC97
+.quad	.LmdC96
+.quad	.LmdC97
+.quad	.LmdC97
 .quad	0
-.quad	.LC98
-.quad	.LC99
-.quad	.LC99
+.quad	.LmdC98
+.quad	.LmdC99
+.quad	.LmdC99
 .quad	0
-.quad	.LC100
-.quad	.LC101
-.quad	.LC100
+.quad	.LmdC100
+.quad	.LmdC101
+.quad	.LmdC100
 .quad	0
-.quad	.LC102
-.quad	.LC81
-.quad	.LC102
+.quad	.LmdC102
+.quad	.LmdC81
+.quad	.LmdC102
 .section	.rodata
 .align 8
-.LC117:
+.LmdC117:
 .string	"*** Colon definition with no name\n"
-.LFE123:
+.LmdFE123:
 .section	.rodata
 .align 8
-.LC131:
+.LmdC131:
 .string	"Could not load input file: %s\n"
-.LC81:
+.LmdC81:
 .string	"wb"
 .align 8
-.LC82:
+.LmdC82:
 .string	"*** Failed to open file for writing: %s\n"
 .text
 .globl	main
 .type	main, @function
 main:
-.LFB124:
+.LmdFB124:
 .cfi_startproc
 movl	%edi, 12(%rsp)
 movq	%rsi, (%rsp)
@@ -1461,8 +1105,8 @@ salq	$5, %rax
 addq	$inputSources+24, %rax
 movq	%rdx, (%rax)
 subl	$1, 12(%rsp)
-jmp	.L334
-.L336:
+jmp	.Lmd334
+.Lmd336:
 addq	$1, inputIndex(%rip)
 movq	inputIndex(%rip), %rbx
 movl	12(%rsp), %eax
@@ -1470,7 +1114,7 @@ cltq
 leaq	0(,%rax,8), %rdx
 movq	(%rsp), %rax
 addq	%rdx, %rax
-movl	$.LC96, %esi
+movl	$.LmdC96, %esi
 movq	(%rax), %rdi
 call	fopen@PLT
 movq	%rax, %rdx
@@ -1483,20 +1127,20 @@ salq	$5, %rax
 addq	$inputSources+16, %rax
 movq	(%rax), %rax
 testq	%rax, %rax
-jne	.L335
+jne	.Lmd335
 movl	12(%rsp), %eax
 cltq
 leaq	0(,%rax,8), %rdx
 movq	(%rsp), %rax
 addq	%rdx, %rax
 movq	(%rax), %rdx
-movl	$.LC131, %esi
+movl	$.LmdC131, %esi
 movq	stderr(%rip), %rdi
 movl	$0, %eax
 call	fprintf@PLT
 movl	$1, %edi
 call	exit@PLT
-.L335:
+.Lmd335:
 movq	inputIndex(%rip), %rax
 salq	$5, %rax
 addq	$inputSources+8, %rax
@@ -1513,9 +1157,9 @@ salq	$5, %rax
 addq	$inputSources+24, %rax
 movq	%rdx, (%rax)
 subl	$1, 12(%rsp)
-.L334:
+.Lmd334:
 cmpl	$0, 12(%rsp)
-jg	.L336
+jg	.Lmd336
 addq	$1, inputIndex(%rip)
 movl	$16, %edi
 call	malloc@PLT
@@ -1700,12 +1344,12 @@ popq	%rbx
 .cfi_def_cfa_offset 8
 ret
 .cfi_endproc
-.LFE124:
+.LmdFE124:
 .size	main, .-main
 .globl	init_primitives
 .type	init_primitives, @function
 init_primitives:
-.LFB125:
+.LmdFB125:
 .cfi_startproc
 movl	key_plus(%rip), %eax
 leal	-1(%rax), %edx
@@ -2906,13 +2550,13 @@ movl	%edx, %edx
 salq	$4, %rdx
 addq	$primitives+8, %rdx
 movl	%eax, (%rdx)
-movl	key_c_library(%rip), %eax
+movl	key_c_lib_loader(%rip), %eax
 leal	-1(%rax), %edx
-movl	key_c_library(%rip), %eax
+movl	key_c_lib_loader(%rip), %eax
 movl	%edx, %ecx
 salq	$4, %rcx
 addq	$primitives, %rcx
-movq	$code_c_library, (%rcx)
+movq	$code_c_lib_loader, (%rcx)
 movl	%edx, %edx
 salq	$4, %rdx
 addq	$primitives+8, %rdx
@@ -2964,7 +2608,7 @@ movl	%eax, (%rdx)
 nop
 ret
 .cfi_endproc
-.LFE125:
+.LmdFE125:
 .size	init_primitives, .-init_primitives
 .globl header_plus
 .section .rodata
@@ -3408,12 +3052,12 @@ movq    (%rbx), %rax
 addq    $8, %rbx
 movq    (%rbx), %rcx
 cmpq	%rax, %rcx
-jge	.L17
+jge	.Lprim17
 movq	$-1, %rax
-jmp	.L18
-.L17:
+jmp	.Lprim18
+.Lprim17:
 movl	$0, %eax
-.L18:
+.Lprim18:
 movq	%rax, (%rbx)
 movq (%rbp), %rax
 addq $8, %rbp
@@ -3446,12 +3090,12 @@ movq    (%rbx), %rax
 addq    $8, %rbx
 movq    (%rbx), %rcx
 cmpq	%rax, %rcx
-jnb	.L20
+jnb	.Lprim20
 movq	$-1, %rax
-jmp	.L21
-.L20:
+jmp	.Lprim821
+.Lprim20:
 movl	$0, %eax
-.L21:
+.Lprim821:
 movq	%rax, (%rbx)
 movq (%rbp), %rax
 addq $8, %rbp
@@ -3484,12 +3128,12 @@ movq    (%rbx), %rcx
 addq    $8, %rbx
 movq    (%rbx), %rax
 cmpq	%rax, %rcx
-jne	.L23
+jne	.Lprim823
 movq	$-1, %rax
-jmp	.L24
-.L23:
+jmp	.Lprim824
+.Lprim823:
 movl	$0, %eax
-.L24:
+.Lprim824:
 movq	%rax, (%rbx)
 movq (%rbp), %rax
 addq $8, %rbp
@@ -4210,12 +3854,12 @@ code_zbranch:
 movq    (%rbx), %rax
 addq    $8, %rbx
 testq	%rax, %rax
-jne	.L49
+jne	.Lprim49
 movq    (%rbp), %rax
-jmp	.L50
-.L49:
+jmp	.Lprim50
+.Lprim49:
 movl	$8, %eax
-.L50:
+.Lprim50:
 # Either way when we get down here, rax contains the delta.
 addq    %rax, %rbp
 movq (%rbp), %rax
@@ -4330,16 +3974,16 @@ salq	$5, %rax
 addq	$inputSources+16, %rax
 movq	(%rax), %rax
 cmpq	$-1, %rax
-jne	.L69
+jne	.Lprim69
 subq	$8, %rbx
 movq	(%rbx), %rax
 movq	$0, (%rax)
-jmp	.L70
-.L69:
+jmp	.Lprim70
+.Lprim69:
 subq	$8, %rbx
 call	refill_@PLT
 movq	%rax, (%rbx)
-.L70:
+.Lprim70:
 movq (%rbp), %rax
 addq $8, %rbp
 jmp *%rax
@@ -4376,10 +4020,10 @@ movq	%rax, c1(%rip)
 movq	(%rbx), %rdx
 movq	c1(%rip), %rax
 cmpq	%rax, %rdx
-jge	.L73
+jge	.Lprim73
 movq	(%rbx), %rax
 movq	%rax, c1(%rip)
-.L73:
+.Lprim73:
 movq	8(%rbx), %rax
 movq	c1(%rip), %rdx
 movq	str1(%rip), %rsi
@@ -4417,38 +4061,10 @@ key_KEY:
 .globl code_KEY
 .type code_KEY, @function
 code_KEY:
-movl	$old_tio, %esi
-movl	$0, %edi
-call	tcgetattr@PLT
-movq	old_tio(%rip), %rax
-movq	%rax, new_tio(%rip)
-movq	old_tio+8(%rip), %rax
-movq	%rax, new_tio+8(%rip)
-movq	old_tio+16(%rip), %rax
-movq	%rax, new_tio+16(%rip)
-movq	old_tio+24(%rip), %rax
-movq	%rax, new_tio+24(%rip)
-movq	old_tio+32(%rip), %rax
-movq	%rax, new_tio+32(%rip)
-movq	old_tio+40(%rip), %rax
-movq	%rax, new_tio+40(%rip)
-movq	old_tio+48(%rip), %rax
-movq	%rax, new_tio+48(%rip)
-movl	old_tio+56(%rip), %eax
-movl	%eax, new_tio+56(%rip)
-andl	$-11, new_tio+12(%rip)
-movl	$new_tio, %edx
-movl	$0, %esi
-movl	$0, %edi
-call	tcsetattr@PLT
-subq	$8, %rbx
-call	getchar@PLT
-cltq
-movq	%rax, (%rbx)
-movl	$old_tio, %edx
-movl	$0, %esi
-movl	$0, %edi
-call	tcsetattr@PLT
+call key_@PLT
+movq c1(%rip), %rax
+subq $8, %rbx
+movq %rax, (%rbx)
 movq (%rbp), %rax
 addq $8, %rbp
 jmp *%rax
@@ -5111,13 +4727,13 @@ addq    $8, %rax
 movq    (%rax), %rax       # Now %rax holds the does> address
 movq    %rax, %rcx         # Which I'll set aside.
 testq	%rax, %rax
-je	.L98
+je	.Lprim98
 movq	rsp(%rip), %rax
 subq	$8, %rax
 movq	%rax, rsp(%rip)
 movq	%rbp, (%rax)
 movq	%rcx, %rbp
-.L98:
+.Lprim98:
 movq (%rbp), %rax
 addq $8, %rbp
 jmp *%rax
@@ -5145,7 +4761,14 @@ key_PARSE:
 .globl code_PARSE
 .type code_PARSE, @function
 code_PARSE:
+movq (%rbx), %rax
+movb %al, ch1(%rip)
 call	parse_@PLT
+subq $8, %rbx
+movq str1(%rip), %rax
+movq %rax, 8(%rbx)
+movq c1(%rip), %rax
+movq %rax, (%rbx)
 movq (%rbp), %rax
 addq $8, %rbp
 jmp *%rax
@@ -5173,7 +4796,7 @@ key_parse_name:
 .globl code_parse_name
 .type code_parse_name, @function
 code_parse_name:
-call	parse_name_@PLT
+call	parse_name_stacked@PLT
 movq (%rbp), %rax
 addq $8, %rbp
 jmp *%rax
@@ -5229,7 +4852,7 @@ key_CREATE:
 .globl code_CREATE
 .type code_CREATE, @function
 code_CREATE:
-call	parse_name_@PLT
+call	parse_name_stacked@PLT
 movq	dsp(%rip), %rax
 addq	$7, %rax
 andq	$-8, %rax
@@ -5614,13 +5237,13 @@ movl	$header_zbranch+24, %eax
 movq	%rax, (%rbx)
 movl	$0, %eax
 call	compile_@PLT
-jmp	.L244
-.L245:
+jmp	.Lprim244
+.Lprim245:
 call	drain_queue_@PLT
-.L244:
+.Lprim244:
 movl	queue_length(%rip), %eax
 testl	%eax, %eax
-jg	.L245
+jg	.Lprim245
 subq	$8, %rbx
 movq	dsp(%rip), %rax
 movq	%rax, (%rbx)
@@ -5659,13 +5282,13 @@ movl	$header_branch+24, %edx
 movq	%rdx, (%rbx)
 movl	$0, %eax
 call	compile_@PLT
-jmp	.L248
-.L249:
+jmp	.Lprim248
+.Lprim249:
 call	drain_queue_@PLT
-.L248:
+.Lprim248:
 movl	queue_length(%rip), %eax
 testl	%eax, %eax
-jg	.L249
+jg	.Lprim249
 subq	$8, %rbx
 movq	dsp(%rip), %rax
 movq	%rax, (%rbx)
@@ -5700,13 +5323,13 @@ key_control_flush:
 .globl code_control_flush
 .type code_control_flush, @function
 code_control_flush:
-jmp	.L252
-.L253:
+jmp	.Lprim252
+.Lprim253:
 call	drain_queue_@PLT
-.L252:
+.Lprim252:
 movl	queue_length(%rip), %eax
 testl	%eax, %eax
-jg	.L253
+jg	.Lprim253
 movq (%rbp), %rax
 addq $8, %rbp
 jmp *%rax
@@ -5765,14 +5388,14 @@ movq	(%rbx), %rdi
 call	fclose@PLT
 cltq
 testq	%rax, %rax
-je	.L256
+je	.Lprim256
 call	__errno_location@PLT
 movl	(%rax), %eax
 cltq
-jmp	.L257
-.L256:
+jmp	.Lprim257
+.Lprim256:
 movl	$0, %eax
-.L257:
+.Lprim257:
 movq	%rax, (%rbx)
 movq (%rbp), %rax
 addq $8, %rbp
@@ -5816,14 +5439,14 @@ movl	$tempBuf, %edi
 call	fopen@PLT
 movq	%rax, 8(%rbx)
 testq	%rax, %rax
-jne	.L260
+jne	.Lprim260
 call	__errno_location@PLT
 movl	(%rax), %eax
 cltq
-jmp	.L261
-.L260:
+jmp	.Lprim261
+.Lprim260:
 movl	$0, %eax
-.L261:
+.Lprim261:
 movq	%rax, (%rbx)
 movq (%rbp), %rax
 addq $8, %rbp
@@ -5865,11 +5488,11 @@ movl	$tempBuf, %edi
 call	fopen@PLT
 movq	%rax, 16(%rbx)
 testq	%rax, %rax
-jne	.L264
+jne	.Lprim264
 movq	(%rbx), %rax
 andl	$2, %eax
 testq	%rax, %rax
-je	.L264
+je	.Lprim264
 movq	(%rbx), %rax
 orq	$8, %rax
 movq	file_modes(,%rax,8), %rax
@@ -5877,17 +5500,17 @@ movq	%rax, %rsi
 movl	$tempBuf, %edi
 call	fopen@PLT
 movq	%rax, 16(%rbx)
-.L264:
+.Lprim264:
 movq	16(%rbx), %rax
 testq	%rax, %rax
-jne	.L265
+jne	.Lprim265
 call	__errno_location@PLT
 movl	(%rax), %eax
 cltq
-jmp	.L266
-.L265:
+jmp	.Lprim266
+.Lprim265:
 movl	$0, %eax
-.L266:
+.Lprim266:
 addq	$8, %rbx
 movq	%rax, (%rbx)
 movq (%rbp), %rax
@@ -5929,12 +5552,12 @@ call	remove@PLT
 cltq
 movq	%rax, (%rbx)
 cmpq	$-1, %rax
-jne	.L269
+jne	.Lprim269
 call	__errno_location@PLT
 movl	(%rax), %eax
 cltq
 movq	%rax, (%rbx)
-.L269:
+.Lprim269:
 movq (%rbp), %rax
 addq $8, %rbp
 jmp *%rax
@@ -5968,14 +5591,14 @@ movq    16(%rbx), %rdi
 call	ftell@PLT
 movq	%rax, 16(%rbx)
 cmpq	$-1, %rax
-jne	.L272
+jne	.Lprim272
 call	__errno_location@PLT
 movl	(%rax), %eax
 cltq
-jmp	.L273
-.L272:
+jmp	.Lprim273
+.Lprim272:
 movl	$0, %eax
-.L273:
+.Lprim273:
 movq	%rax, (%rbx)
 movq (%rbp), %rax
 addq $8, %rbp
@@ -6010,13 +5633,13 @@ movq    16(%rbx), %rdi
 call	ftell@PLT
 movq	%rax, c1(%rip)
 testq	%rax, %rax
-jns	.L276
+jns	.Lprim276
 call	__errno_location@PLT
 movl	(%rax), %eax
 cltq
 movq	%rax, (%rbx)
-jmp	.L277
-.L276:
+jmp	.Lprim277
+.Lprim276:
 movl	$2, %edx
 movl	$0, %esi
 movq	16(%rbx), %rdi
@@ -6024,7 +5647,7 @@ call	fseek@PLT
 cltq
 movq	%rax, c2(%rip)
 testq	%rax, %rax
-jns	.L278
+jns	.Lprim278
 call	__errno_location@PLT
 movl	(%rax), %eax
 cltq
@@ -6033,8 +5656,8 @@ movq	16(%rbx), %rdi
 movl	$0, %edx
 movq	c1(%rip), %rsi
 call	fseek@PLT
-jmp	.L277
-.L278:
+jmp	.Lprim277
+.Lprim278:
 movq	16(%rbx), %rdi
 call	ftell@PLT
 movq	%rax, c2(%rip)
@@ -6045,7 +5668,7 @@ call	fseek@PLT
 movq	c2(%rip), %rax
 movq	%rax, 16(%rbx)
 movq	$0, (%rbx)
-.L277:
+.Lprim277:
 movq (%rbp), %rax
 addq $8, %rbp
 jmp *%rax
@@ -6130,28 +5753,28 @@ movq	16(%rbx), %rdi
 call	fread@PLT
 movq	%rax, c1(%rip)
 testq	%rax, %rax
-jne	.L282
+jne	.Lprim282
 movq	(%rbx), %rdi
 call	feof@PLT
 testl	%eax, %eax
-je	.L283
+je	.Lprim283
 addq	$8, %rbx
 movq	$0, (%rbx)
 movq	$0, 8(%rbx)
-jmp	.L285
-.L283:
+jmp	.Lprim285
+.Lprim283:
 movq	(%rbx), %rdi
 call	ferror@PLT
 cltq
 movq	%rax, 8(%rbx)
 movq	$0, 16(%rbx)
-jmp	.L285
-.L282:
+jmp	.Lprim285
+.Lprim282:
 addq	$8, %rbx
 movq	c1(%rip), %rax
 movq	%rax, 8(%rbx)
 movq	$0, (%rbx)
-.L285:
+.Lprim285:
 movq (%rbp), %rax
 addq $8, %rbp
 jmp *%rax
@@ -6187,28 +5810,28 @@ movl	$str1, %edi
 call	getline@PLT
 movq	%rax, c1(%rip)
 cmpq	$-1, %rax
-jne	.L288
+jne	.Lprim288
 call	__errno_location@PLT
 movl	(%rax), %eax
 cltq
 movq	%rax, (%rbx)
 movq	$0, 8(%rbx)
 movq	$0, 16(%rbx)
-jmp	.L289
-.L288:
+jmp	.Lprim289
+.Lprim288:
 movq	c1(%rip), %rax
 testq	%rax, %rax
-jne	.L290
+jne	.Lprim290
 movq	$0, (%rbx)
 movq	$0, 8(%rbx)
 movq	$0, 16(%rbx)
-jmp	.L289
-.L290:
+jmp	.Lprim289
+.Lprim290:
 movq	c1(%rip), %rax
 leaq	-1(%rax), %rdx
 movq	8(%rbx), %rax
 cmpq	%rax, %rdx
-jle	.L291
+jle	.Lprim291
 movq	8(%rbx), %rdx
 movq	(%rbx), %rax
 movq	c1(%rip), %rcx
@@ -6220,17 +5843,17 @@ call	fseek@PLT
 movq	8(%rbx), %rax
 addq	$1, %rax
 movq	%rax, c1(%rip)
-jmp	.L292
-.L291:
+jmp	.Lprim292
+.Lprim291:
 movq	str1(%rip), %rdx
 movq	c1(%rip), %rax
 addq	%rdx, %rax
 subq	$1, %rax
 movzbl	(%rax), %eax
 cmpb	$10, %al
-je	.L292
+je	.Lprim292
 addq	$1, c1(%rip)
-.L292:
+.Lprim292:
 movq	c1(%rip), %rax
 leaq	-1(%rax), %rdx
 movq	16(%rbx), %rax
@@ -6242,13 +5865,13 @@ movq	$-1, 8(%rbx)
 movq	c1(%rip), %rax
 subq	$1, %rax
 movq	%rax, 16(%rbx)
-.L289:
+.Lprim289:
 movq	str1(%rip), %rax
 testq	%rax, %rax
-je	.L293
+je	.Lprim293
 movq	str1(%rip), %rdi
 call	free@PLT
-.L293:
+.Lprim293:
 movq (%rbp), %rax
 addq $8, %rbp
 jmp *%rax
@@ -6285,12 +5908,12 @@ movq	%rax, 16(%rbx)
 addq	$16, %rbx
 movq	(%rbx), %rax
 cmpq	$-1, %rax
-jne	.L296
+jne	.Lprim296
 call	__errno_location@PLT
 movl	(%rax), %eax
 cltq
 movq	%rax, (%rbx)
-.L296:
+.Lprim296:
 movq (%rbp), %rax
 addq $8, %rbp
 jmp *%rax
@@ -6328,14 +5951,14 @@ movq	%rax, 16(%rbx)
 addq	$16, %rbx
 movq	(%rbx), %rax
 cmpq	$-1, %rax
-jne	.L299
+jne	.Lprim299
 call	__errno_location@PLT
 movl	(%rax), %eax
 cltq
-jmp	.L300
-.L299:
+jmp	.Lprim300
+.Lprim299:
 movl	$0, %eax
-.L300:
+.Lprim300:
 movq	%rax, (%rbx)
 movq (%rbp), %rax
 addq $8, %rbp
@@ -6447,12 +6070,12 @@ call	fsync@PLT
 cltq
 movq	%rax, (%rbx)
 cmpq	$-1, %rax
-jne	.L307
+jne	.Lprim307
 call	__errno_location@PLT
 movl	(%rax), %eax
 cltq
 movq	%rax, (%rbx)
-.L307:
+.Lprim307:
 movq (%rbp), %rax
 addq $8, %rbp
 jmp *%rax
@@ -6491,17 +6114,17 @@ movq	compilationWordlist(%rip), %rdx
 movq    (%rdx), %rcx   # The actual previous head.
 movq	%rcx, (%rax)   # Written to the new header.
 movq    %rax, (%rdx)   # And the new one into the compilation list
-call	parse_name_@PLT
+call	parse_name_stacked@PLT
 movq	(%rbx), %rax
 testq	%rax, %rax
-jne	.L310
+jne	.Lprim310
 movq	stderr(%rip), %rcx
 movl	$34, %edx
 movl	$1, %esi
-movl	$.LC117, %edi
+movl	$.LmdC117, %edi
 call	fwrite@PLT
 call	code_QUIT@PLT
-.L310:
+.Lprim310:
 movq	tempHeader(%rip), %r12
 movq	(%rbx), %rdi
 call	malloc@PLT
@@ -6668,13 +6291,13 @@ movq	$header_EXIT+24, %rdx
 movq	%rdx, (%rbx)
 movl	$0, %eax
 call	compile_@PLT
-jmp	.L330
-.L331:
+jmp	.Lprim330
+.Lprim331:
 call	drain_queue_@PLT
-.L330:
+.Lprim330:
 movl	queue_length(%rip), %eax
 testl	%eax, %eax
-jne	.L331
+jne	.Lprim331
 movq	$0, state(%rip)
 movq (%rbp), %rax
 addq $8, %rbp
@@ -6714,23 +6337,23 @@ addq    %rdx, %rax
 xorq    %rdx, %rax     # rax is now d+i-l XOR i-l
 # We want a truth flag that's true when the top bit is 0.
 testq   %rax, %rax
-js      .L9901         # Jumps when the top bit is 1.
+js      .Lprim9901         # Jumps when the top bit is 1.
 movq    $-1, %r11      # Sets flag true when top bit is 0.
-jmp     .L9902
-.L9901:
+jmp     .Lprim9902
+.Lprim9901:
 movq    $0, %r11       # Or false when top bit is 1.
-.L9902:
+.Lprim9902:
 movq    %rdx, %rax     # rdx is the index-limit, remember.
 xorq    %r10, %rax     # now rax is delta XOR index-limit
 # Same flow as above: true flag when top bit is 0.
 # We OR the new result with the old one, in r11.
 testq   %rax, %rax
-js      .L9903         # Jumps when the top bit is 1.
+js      .Lprim9903         # Jumps when the top bit is 1.
 orq     $-1, %r11      # Sets flag true when top bit is 0.
-jmp     .L9904
-.L9903:
+jmp     .Lprim9904
+.Lprim9903:
 orq     $0, %r11       # Or false when top bit is 1.
-.L9904:
+.Lprim9904:
 # Finally, negate the returned flag.
 xorq    $-1, %r11
 # Now r11 holds the flag we want to return, write it onto the stack.
@@ -6991,50 +6614,50 @@ movq (%rbp), %rax
 addq $8, %rbp
 jmp *%rax
 .size code_CCALL6, .-code_CCALL6
-.globl header_c_library
+.globl header_c_lib_loader
 .section .rodata
-.str_c_library:
-.string "C-LIBRARY"
+.str_c_lib_loader:
+.string "(C-LIBRARY)"
 .data
 .align 32
-.type header_c_library, @object
-.size header_c_library, 32
-header_c_library:
+.type header_c_lib_loader, @object
+.size header_c_lib_loader, 32
+header_c_lib_loader:
 .quad header_CCALL6
-.quad 9
-.quad .str_c_library
-.quad code_c_library
-.globl key_c_library
+.quad 11
+.quad .str_c_lib_loader
+.quad code_c_lib_loader
+.globl key_c_lib_loader
 .align 4
-.type key_c_library, @object
-.size key_c_library, 4
-key_c_library:
+.type key_c_lib_loader, @object
+.size key_c_lib_loader, 4
+key_c_lib_loader:
 .long 112
 .text
-.globl code_c_library
-.type code_c_library, @function
-code_c_library:
+.globl code_c_lib_loader
+.type code_c_lib_loader, @function
+code_c_lib_loader:
 movq    (%rbx), %rdi
-movq    $258, %rsi  # That's RTLD_NOW | RTLD_GLOBAL.
-subq    $8, %rsp # Align rsp to 16 bytes
+movq    $258, %rsi
+subq    $8, %rsp
 call    dlopen@PLT
 addq    $8, %rsp
-movq    %rax, (%rbx) # Push the result. NULL = 0 indicates an error.
+movq    %rax, (%rbx)
 movq (%rbp), %rax
 addq $8, %rbp
 jmp *%rax
-.size code_c_library, .-code_c_library
+.size code_c_lib_loader, .-code_c_lib_loader
 .globl header_c_symbol
 .section .rodata
 .str_c_symbol:
-.string "C-SYMBOL"
+.string "(C-SYMBOL)"
 .data
 .align 32
 .type header_c_symbol, @object
 .size header_c_symbol, 32
 header_c_symbol:
-.quad header_c_library
-.quad 8
+.quad header_c_lib_loader
+.quad 10
 .quad .str_c_symbol
 .quad code_c_symbol
 .globl key_c_symbol
@@ -7160,12 +6783,12 @@ movq    (%rbp), %rax
 addq    $8, %rbp
 movq    (%rbx), %rcx
 cmpq	%rcx, %rax
-jne	.L347
+jne	.Lsup347
 movq	$-1, %rdx
-jmp	.L348
-.L347:
+jmp	.Lsup348
+.Lsup347:
 movl	$0, %edx
-.L348:
+.Lsup348:
 movq	%rdx, (%rbx)
 movq (%rbp), %rax
 addq $8, %rbp
@@ -7251,12 +6874,12 @@ movq    (%rbx), %rsi
 movq    (%rbp), %rax
 addq    $8, %rbp
 cmpq	%rax, %rsi  # TOS -> %rsi, lit -> %rax
-jge	.L355
+jge	.Lsup355
 movq	$-1, %rax
-jmp	.L356
-.L355:
+jmp	.Lsup356
+.Lsup355:
 movl	$0, %eax
-.L356:
+.Lsup356:
 movq	%rax, (%rbx)
 movq (%rbp), %rax
 addq $8, %rbp
@@ -7325,12 +6948,12 @@ movq    (%rbx), %rax
 addq    $8, %rbx
 movq    (%rbx), %rcx
 cmpq	%rax, %rcx
-jne	.L361
+jne	.Lsup361
 movq	$-1, %rax
-jmp	.L362
-.L361:
+jmp	.Lsup362
+.Lsup361:
 movl	$0, %eax
-.L362:
+.Lsup362:
 movq	%rax, (%rbx)
 movq rsp(%rip), %rax
 leaq 8(%rax), %rdx
@@ -7466,12 +7089,12 @@ code_superinstruction_dolit_less_than_EXIT:
 movq    (%rbp), %rax
 movq	(%rbx), %rdx
 cmpq	%rax, %rdx
-jge	.L371
+jge	.Lsup371
 movq	$-1, %rax
-jmp	.L372
-.L371:
+jmp	.Lsup372
+.Lsup371:
 movl	$0, %eax
-.L372:
+.Lsup372:
 movq	%rax, (%rbx)
 addq    $8, %rbp
 movq rsp(%rip), %rax
@@ -7540,12 +7163,12 @@ movq    (%rbx), %rax
 movq    (%rbp), %rcx
 addq    $8, %rbp
 cmpq	%rax, %rcx
-jne	.L377
+jne	.Lsup377
 movq	$-1, %rax
-jmp	.L378
-.L377:
+jmp	.Lsup378
+.Lsup377:
 movl	$0, %eax
-.L378:
+.Lsup378:
 movq	%rax, (%rbx)
 movq rsp(%rip), %rax
 leaq 8(%rax), %rdx
@@ -7786,7 +7409,7 @@ jmp *%rax
 .globl	init_superinstructions
 .type	init_superinstructions, @function
 init_superinstructions:
-.LFB168:
+.LmdFB168:
 .cfi_startproc
 movl	$0, nextSuperinstruction(%rip)
 xorl %edx, %edx
@@ -8521,5 +8144,5 @@ movl	%edx, nextSuperinstruction(%rip)
 nop
 ret
 .cfi_endproc
-.LFE168:
+.LmdFE168:
 .size	init_superinstructions, .-init_superinstructions
