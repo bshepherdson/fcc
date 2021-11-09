@@ -1,219 +1,32 @@
 .include "common/support.s"
-.section	.rodata
-.align 16
-.LC42:
-.string	"> "
 .text
-.globl	refill_
+.globl refill_evaluate_pop
 .type	refill_, @function
-refill_:
-.LFB43:
 .cfi_startproc
-movq	inputIndex(%rip), %rax
-salq	$5, %rax
-addq	$inputSources+16, %rax
-movq	(%rax), %rax
-cmpq	$-1, %rax
-jne	.L54
-subq	$1, inputIndex(%rip)
-movq	rsp(%rip), %rax
-leaq	8(%rax), %rdx
-movq	%rdx, rsp(%rip)
-movq	(%rax), %rbp
+refill_evaluate_pop:
+movq rsp(%rip), %rax
+leaq 8(%rax), %rdx
+movq %rdx, rsp(%rip)
+movq (%rax), %rbp
 movq (%rbp), %rax
 addq $8, %rbp
 jmp *%rax
-.L54:
-pushq	%r12
-.cfi_def_cfa_offset 16
-.cfi_offset 3, -16
-subq	$16, %rsp
-.cfi_def_cfa_offset 32
-movq	inputIndex(%rip), %rax
-salq	$5, %rax
-addq	$inputSources+16, %rax
-movq	(%rax), %rax
-testq	%rax, %rax
-jne	.L55
-movl	$.LC42, %edi
-# readline uses xmm0 kinds of instructions, which requires the
-# target (the stack in this case) be 16-byte aligned.
-# So I move the stack here and save its value in %r14, which is
-# callee-saved.
-movq    %rsp, %r14
-movq    $15, %rax
-notq    %rax
-andq    %rax, %rsp
-call	readline@PLT
-movq    %rax, str1(%rip)
-# Restore %rsp
-movq    %r14, %rsp
-movq	inputIndex(%rip), %r12
-movq	str1(%rip), %rdi
-call	strlen@PLT
-movq	%rax, %rdx
-movq	%r12, %rax
-salq	$5, %rax
-addq	$inputSources, %rax
-movq	%rdx, (%rax)
-movq	inputIndex(%rip), %rax
-salq	$5, %rax
-addq	$inputSources, %rax
-movq	(%rax), %rax
-movq	inputIndex(%rip), %rdx
-salq	$5, %rdx
-leaq	inputSources+24(%rdx), %rcx
-movq	%rax, %rdx
-movq	str1(%rip), %rsi
-movq	(%rcx), %rdi
-call	strncpy@PLT
-movq	inputIndex(%rip), %rax
-salq	$5, %rax
-addq	$inputSources+8, %rax
-movq	$0, (%rax)
-movq	str1(%rip), %rdi
-call	free@PLT
-movq	$-1, %rax
-jmp	.L56
-.L55:
-movq	inputIndex(%rip), %rax
-salq	$5, %rax
-addq	$inputSources+16, %rax
-movq	(%rax), %rax
-andl	$1, %eax
-testq	%rax, %rax
-je	.L57
-movq	inputIndex(%rip), %rax
-salq	$5, %rax
-addq	$inputSources+16, %rax
-movq	(%rax), %rax
-andq	$-2, %rax
-movq	%rax, 8(%rsp)
-movq	8(%rsp), %rax
-movq	(%rax), %rdx
-movq	8(%rsp), %rax
-movq	8(%rax), %rax
-cmpq	%rax, %rdx
-jb	.L58
-subq	$1, inputIndex(%rip)
-movl	$0, %eax
-jmp	.L56
-.L58:
-movq	8(%rsp), %rax
-movq	(%rax), %rax
-movq	%rax, str1(%rip)
-jmp	.L59
-.L61:
-addq	$1, str1(%rip)
-.L59:
-movq	8(%rsp), %rax
-movq	8(%rax), %rdx
-movq	str1(%rip), %rax
-cmpq	%rax, %rdx
-jbe	.L60
-movq	str1(%rip), %rax
-movzbl	(%rax), %eax
-cmpb	$10, %al
-jne	.L61
-.L60:
-movq	inputIndex(%rip), %rcx
-movq	8(%rsp), %rax
-movq	(%rax), %rax
-movq	str1(%rip), %rdx
-subq	%rax, %rdx
-movq	%rcx, %rax
-salq	$5, %rax
-addq	$inputSources, %rax
-movq	%rdx, (%rax)
-movq	inputIndex(%rip), %rax
-salq	$5, %rax
-addq	$inputSources, %rax
-movq	(%rax), %rdx
-movq	8(%rsp), %rax
-movq	(%rax), %rax
-movq	inputIndex(%rip), %rcx
-salq	$5, %rcx
-addq	$inputSources+24, %rcx
-movq	%rax, %rsi
-movq	(%rcx), %rdi
-call	strncpy@PLT
-movq	inputIndex(%rip), %rax
-salq	$5, %rax
-addq	$inputSources+8, %rax
-movq	$0, (%rax)
-movq	8(%rsp), %rax
-movq	8(%rax), %rdx
-movq	str1(%rip), %rax
-cmpq	%rax, %rdx
-jbe	.L62
-movq	str1(%rip), %rax
-addq	$1, %rax
-jmp	.L63
-.L62:
-movq	8(%rsp), %rax
-movq	8(%rax), %rax
-.L63:
-movq	8(%rsp), %rdx
-movq	%rax, (%rdx)
-movq	$-1, %rax
-jmp	.L56
-.L57:
-movq	$0, str1(%rip)
-movq	$0, tempSize(%rip)
-movq	inputIndex(%rip), %rax
-salq	$5, %rax
-addq	$inputSources+16, %rax
-movq	(%rax), %rax
-movq	%rax, %rdx
-movl	$tempSize, %esi
-movl	$str1, %edi
-call	getline@PLT
-movq	%rax, c1(%rip)
-movq	c1(%rip), %rax
-cmpq	$-1, %rax
-jne	.L64
-subq	$1, inputIndex(%rip)
-movl	$0, %eax
-jmp	.L56
-.L64:
-movq	str1(%rip), %rdx
-movq	c1(%rip), %rax
-addq	%rdx, %rax
-subq	$1, %rax
-movzbl	(%rax), %eax
-cmpb	$10, %al
-jne	.L65
-subq	$1, c1(%rip)
-.L65:
-movq	inputIndex(%rip), %rax
-salq	$5, %rax
-addq	$inputSources+24, %rax
-movq	c1(%rip), %rdx
-movq	str1(%rip), %rsi
-movq	(%rax), %rdi
-call	strncpy@PLT
-movq	str1(%rip), %rdi
-call	free@PLT
-movq	inputIndex(%rip), %rax
-salq	$5, %rax
-leaq	inputSources(%rax), %rdx
-movq	c1(%rip), %rax
-movq	%rax, (%rdx)
-movq	inputIndex(%rip), %rax
-salq	$5, %rax
-addq	$inputSources+8, %rax
-movq	$0, (%rax)
-movq	$-1, %rax
-.L56:
-addq	$16, %rsp
-.cfi_def_cfa_offset 16
-popq	%r12
-.cfi_restore 3
-.cfi_def_cfa_offset 8
+nop
 ret
 .cfi_endproc
-.LFE43:
-.size	refill_, .-refill_
+.size	refill_evaluate_pop, .-refill_evaluate_pop
+.globl refill_wrapper
+.type	refill_wrapper, @function
+.cfi_startproc
+refill_wrapper:
+movq %rsp, %r14
+andq $~7, %rsp
+call refill_@PLT
+movq %r14, %rsp
+nop
+ret
+.cfi_endproc
+.size	refill_wrapper, .-refill_wrapper
 .globl parse_name_stacked
 .type	parse_name_stacked, @function
 .cfi_startproc
@@ -921,7 +734,7 @@ jne	.Lmd219
 movq	$0, inputIndex(%rip)
 .Lmd219:
 movq	$.Lmd220, quit_inner(%rip)
-call	refill_@PLT
+call	refill_wrapper@PLT
 .Lmd220:
 call	parse_name_stacked@PLT
 movq	(%rbx), %rax
@@ -937,7 +750,7 @@ movl	$.LmdC84, %edi
 call	puts@PLT
 .Lmd223:
 addq	$16, %rbx
-call	refill_@PLT
+call	refill_wrapper@PLT
 jmp	.Lmd220
 .Lmd233:
 nop

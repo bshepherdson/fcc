@@ -155,68 +155,69 @@ void print(char *str, cell len) {
 }
 
 
-//// refill_evaluate_pop is defined in assembly.
-//cell refill_evaluate_pop(void);
-//
-//// NB: Refilling from a completed EVALUATE is kinda magic since it needs to jump
-//// into the caller directly.
-//// I think jumping out of two C calls like that is busted, though. Might need
-//// to set a flag or something?
-//cell refill_(void) {
-//  if (SRC.type == -1) { // EVALUATE
-//    // EVALUATE strings cannot be refilled. Pop the source.
-//    inputIndex--;
-//    return refill_evaluate_pop();
-//    // And do an EXIT to return to executing whoever called EVALUATE.
-//    //ip = (code**) *(rsp++);
-//    //NEXT;
-//    //return 0;
-//  } else if ( SRC.type == 0) { // KEYBOARD
-//    str1 = readline("> ");
-//    SRC.parseLength = strlen(str1);
-//    strncpy(SRC.parseBuffer, str1, SRC.parseLength);
-//    SRC.inputPtr = 0;
-//    free(str1);
-//    return -1;
-//  } else if ( (SRC.type & EXTERNAL_SYMBOL_FLAG) != 0 ) {
-//    // External symbol, pseudofile.
-//    external_source *ext = (external_source*) (SRC.type & EXTERNAL_SYMBOL_MASK);
-//    if (ext->current >= ext->end) {
-//      inputIndex--;
-//      return 0;
-//    }
-//
-//    str1 = ext->current;
-//    while (str1 < ext->end && *str1 != '\n') {
-//      str1++;
-//    }
-//    SRC.parseLength = str1 - ext->current;
-//    strncpy(SRC.parseBuffer, ext->current, SRC.parseLength);
-//    SRC.inputPtr = 0;
-//
-//    ext->current = str1 < ext->end ? str1 + 1 : ext->end;
-//    return -1;
-//  } else {
-//    // Real file.
-//    str1 = NULL;
-//    tempSize = 0;
-//    c1 = getline(&str1, &tempSize, (FILE*) SRC.type);
-//
-//    if (c1 == -1) {
-//      // Dump the source and recurse.
-//      inputIndex--;
-//      return 0;
-//    } else {
-//      // Knock off the trailing newline, if present.
-//      if (str1[c1 - 1] == '\n') c1--;
-//      strncpy(SRC.parseBuffer, str1, c1);
-//      free(str1);
-//      SRC.parseLength = c1;
-//      SRC.inputPtr = 0;
-//      return -1;
-//    }
-//  }
-//}
+// refill_evaluate_pop is defined in assembly.
+cell refill_evaluate_pop(void);
+
+// NB: Refilling from a completed EVALUATE is kinda magic since it needs to jump
+// into the caller directly.
+// I think jumping out of two C calls like that is busted, though. Might need
+// to set a flag or something?
+cell refill_(void) {
+  if (SRC.type == -1) { // EVALUATE
+    // EVALUATE strings cannot be refilled. Pop the source.
+    inputIndex--;
+    return refill_evaluate_pop();
+    // And do an EXIT to return to executing whoever called EVALUATE.
+    //ip = (code**) *(rsp++);
+    //NEXT;
+    //return 0;
+  } else if ( SRC.type == 0) { // KEYBOARD
+    str1 = readline("> ");
+    if (str1 == NULL) exit(0);
+    SRC.parseLength = strlen(str1);
+    strncpy(SRC.parseBuffer, str1, SRC.parseLength);
+    SRC.inputPtr = 0;
+    free(str1);
+    return -1;
+  } else if ( (SRC.type & EXTERNAL_SYMBOL_FLAG) != 0 ) {
+    // External symbol, pseudofile.
+    external_source *ext = (external_source*) (SRC.type & EXTERNAL_SYMBOL_MASK);
+    if (ext->current >= ext->end) {
+      inputIndex--;
+      return 0;
+    }
+
+    str1 = ext->current;
+    while (str1 < ext->end && *str1 != '\n') {
+      str1++;
+    }
+    SRC.parseLength = str1 - ext->current;
+    strncpy(SRC.parseBuffer, ext->current, SRC.parseLength);
+    SRC.inputPtr = 0;
+
+    ext->current = str1 < ext->end ? str1 + 1 : ext->end;
+    return -1;
+  } else {
+    // Real file.
+    str1 = NULL;
+    tempSize = 0;
+    c1 = getline(&str1, &tempSize, (FILE*) SRC.type);
+
+    if (c1 == -1) {
+      // Dump the source and recurse.
+      inputIndex--;
+      return 0;
+    } else {
+      // Knock off the trailing newline, if present.
+      if (str1[c1 - 1] == '\n') c1--;
+      strncpy(SRC.parseBuffer, str1, c1);
+      free(str1);
+      SRC.parseLength = c1;
+      SRC.inputPtr = 0;
+      return -1;
+    }
+  }
+}
 
 // Input: c1 is the length, str1 the string.
 // Output: c1 is TOS (the +/-1 flag), c2 is the XT.
