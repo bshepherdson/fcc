@@ -1,3 +1,6 @@
 **/*.o
 **/*.pyc
 portable/forth
+portable/gen/forth
+portable/gen/*.in
+
