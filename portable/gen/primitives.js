@@ -438,7 +438,7 @@ primitive('create', 'CREATE', {}, [
   `char *s;`,
   `cell len;`,
   `parse_name_(&s, &len);`,
-  `dsp.chars = (char*) ((((cell) dsp.chars) + sizeof(cell) - 1) & ~(sizeof(cell) - 1));`,
+  `ALIGN_DSP(cell);`,
   `header *h = (header*) dsp.chars;`,
   `dsp.chars += sizeof(header);`,
   `h->link = *compilationWordlist;`,
@@ -671,6 +671,72 @@ primitive('write_line', 'WRITE-LINE', {
 primitive('flush_file', 'FLUSH-FILE', {sp: [['File'], ['ior']]}, [
   `ior = (cell) fsync(fileno(File));`,
   `if (ior == -1) ior = errno;`,
+]);
+
+
+
+// Back to the core: creating words.
+primitive('colon', ':', {}, [
+  `ALIGN_DSP(cell);`,
+  `header *h = (header*) dsp.chars;`,
+  `dsp.chars += sizeof(header);`,
+  `h->link = *compilationWordlist;`,
+  `*compilationWordlist = h;`,
+  `char *name;`,
+  `cell len;`,
+  `parse_name_(&name, &len);`,
+  `if (len == 0) {`,
+  `  fprintf(stderr, "*** Colon definition with no name\\n");`,
+  `  code_quit();`,
+  // Never returns.
+  `}`,
+
+  `h->name = (char*) malloc(len);`,
+  `strncpy(h->name, name, len);`,
+  `h->metadata = len | HIDDEN;`,
+  `h->code_field = &code_docol;`,
+  `lastWord = (cell) &(h->code_field);`,
+  `state = COMPILING;`,
+]);
+
+primitive('colon_no_name', ':NONAME', {sp: [[], ['a1']]}, [
+  `ALIGN_DSP(cell);`,
+  `lastWord = (cell) dsp.cells;`,
+  `a1 = (cell*) dsp.cells;`,
+  `*(dsp.cells++) = (cell) &prim_docol;`,
+  `state = COMPILING;`,
+]);
+
+primitive('exit', 'EXIT', {rsp: [['a1'], []]}, [
+  `ip = a1;`,
+]);
+
+primitive('semicolon', ';', {}, [
+  `(*compilationWordlist)->metadata &= (~HIDDEN);`, // Clear the hidden bit.
+  // Compile an EXIT
+  `compile_(&prim_exit);`,
+  // And drain the queue completely - this definition is over.
+  `while (queue_length) drain_queue_();`,
+  // And stop compiling.
+  `state = INTERPRETING;`,
+], /* immediate */ true);
+
+// TODO Implement SEE
+
+// Misc
+// Pushes microseconds since the epoch as a double-cell integer.
+// On 64-bit machines, the low word is big enough; on 32-bit it's not.
+primitive('utime', 'UTIME', {sp: [[], ['uLo', 'uHi']]}, [
+  `struct timeval timeVal;`,
+  `gettimeofday(&timeVal, NULL);`,
+  `uint64_t i64 = ((uint64_t) timeVal.tv_sec) * 1000000 + ((uint64_t) timeVal.tv_usec);`,
+  `if (sizeof(cell) > 4) {`,
+  `  uLo = (ucell) i64;`,
+  `  uHi = 0;`,
+  `} else {`,
+  `  uLo = (i64 >> 32);`,
+  `  uHi = i64 & 0xffffffff;`,
+  `}`,
 ]);
 
 module.exports = primitives;

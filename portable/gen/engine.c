@@ -120,6 +120,8 @@ union {
   char* chars;
 } dsp;
 
+#define ALIGN_DSP(type) (dsp.chars = (char*) ((((ucell) dsp.chars) + sizeof(type) - 1) & ~(sizeof(type) - 1)))
+
 
 #define INPUT_SOURCE_COUNT (32)
 
@@ -237,6 +239,16 @@ void print(char *str, cell len) {
 #define NEXT1 do { goto *ca; } while(0)
 #define NEXT do { goto **ip++; } while(0)
 
+// Pop the return stack and NEXT into it.
+#define EXIT_NEXT ip = (code**) *(rsp++);\
+NEXT
+
+#define CALL_NEXT ca = *(ip++);\
+  *(--rsp) = (cell) ip;\
+  ip = (code**) ca;\
+  NEXT
+
+
 // Called at the top of primitives to create a jump label. These jumps are
 // prim_foo. Needs the identifier, not the Forth name.
 #define LABEL(inst_name) asm volatile ("prim_" #inst_name ": .global prim_" #inst_name)
@@ -280,6 +292,7 @@ void print(char *str, cell len) {
 #define conv_sp_from_F(rhs) ((cell) (rhs))
 
 #define conv_rsp_to_i(rhs) (rhs)
+#define conv_rsp_to_a(rhs) ((cell*) (rhs))
 #define conv_rsp_from_i(rhs) (rhs)
 #define conv_rsp_from_a(rhs) ((cell) (rhs))
 
