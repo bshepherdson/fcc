@@ -81,8 +81,8 @@ function primitive(ident, name, effects, code, opt_immediate, opt_skipNext) {
   const prim = {
     implementation: [
       `void code_${ident}(void) {`,
-      `  NAME("${name}")`,
       `LABEL(${ident});`,
+      `  NAME("${name}")`,
     ].concat(inputCode)
       .concat(code.map(x => '  ' + x))
       .concat(outputCode)
@@ -266,7 +266,8 @@ primitive('evaluate', 'EVALUATE', {
   // That might be solved by moving this hack to be a special case where quit_
   // calls refill_. That's actually how my ARM assembler Forth system works.
   `i2 = ipTOS;`,
-  `goto *quit_inner;`,
+  //`goto *quit_inner;`,
+  `quit_kernel_();`,
 ], /* immediate */ false, /* skipNext */ true);
 
 primitive('refill', 'REFILL', {sp: [[], ['i1']]}, [
@@ -425,7 +426,9 @@ primitive('parse', 'PARSE', {sp: [['c1'], ['s1', 'i1']]}, [
 ]);
 
 primitive('parse_name', 'PARSE-NAME', {sp: [[], ['s1', 'i1']]}, [
-  `parse_name_(&s1, &i1);`,
+  `string s = parse_name_();`,
+  `s1 = s.text;`,
+  `i1 = s.length;`,
 ]);
 
 // Stack effect is ( lo hi c-addr u -- lo' hi' c-addr' u' ) but to_number_
@@ -435,25 +438,28 @@ primitive('to_number', '>NUMBER', {}, [`to_number_();`]);
 // Parses a name, and constructs a header for it.
 // When finished, HERE is the data space properly set up for compilation.
 primitive('create', 'CREATE', {}, [
-  `char *s;`,
-  `cell len;`,
-  `parse_name_(&s, &len);`,
+  `string s = parse_name_();`,
   `ALIGN_DSP(cell);`,
   `header *h = (header*) dsp.chars;`,
   `dsp.chars += sizeof(header);`,
   `h->link = *compilationWordlist;`,
   `*compilationWordlist = h;`,
-  `h->metadata = len;`,
-  `h->name = (char*) malloc(len * sizeof(char));`,
-  `strncpy(h->name, s, len);`,
+  `h->metadata = s.length;`,
+  `h->name = (char*) malloc(s.length * sizeof(char));`,
+  `strncpy(h->name, s.text, s.length);`,
   `h->code_field = &code_dodoes;`,
   `*(dsp.cells++) = 0;`,
 ]);
 
 primitive('find', '(FIND)', {sp: [['sName', 'iLen'], ['aXT', 'iFlag']]}, [
-  `find_(&sName, &iLen);`,
-  `aXT = (cell*) sName;`,
-  `iFlag = iLen;`,
+  `header *h = find_(sName, iLen);`,
+  `if (h == NULL) {`,
+  `  aXT = (cell*) 0;`,
+  `  iFlag = 0;`,
+  `} else {`,
+  `  aXT = h->code_field;`,
+  `  iFlag = (h->metadata & IMMEDIATE) != 0 ? 1 : -1;`,
+  `}`,
 ]);
 
 
@@ -470,7 +476,10 @@ primitive('quit', 'QUIT', {}, [
   `quit_();`,
 ]);
 
-primitive('bye', 'BYE', {}, [`exit(0);`]);
+primitive('bye', 'BYE', {}, [
+  `printf("bye!\\n");`,
+  `exit(0);`,
+]);
 
 primitive('compile_comma', 'COMPILE,', {sp: [['i1'], []]}, [
   `compile_((void*) i1);`,
@@ -682,18 +691,17 @@ primitive('colon', ':', {}, [
   `dsp.chars += sizeof(header);`,
   `h->link = *compilationWordlist;`,
   `*compilationWordlist = h;`,
-  `char *name;`,
-  `cell len;`,
-  `parse_name_(&name, &len);`,
-  `if (len == 0) {`,
+  `string s = parse_name_();`,
+  `if (s.length == 0) {`,
   `  fprintf(stderr, "*** Colon definition with no name\\n");`,
   `  code_quit();`,
   // Never returns.
   `}`,
 
-  `h->name = (char*) malloc(len);`,
-  `strncpy(h->name, name, len);`,
-  `h->metadata = len | HIDDEN;`,
+  `printf("Compiling : %.*s\\n", (int) s.length, s.text);`,
+  `h->name = (char*) malloc(s.length);`,
+  `strncpy(h->name, s.text, s.length);`,
+  `h->metadata = s.length | HIDDEN;`,
   `h->code_field = &code_docol;`,
   `lastWord = (cell) &(h->code_field);`,
   `state = COMPILING;`,

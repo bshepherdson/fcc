@@ -24,9 +24,9 @@
   F(core)
 
 // How external files are imported.
-// The linker includes them as symbols like _binary_core_exception_fs.
+// The linker includes them as symbols like _binary____core_exception_fs.
 // The "extern char" references here are not pointers, they're the actual
-// character at position 0. Therefore we take &_binary_core_exception_fs and use
+// character at position 0. Therefore we take &_binary____core_exception_fs and use
 // that as the input pointer.
 // In order to distinguish these pointers from the FILE* inputs used by
 // command-line arguments or INCLUDE and friends, I add EXTERN_SYMBOL_FLAG to
@@ -35,8 +35,8 @@
 #define EXTERNAL_SYMBOL_FLAG (1)
 #define EXTERNAL_SYMBOL_MASK (~1)
 
-#define EXTERNAL_START(name) _binary_core_ ## name ## _fs_start
-#define EXTERNAL_END(name) _binary_core_ ## name ## _fs_end
+#define EXTERNAL_START(name) _binary____core_ ## name ## _fs_start
+#define EXTERNAL_END(name) _binary____core_ ## name ## _fs_end
 #define FORTH_EXTERN(name) \
   extern char EXTERNAL_START(name);\
   extern char EXTERNAL_END(name);
@@ -101,6 +101,7 @@ cell *rsp; // TODO Maybe find a register for this one?
 #if defined(__x86_64__)
 register cell *sp asm ("rbx");
 register cell *ip asm ("rbp");
+register header *quitHeader asm ("r14");
 #else
 #error Not a known machine!
 #endif
@@ -160,7 +161,6 @@ char tempBuf[256];
 //unsigned char numBuf[sizeof(cell) * 2];
 //FILE* tempFile;
 //struct stat tempStat;
-void *quit_inner;
 //struct timeval timeVal;
 //uint64_t i64;
 //
@@ -187,8 +187,6 @@ queued_primitive queueSource[4];
 int next_queue_source = 0;
 int queue_length = 0;
 
-int primitive_count = 0;
-
 
 typedef struct {
   void *implementation;
@@ -197,19 +195,9 @@ typedef struct {
 
 superinstruction primitives[256];
 superinstruction superinstructions[256];
-int nextSuperinstruction = 0;
+int primitive_count = 0;
+header *last_header;
 
-//#define DEF_SI2(a, b) void code_superinstruction_ ## a ## _ ## b(void)
-//#define ADD_SI2(a, b) superinstructions[nextSuperinstruction].key = key_ ## a | (key_ ## b << 8);\
-//superinstructions[nextSuperinstruction++].implementation = &code_superinstruction_ ## a ## _ ## b;
-//
-//#define DEF_SI3(a, b, c) void code_superinstruction_ ## a ## _ ## b ## _ ## c (void)
-//#define ADD_SI3(a, b, c) superinstructions[nextSuperinstruction].key = key_ ## a | (key_ ## b << 8) | (key_ ## c << 16);\
-//superinstructions[nextSuperinstruction++].implementation = &code_superinstruction_ ## a ## _ ## b ## _ ## c;
-//
-//#define DEF_SI4(a, b, c, d) void code_superinstruction_ ## a ## _ ## b ## _ ## c ## _ ## d(void)
-//#define ADD_SI4(a, b, c, d) superinstructions[nextSuperinstruction].key = key_ ## a | (key_ ## b << 8) | (key_ ## c << 16) | (key_ ## d << 24);\
-//superinstructions[nextSuperinstruction++].implementation = &code_superinstruction_ ## a ## _ ## b ## _ ## c ## _ ## d;
 
 
 // Implementations of the VM primitives.
@@ -229,6 +217,11 @@ void print(char *str, cell len) {
   printf("%s", s);
   free(s);
 }
+
+typedef struct {
+  cell length;
+  char* text;
+} string;
 
 
 // VM macros! These hide a lot of the implementation details from the generated
@@ -257,7 +250,7 @@ NEXT
 // Usually does nothing, this can be used to print debug info or to log
 // primitives for superinstruction profiling.
 // Includes the ; if it does anything!
-#define NAME(inst_name_string)
+#define NAME(inst_name_string) printf("Primitive: %s\n", inst_name_string);
 
 #define INC_ip_bytes(n) (ip = (cell*) (((cell) ip) + ((cell) (n))))
 #define INC_ip(n) (ip += n)
@@ -334,6 +327,10 @@ cell refill_(void) {
     }
     SRC.parseLength = s - ext->current;
     strncpy(SRC.parseBuffer, ext->current, SRC.parseLength);
+
+    // DEBUG only
+    //print(SRC.parseBuffer, SRC.parseLength);
+
     SRC.inputPtr = 0;
 
     ext->current = s < ext->end ? s + 1 : ext->end;
@@ -376,18 +373,20 @@ void parse_(char delim, char **s, cell* len) {
   if ( SRC.inputPtr < SRC.parseLength ) SRC.inputPtr++; // Skip over the delimiter.
 }
 
-void parse_name_(char **s, cell *len) {
+string parse_name_() {
   // Skip any leading delimiters.
+  string s;
   while ( SRC.inputPtr < SRC.parseLength && (SRC.parseBuffer[SRC.inputPtr] == ' ' || SRC.parseBuffer[SRC.inputPtr] == '\t') ) {
     SRC.inputPtr++;
   }
-  *len = 0;
-  *s = SRC.parseBuffer + SRC.inputPtr;
+  s.length = 0;
+  s.text = SRC.parseBuffer + SRC.inputPtr;
   while ( SRC.inputPtr < SRC.parseLength && SRC.parseBuffer[SRC.inputPtr] != ' ' ) {
     SRC.inputPtr++;
-    (*len)++;
+    s.length++;
   }
   if (SRC.inputPtr < SRC.parseLength) SRC.inputPtr++; // Jump over a trailing delimiter.
+  return s;
 }
 
 // The basic >NUMBER - unsigned values only, no magic $ff or whatever.
@@ -473,25 +472,19 @@ void parse_number_(void) {
   base = oldBase;
 }
 
-// Expects c-addr u on top of the stack.
-// Returns 0 0 on not found, xt 1 for immediate, or xt -1 for not immediate.
-void find_(char **s, cell* len) {
+header* find_(const char *s, const cell len) {
   for (cell i = searchIndex; i >= 0; i--) {
     header *h = searchOrder[i];
     while (h != NULL) {
-      if ((h->metadata & LEN_HIDDEN_MASK) == *len) {
-        if (strncasecmp(h->name, *s, *len) == 0) {
-          *s = (char*) (&(h->code_field));
-          *len = (h->metadata & IMMEDIATE) == 0 ? -1 : 1;
-          return;
+      if ((h->metadata & LEN_HIDDEN_MASK) == len) {
+        if (strncasecmp(h->name, s, len) == 0) {
+          return h;
         }
       }
       h = h->link;
     }
   }
-
-  *s = 0;
-  *len = 0;
+  return NULL;
 }
 
 
@@ -580,9 +573,8 @@ void compile_(void *code) {
       queueTail->key = key_call_;
     }
   } else {
-    void* c = (void*) *((cell*) code);
-    super_key_t key = lookup_primitive(c);
-    queueTail->target = c;
+    super_key_t key = lookup_primitive(code);
+    queueTail->target = code;
     queueTail->hasValue = 0;
     queueTail->key = key;
   }
@@ -602,9 +594,7 @@ void compile_lit_(cell value) {
 }
 
 
-char *quitString;
-char *savedString;
-cell quitLength, savedLength;
+volatile string quitString;
 
 #ifdef __arm__
 #define QUIT_JUMP_IN __asm__("bx %0" : /* outputs  */ : "r" (**cfa) : "memory")
@@ -614,79 +604,94 @@ cell quitLength, savedLength;
 #define QUIT_JUMP_IN __asm__("jmpq *%0" : /* outputs */ : "r" (*cfa) : "memory")
 #endif
 
+bool quit_kernel_(void);
+
 void quit_(void) {
   // Empty the stacks.
-quit_top:
-  sp = spTop;
-  rsp = rspTop;
-  state = INTERPRETING;
-
-  // If this is not the first QUIT, reset to keyboard input.
-  if (!firstQuit) {
-    inputIndex = 0;
-  }
-
-  // Save the label below for use by EVALUATE.
-  quit_inner = &&quit_loop;
-
-  // Refill the input buffer.
-  refill_();
-  // And start trying to parse things.
   while (true) {
-    // ( )
-quit_loop:
-    while (true) {
-      parse_name_(&quitString, &quitLength);
-      if (quitLength != 0) {
-        break;
-      } else {
-        if (SRC.type == 0) printf("  ok\n");
-        refill_();
-      }
+    sp = spTop;
+    rsp = rspTop;
+    state = INTERPRETING;
+
+    // If this is not the first QUIT, reset to keyboard input.
+    if (!firstQuit) {
+      inputIndex = 0;
     }
 
-    savedString = quitString;
-    savedLength = quitLength;
-    find_(&quitString, &quitLength); // xt immediate (or 0 0)
-    if (quitLength == 0) { // Failed to parse. Try to parse as a number.
-      INC_sp(-4);
-      spREF(0) = savedLength;
-      spREF(1) = (cell) savedString; // Bring back the string and length.
-      spREF(2) = 0;
-      spREF(3) = 0;
+    // Refill the input buffer.
+    refill_();
+    // And start trying to parse things.
+    while (quit_kernel_()) {}
+  }
+}
 
-      parse_number_();
-      if (spTOS == 0) { // Successful parse, handle the number.
-        if (state == COMPILING) {
-          INC_sp(3); // Number now on top.
-          compile_lit_(spTOS);
-          INC_sp(1);
-        } else {
-          // Clear my mess from the stack, but leave the new number atop it.
-          INC_sp(3);
-        }
-      } else { // Failed parse of a number. Unrecognized word.
-        strncpy(tempBuf, savedString, savedLength);
-        tempBuf[savedLength] = '\0';
-        fprintf(stderr, "*** Unrecognized word: %s\n", tempBuf);
-        goto quit_top;
-      }
+bool quit_kernel_(void) {
+  cell blanks[256];
+  (void)(blanks); // Touch it so it's not "unused".
+
+  while (true) {
+    quitString = parse_name_();
+    if (quitString.length != 0) {
+      break;
     } else {
-      // Successful parse. ( xt 1 ) indicates immediate, ( xt -1 ) not.
-      if (quitLength == 1 || state == INTERPRETING) {
-        quitTop = &&quit_loop;
-        SET_ip((cell*) &quitTop);
-        cfa = (void*) quitLength;
-        //NEXT1;
-        QUIT_JUMP_IN;
-        __builtin_unreachable();
-      } else { // Compiling mode
-        compile_((void*) quitString);
-      }
+      if (SRC.type == 0) printf("  ok\n");
+      refill_();
     }
   }
-  // Should never be reachable.
+
+  quitHeader = find_(quitString.text, quitString.length);
+
+  if (quitHeader == NULL) { // Failed to parse. Try to parse as a number.
+    INC_sp(-4);
+    spREF(0) = quitString.length;
+    spREF(1) = (cell) quitString.text; // Bring back the string and length.
+    spREF(2) = 0;
+    spREF(3) = 0;
+
+    parse_number_();
+    if (spTOS == 0) { // Successful parse, handle the number.
+      if (state == COMPILING) {
+        INC_sp(3); // Number now on top.
+        compile_lit_(spTOS);
+        INC_sp(1);
+      } else {
+        // Clear my mess from the stack, but leave the new number atop it.
+        INC_sp(3);
+      }
+      return true;
+    } else { // Failed parse of a number. Unrecognized word.
+      strncpy(tempBuf, quitString.text, quitString.length);
+      tempBuf[quitString.length] = '\0';
+      fprintf(stderr, "*** Unrecognized word: %s\n", tempBuf);
+      return false; // Back to the top of quit_.
+    }
+  }
+
+  // Successful parse: quitHeader holds the word.
+  if ((quitHeader->metadata & IMMEDIATE) == 0 && state == COMPILING) {
+    compile_((void*) quitHeader->code_field);
+    return true;
+  }
+
+  quitTop = &&quit_done;
+  SET_ip((cell*) &quitTop);
+  cfa = (cell**) &(quitHeader->code_field);
+  //NEXT1;
+  QUIT_JUMP_IN;
+
+quit_done:
+  int i = 4;
+  i = 5;
+  (void)(i);
+  return true;
 }
+
+// quit workflow is still busted. Returning is no good, the C stack is a train
+// wreck. Probably: move all the refill and find stuff into a helper function,
+// it doesn't call non-C things so it should be sound. It returns 0 if the
+// parsed word was handled (compiled, or a number, or in error), and the code
+// field to execute if not. Then there's no return or other C stack traffic
+// across the hacky Forth threaded code.
 
 
 // File Access
@@ -716,12 +721,44 @@ char *file_modes[16] = {
   "w+b" // 15 = read/write, bin, truncated
 };
 
-
 #include "./primitives.in"
 
 
-int main(void) {
-  print("what\n", 5);
-  return 0;
+int main(int argc, char **argv) {
+  compilationWordlist = searchOrder;
+  base = 10;
+  inputIndex = 0;
+  SRC.type = SRC.parseLength = SRC.inputPtr = 0;
+  SRC.parseBuffer = parseBuffers[inputIndex];
+  dsp.chars = (char*) malloc(16 * 1024 * 1024);
+
+  // Open the input files in reverse order and push them as file inputs.
+  argc--;
+  for (; argc > 0; argc--) {
+    inputIndex++;
+    SRC.type = (cell) fopen(argv[argc], "r");
+    if ((FILE*) SRC.type == NULL) {
+      fprintf(stderr, "Could not load input file: %s\n", argv[argc]);
+      exit(1);
+    }
+
+    SRC.inputPtr = SRC.parseLength = 0;
+    SRC.parseBuffer = parseBuffers[inputIndex];
+  }
+
+  // Turn the external Forth libraries into input sources.
+  external_source *ext;
+  EXTERNAL_FILES(EXTERNAL_INPUT_SOURCES)
+
+  init_primitives();
+  *compilationWordlist = last_header;
+
+  // Somewhat hacky: using prim_foo rather than code_foo, we jump over the
+  // function preambles that adjust the stack. However, some locals are still
+  // being stored on the stacks, and the stack pointer is sometimes moved.
+  // We deliberately move the stack pointer here to make room for whatever.
+  // TODO Machine-dependent!
+  asm volatile("subq $1024, %rsp");
+  quit_();
 }
 

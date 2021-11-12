@@ -10,7 +10,8 @@ CC?=gcc
 NODEJS?=node
 
 CFLAGS+=-O2 -std=gnu17 -Wall -Wextra -Werror -Wno-unused-label -Wno-comment \
-				-Wno-stringop-truncation
+				-Wno-stringop-truncation -fPIC -g
+
 
 ELF_FORMAT=$(shell objcopy --info | head -n 2 | tail -n 1)
 ELF_ARCH=$(shell objcopy --info | head -n 4 | tail -n 1)
