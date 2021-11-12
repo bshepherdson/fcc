@@ -27,6 +27,7 @@ const stackPrefixes = {
   'a': {type: 'cell*'},
   'c': {type: 'unsigned char'},
   's': {type: 'char*'},
+  'F': {type: 'FILE*'},
 };
 
 // effects is a map of stack effects by stack:
@@ -81,7 +82,7 @@ function primitive(ident, name, effects, code, opt_immediate, opt_skipNext) {
     implementation: [
       `void code_${ident}(void) {`,
       `  NAME("${name}")`,
-      `LABEL("${ident}");`,
+      `LABEL(${ident});`,
     ].concat(inputCode)
       .concat(code.map(x => '  ' + x))
       .concat(outputCode)
@@ -481,6 +482,195 @@ primitive('literal', 'LITERAL', {sp: [['i1'], []]}, [
 
 primitive('compile_literal', '[LITERAL]', {sp: [['i1'], []]}, [
   `compile_lit_(i1);`,
+]);
+
+// Compiles a 0branch and a 0 (placeholder delta) into the current definition.
+// Pushes the address of the 0 onto the stack.
+primitive('compile_zbranch', '[0BRANCH]', {sp: [[], ['a1']]}, [
+  `compile_(&prim_zbranch);`,
+  `while (queue_length > 0) drain_queue_();`,
+  `a1 = dsp.cells;`,
+  `*(dsp.cells++) = 0;`,
+]);
+primitive('compile_branch', '[BRANCH]', {sp: [[], ['a1']]}, [
+  `compile_(&prim_branch);`,
+  `while (queue_length > 0) drain_queue_();`,
+  `a1 = dsp.cells;`,
+  `*(dsp.cells++) = 0;`,
+]);
+
+// Called before Forth-defined control structures like IF and WHILE to make sure
+// the superinstruction queue is drained. Superinstructions cannot span control
+// flow points in this scheme (though they can end with one!)
+primitive('control_flush', '(CONTROL-FLUSH)', {}, [
+  `while (queue_length > 0) drain_queue_();`,
+]);
+
+// Does nothing; this only exists to be a breakpoint.
+primitive('debug_break', '(DEBUG)', {}, []);
+
+
+
+// File access
+primitive('close_file', 'CLOSE-FILE', {sp: [['File'], ['iErr']]}, [
+  `int err = fclose(File);`,
+  `iErr = err ? errno : 0;`,
+]);
+
+primitive('create_file', 'CREATE-FILE', {
+  sp: [['s1', 'uLen', 'iMode'], ['File', 'ior']],
+}, [
+  `strncpy(tempBuf, s1, uLen);`,
+  `tempBuf[uLen] = 0;`,
+  `File = fopen(tempBuf, file_modes[iMode | FA_TRUNC]);`,
+  `ior = File == 0 ? errno : 0;`,
+]);
+
+// Don't truncate files that exists. Opening a file for R/O that doesn't exist
+// is a failure, but opening a file that doesn't exist for W/O or R/W should
+// create it.
+// Therefore if we try a normal open and it fails, we should try again with
+// TRUNC enabled, IFF the FA_WRITE bit is set in the user's mode.
+primitive('open_file', 'OPEN-FILE', {
+  sp: [['s1', 'uLen', 'iMode'], ['File', 'ior']],
+}, [
+  `strncpy(tempBuf, s1, uLen);`,
+  `tempBuf[uLen] = 0;`,
+  `File = fopen(tempBuf, file_modes[iMode]);`,
+  `if (File == NULL && (iMode & FA_WRITE) != 0) {`,
+  `  File = fopen(tempBuf, file_modes[iMode | FA_TRUNC]);`,
+  `}`,
+  `ior = File == 0 ? errno : 0;`,
+]);
+
+primitive('delete_file', 'DELETE-FILE', {sp: [['s1', 'u1'], ['ior']]}, [
+  `strncpy(tempBuf, s1, u1);`,
+  `tempBuf[u1] = 0;`,
+  `ior = remove(tempBuf);`,
+  `if (ior == -1) ior = errno;`,
+]);
+
+primitive('file_position', 'FILE-POSITION', {
+  sp: [['File'], ['iLo', 'iHi', 'ior']],
+}, [
+  // TODO This isn't 32-bit safe. It's fine on x86_64; we can safely assume the
+  // file is not 9.2 exabytes.
+  `iHi = 0;`,
+  `iLo = (cell) ftell(File);`,
+  `ior = iLo == -1 ? errno : 0;`,
+]);
+
+primitive('file_size', 'FILE-SIZE', {
+  sp: [['File'], ['iLo', 'iHi', 'ior']],
+}, [
+  `iHi = 0;`,
+  `iLo = 0;`,
+  `cell c = ftell(File);`, // Save the position.
+  `if (c < 0) {`,
+  `  ior = errno;`,
+  `} else {`,
+  `  iLo = fseek(File, 0L, SEEK_END);`,
+  `  if (iLo < 0) {`,
+  `    ior = errno;`,
+  `    fseek(File, (long) c, SEEK_SET);`,
+  `  } else {`,
+  `    iLo = ftell(File);`,
+  `    fseek(File, (long) c, SEEK_SET);`,
+  `    ior = 0;`,
+  `  }`,
+  `}`,
+]);
+
+primitive('include_file', 'INCLUDE-FILE', {sp: [['File'], []]}, [
+  `inputIndex++;`,
+  `SRC.type = (cell) File;`,
+  `SRC.inputPtr = 0;`,
+  `SRC.parseLength = 0;`,
+  `SRC.parseBuffer = parseBuffers[inputIndex];`,
+]);
+
+primitive('read_file', 'READ-FILE', {
+  sp: [['s1', 'u1', 'File'], ['u2', 'ior']],
+}, [
+  `u2 = (cell) fread(s1, 1, u1, File);`,
+  `if (u2 == 0) {`,
+  `  if (feof(File)) {`,
+  `    ior = u2 = 0;`,
+  `  } else {`,
+  `    ior = ferror(File);`,
+  `    u2 = 0;`,
+  `  }`,
+  `} else {`,
+  `  ior = 0;`,
+  `}`,
+]);
+
+// Expects a buffer and size. Reads at most that many characters, plus the
+// delimiter. Should return a size that EXCLUDES the terminator.
+// Uses getline, and if the line turns out to be longer than our buffer, the
+// file is repositioned accordingly.
+primitive('read_line', 'READ-LINE', {
+  sp: [['s1', 'u1', 'File'], ['i2', 'iFlag', 'ior']],
+}, [
+  `char *s = NULL;`,
+  `size_t size = 0;`,
+  `i2 = getline(&s, &size, File);`,
+  `if (i2 == -1) {`,
+  `  ior = errno;`,
+  `  i2 = iFlag = 0;`,
+  `} else if (i2 == 0) {`,
+  `  ior = i2 = iFlag = 0;`,
+  `} else {`,
+  `  if (((ucell) i2 - 1) > u1) {`,
+  `    fseek(File, i2 - u1, SEEK_CUR);`,
+  `    i2 = u1 + 1;`,
+  `  } else if (s[i2 - 1] != '\\n') {`, // Found EOF, not newline.
+  `    i2++;`,
+  `  }`,
+  `  strncpy(s1, s, i2-1);`,
+  `  ior = 0;`,
+  `  iFlag = true;`,
+  `  i2--;`,
+  `}`,
+
+  `if (s != NULL) free(s);`,
+]);
+
+primitive('reposition_file', 'REPOSITION-FILE', {
+  sp: [['iLo', 'iHi', 'File'], ['ior']],
+}, [
+  `ior = fseek(File, iLo, SEEK_SET);`,
+  `if (ior == -1) ior = errno;`,
+  `else if (iHi != 0) ior = 99999;`,
+]);
+
+primitive('resize_file', 'RESIZE-FILE', {
+  sp: [['iLo', 'iHi', 'File'], ['ior']],
+}, [
+  `ior = ftruncate(fileno(File), iLo);`,
+  `if (ior == -1) ior = errno;`,
+  `else if (iHi != 0) ior = 99999;`,
+]);
+
+primitive('write_file', 'WRITE-FILE', {
+  sp: [['s1', 'u1', 'File'], ['ior']],
+}, [
+  `fwrite(s1, 1, u1, File);`,
+  `ior = 0;`,
+]);
+
+primitive('write_line', 'WRITE-LINE', {
+  sp: [['s1', 'u1', 'File'], ['ior']],
+}, [
+  `strncpy(tempBuf, s1, u1);`,
+  `tempBuf[u1] = '\\n';`,
+  `fwrite(tempBuf, 1, u1 + 1, File);`,
+  `ior = 0;`,
+]);
+
+primitive('flush_file', 'FLUSH-FILE', {sp: [['File'], ['ior']]}, [
+  `ior = (cell) fsync(fileno(File));`,
+  `if (ior == -1) ior = errno;`,
 ]);
 
 module.exports = primitives;

@@ -8,8 +8,9 @@
 const primitives = require('./primitives.js');
 const fs = require('fs');
 
-fs.writeFileSync('primitives.in',
-    primitives.map(x => x.implementation.join('\n')).join('\n\n'),
-    'utf-8');
+fs.writeFileSync('primitives.in', [
+  primitives.map(x => `void prim_${x.header.ident}(void);`).join('\n'),
+  primitives.map(x => x.implementation.join('\n')).join('\n\n'),
+].join('\n\n'), 'utf-8');
 
 
