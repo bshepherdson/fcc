@@ -133,6 +133,7 @@ header *searchOrder[16];
 cell searchIndex; // Index of the first word list to search.
 header **compilationWordlist;
 cell lastWord;
+void *quit_inner;
 
 char parseBuffers[INPUT_SOURCE_COUNT][256];
 
@@ -604,9 +605,12 @@ volatile string quitString;
 #define QUIT_JUMP_IN __asm__("jmpq *%0" : /* outputs */ : "r" (*cfa) : "memory")
 #endif
 
-bool quit_kernel_(void);
+cell quit_parse_(void);
 
 void quit_(void) {
+  cell blanks[256];
+  (void)(blanks); // Touch it so it's not "unused".
+
   // Empty the stacks.
   while (true) {
     sp = spTop;
@@ -618,17 +622,28 @@ void quit_(void) {
       inputIndex = 0;
     }
 
+    quit_inner = &&quit_loop;
+
     // Refill the input buffer.
     refill_();
     // And start trying to parse things.
-    while (quit_kernel_()) {}
+quit_loop:
+    while (true) {
+      cell code = quit_parse_();
+      if (code == 0) continue;
+      if (code == -1) break;
+
+      // Jump into the interpretive code.
+      quitTop = &&quit_loop;
+      SET_ip((cell*) &quitTop);
+      cfa = (cell**) &(quitHeader->code_field);
+      //NEXT1;
+      QUIT_JUMP_IN;
+    }
   }
 }
 
-bool quit_kernel_(void) {
-  cell blanks[256];
-  (void)(blanks); // Touch it so it's not "unused".
-
+cell quit_parse_(void) {
   while (true) {
     quitString = parse_name_();
     if (quitString.length != 0) {
@@ -658,32 +673,23 @@ bool quit_kernel_(void) {
         // Clear my mess from the stack, but leave the new number atop it.
         INC_sp(3);
       }
-      return true;
+      return 0;
     } else { // Failed parse of a number. Unrecognized word.
       strncpy(tempBuf, quitString.text, quitString.length);
       tempBuf[quitString.length] = '\0';
       fprintf(stderr, "*** Unrecognized word: %s\n", tempBuf);
-      return false; // Back to the top of quit_.
+      return -1; // Back to the top of quit_.
     }
   }
 
   // Successful parse: quitHeader holds the word.
   if ((quitHeader->metadata & IMMEDIATE) == 0 && state == COMPILING) {
     compile_((void*) quitHeader->code_field);
-    return true;
+    return 0;
   }
 
-  quitTop = &&quit_done;
-  SET_ip((cell*) &quitTop);
-  cfa = (cell**) &(quitHeader->code_field);
-  //NEXT1;
-  QUIT_JUMP_IN;
+  return (cell) &(quitHeader->code_field);
 
-quit_done:
-  int i = 4;
-  i = 5;
-  (void)(i);
-  return true;
 }
 
 // quit workflow is still busted. Returning is no good, the C stack is a train

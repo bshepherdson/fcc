@@ -266,8 +266,7 @@ primitive('evaluate', 'EVALUATE', {
   // That might be solved by moving this hack to be a special case where quit_
   // calls refill_. That's actually how my ARM assembler Forth system works.
   `i2 = ipTOS;`,
-  //`goto *quit_inner;`,
-  `quit_kernel_();`,
+  `goto *quit_inner;`,
 ], /* immediate */ false, /* skipNext */ true);
 
 primitive('refill', 'REFILL', {sp: [[], ['i1']]}, [
