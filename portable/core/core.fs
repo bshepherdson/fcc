@@ -7,6 +7,25 @@
 : ( 41 parse drop drop ; IMMEDIATE
 : \ refill drop ; IMMEDIATE
 
+\ START HERE segfault on entering THEN, not sure what's up.
+\ Breakpoint on docol probably?
+\ All this is debug code
+: HERE (control-flush) (>HERE) @ ;
+: IF ( ? --   C: -- jumploc ) [0branch] ; IMMEDIATE
+: THEN ( C: jumploc -- ) here ( ifloc endloc ) over - swap ! ; IMMEDIATE
+: ELSE ( C: jumploc1 -- jumploc2 )
+  [branch] ( ifloc endifloc )
+  here    ( ifloc endifloc elseloc )
+  rot     ( endifloc elseloc ifloc )
+  dup >r - ( endifloc delta  R: ifloc )
+  r> !     ( endifloc )
+; IMMEDIATE
+
+: foo IF 72 THEN EMIT ;
+65 0 foo bye
+\ End debug
+
+
 : BL 32 ;
 
 : 0< 0 < ;
@@ -83,6 +102,16 @@
   dup >r - ( endifloc delta  R: ifloc )
   r> !     ( endifloc )
 ; IMMEDIATE
+
+
+(debug)
+: foo IF 65 THEN EMIT ;
+\ START HERE segfault on entering THEN, not sure what's up.
+\ Breakpoint on docol probably?
+
+
+
+
 
 : BEGIN ( C: -- beginloc ) here ; IMMEDIATE
 : WHILE ( ? -- C: beginloc -- whileloc beginloc )
@@ -638,3 +667,4 @@ VARIABLE (str-adjust)
   2drop 0
 ;
 
+bye

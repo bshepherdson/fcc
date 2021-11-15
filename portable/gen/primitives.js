@@ -17,7 +17,7 @@ const stacks = {
       if (i !== 0) throw new Error('Only ipTOS is really accessible easily');
       return `ip[0]`;
     },
-    type: 'cell',
+    type: 'code*',
   },
 };
 
@@ -28,6 +28,8 @@ const stackPrefixes = {
   'c': {type: 'unsigned char'},
   's': {type: 'char*'},
   'F': {type: 'FILE*'},
+  // Code field address, eg. for EXECUTE.
+  'C': {type: 'code**'},
 };
 
 // effects is a map of stack effects by stack:
@@ -80,7 +82,8 @@ function primitive(ident, name, effects, code, opt_immediate, opt_skipNext) {
 
   const prim = {
     implementation: [
-      `void code_${ident}(void) {`,
+      //`void code_${ident}(void) {`,
+      `{`,
       `LABEL(${ident});`,
       `  NAME("${name}")`,
     ].concat(inputCode)
@@ -227,7 +230,7 @@ primitive('raw_alloc', '(ALLOCATE)', {sp: [['i1'], ['a1']]}, [
   `a1 = (cell*) malloc(i1);`,
 ]);
 primitive('here_ptr', '(>HERE)', {sp: [[], ['a1']]}, [
-  `a1 = dsp.cells;`,
+  `a1 = (cell*) &(dsp.cells);`,
 ]);
 
 
@@ -242,8 +245,8 @@ primitive('zbranch', '(0BRANCH)', {
   `INC_ip_bytes(iCond == 0 ? iDelta : ((cell) sizeof(cell)));`,
 ]);
 
-primitive('execute', 'EXECUTE', {sp: [['a1'], []]}, [
-  `cfa = (cell**) a1;`,
+primitive('execute', 'EXECUTE', {sp: [['C1'], []]}, [
+  `cfa = C1;`,
   `ca = *cfa;`,
   `NEXT1;`,
 ], /* immediate */ false, /* skipNext */ true);
@@ -265,7 +268,7 @@ primitive('evaluate', 'EVALUATE', {
   // TODO: This might be slowly leaking RSP frames?
   // That might be solved by moving this hack to be a special case where quit_
   // calls refill_. That's actually how my ARM assembler Forth system works.
-  `i2 = ipTOS;`,
+  `i2 = (cell) ipTOS;`,
   `goto *quit_inner;`,
 ], /* immediate */ false, /* skipNext */ true);
 
@@ -300,7 +303,7 @@ primitive('key', 'KEY', {sp: [[], ['c1']]}, [
 ]);
 
 primitive('latest', '(LATEST)', {sp: [[], ['a1']]}, [
-  `a1 = (cell*) *compilationWordlist;`,
+  `a1 = (cell*) compilationWordlist;`,
 ]);
 
 primitive('in_ptr', '>IN', {sp: [[], ['i1']]}, [
@@ -370,11 +373,28 @@ primitive('last_word', '(LAST-WORD)', {sp: [[], ['i1']]}, [
 
 
 // Compilation helpers
-primitive('docol', '(DOCOL)', {rsp: [[], ['a1']]}, [
-  // TODO How does this even work? CFA isn't set most of the time by NEXT, only
-  // by the heavy calls like EXECUTE and QUIT.
-  `a1 = ip;`,
-  `SET_ip((cell*) &(cfa[1]));`,
+primitive('docol', '(DOCOL)', {rsp: [[], ['C1']]}, [
+  // NB This is only actually executed by QUIT or EXECUTE.
+  // When the compiler sees a call of a nonprimitive, it compiles it as a
+  // call_ primitive with the target address in the next cell.
+  //
+  // This is "primitive-centric" direct threaded code, and it avoids a double
+  // indirection in compiled code.
+  //
+  // Nonprimitives are in memory like this:
+  // prev header link     <-- header*
+  // metadata/length
+  // name string
+  // code_field     --> ca_docol --> tag_docol
+  // body thread
+  // ...
+  // tag_exit
+  //
+  // We want to set IP to cfa + 1 cell; we treat &cfa like an array, and take
+  // element 1.
+  `C1 = ip;`,
+  `SET_ip(((void*)cfa) + sizeof(cell));`,
+  // START HERE: Is the above wrong?
 ]);
 
 primitive('dolit', '(DOLIT)', {
@@ -394,7 +414,7 @@ primitive('dostring', '(DOSTRING)', {
   // The stack is ready but we need to skip the IP over it.
   `char *s = s2 + i1 + (sizeof(cell) - 1);`,
   `s = (char*) (((cell) s) & ~(sizeof(cell) - 1));`,
-  `SET_ip((cell*) s);`,
+  `SET_ip((code**) s);`,
 ]);
 
 
@@ -403,18 +423,18 @@ primitive('dostring', '(DOSTRING)', {
 // the user's data space area, as intended (cfa + 2 cells) and then crack that
 // 0 at cfa + 1 cell. If it's 0, do nothing. Otherwise, jump to that point.
 primitive('dodoes', '(DODOES)', {
-  sp:  [[], ['i1']], // The data space value.
+  sp:  [[], ['C1']], // The data space value.
   // rsp might get a push, or might not.
 }, [
-  `char *code = (char*) cfa;`,
-  `i1 = (cell) (code + 2 * sizeof(cell));`,
-  `cell* does = *((cell**) (code + sizeof(cell)));`,
+  `code **target = cfa;`,
+  `C1 = &target[2];`,
+  `code* does = target[1];`,
 
   // Similar to docol, push onto the return stack and jump.
   `if (does != 0) {`,
   `  INC_rsp(-1);`,
   `  rspTOS = (cell) ip;`,
-  `  SET_ip(does);`,
+  `  SET_ip((code**) does);`,
   `}`,
 ]);
 
@@ -446,17 +466,17 @@ primitive('create', 'CREATE', {}, [
   `h->metadata = s.length;`,
   `h->name = (char*) malloc(s.length * sizeof(char));`,
   `strncpy(h->name, s.text, s.length);`,
-  `h->code_field = &code_dodoes;`,
+  `h->code_field = ca_dodoes;`,
   `*(dsp.cells++) = 0;`,
 ]);
 
-primitive('find', '(FIND)', {sp: [['sName', 'iLen'], ['aXT', 'iFlag']]}, [
+primitive('find', '(FIND)', {sp: [['sName', 'iLen'], ['CXT', 'iFlag']]}, [
   `header *h = find_(sName, iLen);`,
   `if (h == NULL) {`,
-  `  aXT = (cell*) 0;`,
+  `  CXT = (code**) 0;`,
   `  iFlag = 0;`,
   `} else {`,
-  `  aXT = h->code_field;`,
+  `  CXT = h->code_field;`,
   `  iFlag = (h->metadata & IMMEDIATE) != 0 ? 1 : -1;`,
   `}`,
 ]);
@@ -480,8 +500,8 @@ primitive('bye', 'BYE', {}, [
   `exit(0);`,
 ]);
 
-primitive('compile_comma', 'COMPILE,', {sp: [['i1'], []]}, [
-  `compile_((void*) i1);`,
+primitive('compile_comma', 'COMPILE,', {sp: [['C1'], []]}, [
+  `compile_(C1);`,
 ]);
 
 primitive('literal', 'LITERAL', {sp: [['i1'], []]}, [
@@ -495,13 +515,13 @@ primitive('compile_literal', '[LITERAL]', {sp: [['i1'], []]}, [
 // Compiles a 0branch and a 0 (placeholder delta) into the current definition.
 // Pushes the address of the 0 onto the stack.
 primitive('compile_zbranch', '[0BRANCH]', {sp: [[], ['a1']]}, [
-  `compile_(&prim_zbranch);`,
+  `compile_(&ca_zbranch);`,
   `while (queue_length > 0) drain_queue_();`,
   `a1 = dsp.cells;`,
   `*(dsp.cells++) = 0;`,
 ]);
 primitive('compile_branch', '[BRANCH]', {sp: [[], ['a1']]}, [
-  `compile_(&prim_branch);`,
+  `compile_(&ca_branch);`,
   `while (queue_length > 0) drain_queue_();`,
   `a1 = dsp.cells;`,
   `*(dsp.cells++) = 0;`,
@@ -516,6 +536,15 @@ primitive('control_flush', '(CONTROL-FLUSH)', {}, [
 
 // Does nothing; this only exists to be a breakpoint.
 primitive('debug_break', '(DEBUG)', {}, []);
+primitive('debug_print', '(PRINT)', {sp: [['i1'], []]}, [
+  `printf("%ld %" PRIxPTR "\\n", i1, i1);`,
+]);
+primitive('debug_star_print', '(*PRINT)', {sp: [['a1'], []]}, [
+  `printf("%" PRIxPTR ": %ld %" PRIxPTR "\\n", (ucell) a1, *a1, *a1);`,
+]);
+primitive('debug_words', '(WORDS)', {}, [
+  `debug_words_();`,
+]);
 
 
 
@@ -693,7 +722,7 @@ primitive('colon', ':', {}, [
   `string s = parse_name_();`,
   `if (s.length == 0) {`,
   `  fprintf(stderr, "*** Colon definition with no name\\n");`,
-  `  code_quit();`,
+  `  goto quit_top;`,
   // Never returns.
   `}`,
 
@@ -701,27 +730,28 @@ primitive('colon', ':', {}, [
   `h->name = (char*) malloc(s.length);`,
   `strncpy(h->name, s.text, s.length);`,
   `h->metadata = s.length | HIDDEN;`,
-  `h->code_field = &code_docol;`,
-  `lastWord = (cell) &(h->code_field);`,
+  `h->code_field = ca_docol;`,
+  `lastWord = h->code_field;`,
   `state = COMPILING;`,
 ]);
 
 primitive('colon_no_name', ':NONAME', {sp: [[], ['a1']]}, [
   `ALIGN_DSP(cell);`,
-  `lastWord = (cell) dsp.cells;`,
+  `lastWord = (code**) dsp.cells;`,
   `a1 = (cell*) dsp.cells;`,
-  `*(dsp.cells++) = (cell) &prim_docol;`,
+  `*(dsp.cells++) = (cell) &ca_docol;`,
   `state = COMPILING;`,
 ]);
 
-primitive('exit', 'EXIT', {rsp: [['a1'], []]}, [
-  `ip = a1;`,
+primitive('exit', 'EXIT', {rsp: [['C1'], []]}, [
+  `ip = C1;`,
 ]);
 
 primitive('semicolon', ';', {}, [
   `(*compilationWordlist)->metadata &= (~HIDDEN);`, // Clear the hidden bit.
   // Compile an EXIT
-  `compile_(&prim_exit);`,
+  `breakpoint();`,
+  `compile_(&ca_exit);`,
   // And drain the queue completely - this definition is over.
   `while (queue_length) drain_queue_();`,
   // And stop compiling.
