@@ -215,6 +215,7 @@ header *last_header;
 #define LEN_HIDDEN_MASK (0x1ff)
 #define HIDDEN          (0x100)
 #define IMMEDIATE       (0x200)
+#define TOP_BIT         (1 << (8 * sizeof(void*) - 1))
 
 void print(char *str, cell len) {
   char* s = (char*) malloc(len + 1);
@@ -259,9 +260,9 @@ NEXT
 // primitives for superinstruction profiling.
 // Includes the ; if it does anything!
 #define NAME(inst_name_string) { \
-  printf("Primitive: %s\n", inst_name_string); \
+  fprintf(stderr, "Primitive: %s\n", inst_name_string); \
   for (cell *p = &(spTop[-1]); p >= sp; p--) {\
-    printf("\t%ld\n", *p);\
+    fprintf(stderr, "\t%ld\n", *p);\
   }\
 }
 
@@ -280,6 +281,7 @@ NEXT
 
 #define INC_rsp(n) (rsp += n)
 #define SET_rsp(target) (rsp = target)
+#define rspREF(index) (rsp[index])
 #define rspTOS (rsp[0])
 
 
@@ -317,8 +319,9 @@ code *ca_dodoes;
 code *ca_exit;
 code *ca_branch;
 code *ca_zbranch;
+code *ca_call;
 
-super_key_t key_dolit;
+super_key_t key_dolit, key_call_forth;
 
 cell refill_(void) {
   if (SRC.type == -1) { // EVALUATE
@@ -511,21 +514,6 @@ header* find_(const char *s, const cell len) {
 }
 
 
-// Primitive for calling a (DOCOL) word.
-// Expects the next cell in ip-space to be the address of the code.
-// Otherwise it resembles a (DOCOL).
-super_key_t key_call_ = 100;
-
-void call_() {
-  ca = ipTOS;
-  printf("call into %" PRIxPTR "\n", (cell) ca);
-  INC_ip(1);
-  INC_rsp(-1);
-  rspTOS = (cell) ip;
-  ip = (code**) ca;
-  NEXT;
-}
-
 
 // Exits with 40 if not found.
 super_key_t lookup_primitive(code* target) {
@@ -576,15 +564,15 @@ void compile_(code** cfa) {
   bump_queue_tail_();
   // queueTail now points at a free queue slot.
 
-  // Check the doer-word. If it's a (DOCOL) word, compile a call_.
+  // Check the doer-word. If it's a (DOCOL) word, compile a call_forth.
   if (cfa[0] == ca_docol) {
-    queueTail->target = &call_;
+    queueTail->target = ca_call;
     queueTail->hasValue = 1;
     // cfa points to the thread, where docol is the first thread.
     // cfa[0] is docol; cfa[1] is the first real word.
     // &cfa[1], then, is the pointer we actually want.
     queueTail->value = (cell) &cfa[1];
-    queueTail->key = key_call_;
+    queueTail->key = key_call_forth;
   } else if (cfa[0] == ca_dodoes) {
     // (DODOES) pushes the data space pointer (&cfa[2]) onto the stack,
     // then checks cfa[1]. If it's 0, do nothing. If not, it's another CFA, jump
@@ -599,10 +587,10 @@ void compile_(code** cfa) {
     if (cfa[1] != 0) {
       if (queue_length == 4) drain_queue_();
       bump_queue_tail_();
-      queueTail->target = &call_;
+      queueTail->target = ca_call;
       queueTail->hasValue = 1;
       queueTail->value = (cell) cfa[1];
-      queueTail->key = key_call_;
+      queueTail->key = key_call_forth;
     }
   } else {
     // For a primitive, the type of cfa is a lie. It's actually a code*
@@ -660,6 +648,75 @@ char *file_modes[16] = {
 void breakpoint(void) {
 }
 
+// Given a code field address (eg. &h->code_field) this searches through the
+// word lists until it finds the corresponding word, and returns it.
+// This *moves* cfa so it points at the next word, not at my data field.
+header* find_by_cfa_(code ***cfa) {
+  for (cell i = searchIndex; i >= 0; i--) {
+    header *h = searchOrder[i];
+    while (h != NULL) {
+      if (h->code_field == **cfa) {
+        return h;
+      } else if (h->code_field == ca_docol &&
+          (((void*) &(h->code_field)) + sizeof(cell)) == (*cfa)[1]) {
+        (*cfa)++;
+        return h;
+      }
+      h = h->link;
+    }
+  }
+  return NULL;
+}
+
+void print_name_(header *h) {
+  printf("%.*s \n", (int) h->metadata & LEN_MASK, h->name);
+}
+
+void see_singular_(char* label, header *word) {
+  printf("%s<%.*s>\n", label, (int) word->metadata & LEN_MASK, word->name);
+}
+
+void see_docol_(header *word) {
+  printf(": %.*s   \n", (int) word->metadata & LEN_MASK, word->name);
+  code **thread = ((code**) word) + 4;
+  while (true) {
+    if (*thread == ca_dolit) {
+      printf("%" PRIdPTR "__$%" PRIxPTR " \n", (cell) thread[1], (ucell) thread[1]);
+      thread += 2;
+    } else if (*thread == ca_zbranch || *thread == ca_branch) {
+      printf("%s: %" PRIdPTR " bytes / %" PRIdPTR " cells\n",
+          *thread == ca_zbranch ? "0branch" : "branch",
+          (cell) thread[1], ((cell) thread[1]) / sizeof(cell));
+      thread += 2;
+    } else {
+      // find_by_cfa moves the thread pointer if there's an extra field there.
+      header* word = find_by_cfa_(&thread);
+      print_name_(word);
+      thread++;
+      if (word->code_field == ca_exit) break;
+    }
+  }
+  putchar('\n');
+}
+
+void see_(void) {
+  string s = parse_name_();
+  header *h = find_(s.text, s.length);
+
+  if (h == NULL) {
+    fprintf(stderr, "*** Unknown SEE word: %.*s\n", (int) s.length, s.text);
+    return;
+  }
+
+  if (h->code_field == ca_docol) {
+    see_docol_(h);
+  } else if (h->code_field == ca_dodoes) {
+    see_singular_("var", h);
+  } else {
+    see_singular_("primitive", h);
+  }
+}
+
 void debug_words_(void) {
   printf("Words:\n");
   for (header *h = *compilationWordlist; h != 0; h = h->link) {
@@ -696,6 +753,7 @@ void quit_(void) {
   ca_branch = &&prim_branch;
   ca_zbranch = &&prim_zbranch;
   ca_exit = &&prim_exit;
+  ca_call = &&prim_call_forth;
 
 quit_top:
   // Empty the stacks.

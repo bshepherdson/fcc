@@ -7,24 +7,6 @@
 : ( 41 parse drop drop ; IMMEDIATE
 : \ refill drop ; IMMEDIATE
 
-\ START HERE segfault on entering THEN, not sure what's up.
-\ Breakpoint on docol probably?
-\ All this is debug code
-: HERE (control-flush) (>HERE) @ ;
-: IF ( ? --   C: -- jumploc ) [0branch] ; IMMEDIATE
-: THEN ( C: jumploc -- ) here ( ifloc endloc ) over - swap ! ; IMMEDIATE
-: ELSE ( C: jumploc1 -- jumploc2 )
-  [branch] ( ifloc endifloc )
-  here    ( ifloc endifloc elseloc )
-  rot     ( endifloc elseloc ifloc )
-  dup >r - ( endifloc delta  R: ifloc )
-  r> !     ( endifloc )
-; IMMEDIATE
-
-: foo IF 72 THEN EMIT ;
-65 0 foo bye
-\ End debug
-
 
 : BL 32 ;
 
@@ -104,14 +86,6 @@
 ; IMMEDIATE
 
 
-(debug)
-: foo IF 65 THEN EMIT ;
-\ START HERE segfault on entering THEN, not sure what's up.
-\ Breakpoint on docol probably?
-
-
-
-
 
 : BEGIN ( C: -- beginloc ) here ; IMMEDIATE
 : WHILE ( ? -- C: beginloc -- whileloc beginloc )
@@ -179,6 +153,12 @@
 
 : RECURSE (last-word) compile, ; IMMEDIATE
 
+: fib ( n -- fib-n )
+  dup 2 < IF drop 1 EXIT THEN
+  dup  2 - recurse
+  swap 1 - recurse +
+;
+
 \ DO ... LOOP design:
 \ old value of (loop-top) is pushed onto the compile-time stack.
 \ new value of the top of the loop is placed in (loop-top).
@@ -196,6 +176,7 @@ VARIABLE (loop-top)
   1 [literal]   [0branch] ( new-loop-top )
   (loop-top) @ swap   (loop-top) ! ( C: old-jump-addr )
 ; IMMEDIATE
+
 
 : I ( -- index ) ['] R@ compile, ; IMMEDIATE
 : J ( -- index )
@@ -215,7 +196,7 @@ VARIABLE (loop-top)
 \ - Delta doesn't change the sign of the distance to go (normal interval), OR
 \ - Delta has a different sign from the distance to go, meaning we need to do an
 \   overflow or underflow first.
-\ NB: Commented out now, it's been replaced with a native word for speed.
+\ NB This has been rewritten as a primitive for speed.
 \ : (LOOP-END) ( delta -- exit?   R: limit index ret -- limit index' ret )
 \   R> swap R> R> ( ret delta index limit )
 \   2dup - >R ( ret delta index limit   R: index-limit )
@@ -667,4 +648,3 @@ VARIABLE (str-adjust)
   2drop 0
 ;
 
-bye

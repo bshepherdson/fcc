@@ -235,14 +235,32 @@ primitive('here_ptr', '(>HERE)', {sp: [[], ['a1']]}, [
 
 
 // Control flow - note that the offsets are in *bytes*.
-primitive('branch', '(BRANCH)', {ip: [['i1'], []]}, [
-  `INC_ip_bytes(i1);`
+primitive('branch', '(BRANCH)', {ip: [['iDelta'], []]}, [
+  // IP points *after* iDelta, since fetching iDelta has itself moved IP.
+  `INC_ip_bytes(iDelta - sizeof(cell));`
 ]);
 primitive('zbranch', '(0BRANCH)', {
   sp: [['iCond'], []],
   ip: [['iDelta'], []],
 }, [
-  `INC_ip_bytes(iCond == 0 ? iDelta : ((cell) sizeof(cell)));`,
+  // iDelta is an offset from where the offset is stored, but IP has already
+  // been incremented by fetching iDelta itself. So we need to increment by 0
+  // or by iDelta - 8.
+  `INC_ip_bytes(iCond == 0 ? iDelta - sizeof(cell) : 0);`,
+]);
+
+primitive('loop_end', '(LOOP-END)', {
+  sp: [['iDelta'], ['iExit']],
+  // Limit is the next value up on the stack, rsp[1].
+  rsp: [['iIndex1'], ['iIndex2']],
+}, [
+  `cell limit = rspREF(1);`,
+  `cell il = iIndex1 - limit;`,
+  `cell idl = iDelta + il;`,
+  `iIndex2 = iIndex1 + iDelta;`,
+  `bool sameSigns = (idl ^ il) >= 0;`,
+  `bool wantSameSigns = (iDelta ^ il) >= 0;`,
+  `iExit = (sameSigns || wantSameSigns) ? false : true;`,
 ]);
 
 primitive('execute', 'EXECUTE', {sp: [['C1'], []]}, [
@@ -350,8 +368,7 @@ primitive('return_stack_cells', '(RETURN-STACK-CELLS)', {sp: [[], ['i1']]}, [
 // Converts a header* eg. from (latest) into the DOES> address, which is the
 // cell after the CFA.
 primitive('to_does', '(>DOES)', {sp: [['i1'], ['i2']]}, [
-  `header* h = (header*) i1;`,
-  `i2 = ((cell) &(h->code_field)) + sizeof(cell);`,
+  `i2 = i1 + sizeof(header);`,
 ]);
 
 // Converts a header* eg. from (latest) into the code field address.
@@ -381,20 +398,19 @@ primitive('docol', '(DOCOL)', {rsp: [[], ['C1']]}, [
   // This is "primitive-centric" direct threaded code, and it avoids a double
   // indirection in compiled code.
   //
-  // Nonprimitives are in memory like this:
+  // Nonprimitives are laid out in memory thus:
   // prev header link     <-- header*
   // metadata/length
   // name string
-  // code_field     --> ca_docol --> tag_docol
+  // code_field           <-- cfa
   // body thread
   // ...
   // tag_exit
   //
-  // We want to set IP to cfa + 1 cell; we treat &cfa like an array, and take
-  // element 1.
+  // So we want to set IP to cfa + 1 cell, since that's where the thread begins.
+  // We push the old IP onto the return stack.
   `C1 = ip;`,
   `SET_ip(((void*)cfa) + sizeof(cell));`,
-  // START HERE: Is the above wrong?
 ]);
 
 primitive('dolit', '(DOLIT)', {
@@ -439,6 +455,21 @@ primitive('dodoes', '(DODOES)', {
 ]);
 
 
+// Primitive for calling a (DOCOL) word.
+// Expects the next cell in ip-space to be the address of the code.
+// Otherwise it resembles a (DOCOL).
+primitive('call_forth', '(call-forth)', {
+  ip: [['iTarget'], []],
+  rsp: [[], ['iRet']],
+}, [
+  `ca = (code*) iTarget;`,
+  `fprintf(stderr, "call into %" PRIxPTR "\\n", (cell) ca);`,
+  `iRet = (cell) ip;`,
+  `ip = (code**) ca;`,
+]);
+
+
+
 // Parsing and input
 primitive('parse', 'PARSE', {sp: [['c1'], ['s1', 'i1']]}, [
   `parse_(c1, &s1, &i1);`,
@@ -476,7 +507,7 @@ primitive('find', '(FIND)', {sp: [['sName', 'iLen'], ['CXT', 'iFlag']]}, [
   `  CXT = (code**) 0;`,
   `  iFlag = 0;`,
   `} else {`,
-  `  CXT = h->code_field;`,
+  `  CXT = &h->code_field;`,
   `  iFlag = (h->metadata & IMMEDIATE) != 0 ? 1 : -1;`,
   `}`,
 ]);
@@ -501,6 +532,7 @@ primitive('bye', 'BYE', {}, [
 ]);
 
 primitive('compile_comma', 'COMPILE,', {sp: [['C1'], []]}, [
+  `breakpoint();`,
   `compile_(C1);`,
 ]);
 
@@ -726,12 +758,12 @@ primitive('colon', ':', {}, [
   // Never returns.
   `}`,
 
-  `printf("Compiling : %.*s\\n", (int) s.length, s.text);`,
+  `fprintf(stderr, "Compiling : %.*s\\n", (int) s.length, s.text);`,
   `h->name = (char*) malloc(s.length);`,
   `strncpy(h->name, s.text, s.length);`,
   `h->metadata = s.length | HIDDEN;`,
   `h->code_field = ca_docol;`,
-  `lastWord = h->code_field;`,
+  `lastWord = &h->code_field;`,
   `state = COMPILING;`,
 ]);
 
@@ -739,7 +771,7 @@ primitive('colon_no_name', ':NONAME', {sp: [[], ['a1']]}, [
   `ALIGN_DSP(cell);`,
   `lastWord = (code**) dsp.cells;`,
   `a1 = (cell*) dsp.cells;`,
-  `*(dsp.cells++) = (cell) &ca_docol;`,
+  `*(dsp.cells++) = (cell) ca_docol;`,
   `state = COMPILING;`,
 ]);
 
@@ -750,7 +782,6 @@ primitive('exit', 'EXIT', {rsp: [['C1'], []]}, [
 primitive('semicolon', ';', {}, [
   `(*compilationWordlist)->metadata &= (~HIDDEN);`, // Clear the hidden bit.
   // Compile an EXIT
-  `breakpoint();`,
   `compile_(&ca_exit);`,
   // And drain the queue completely - this definition is over.
   `while (queue_length) drain_queue_();`,
@@ -774,6 +805,11 @@ primitive('utime', 'UTIME', {sp: [[], ['uLo', 'uHi']]}, [
   `  uLo = (i64 >> 32);`,
   `  uHi = i64 & 0xffffffff;`,
   `}`,
+]);
+
+
+primitive('see', 'SEE', {}, [
+  `see_();`,
 ]);
 
 module.exports = primitives;
