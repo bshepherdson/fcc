@@ -7,7 +7,8 @@ FORTH?=gforth
 
 LIBS=-leditline -ldl
 
-BENCHMARKS=bubble-sort fib matrix-mult mm-rtcg sieve 1mloop bpsieve loop-nest
+BENCHMARKS=bubble-sort fib matrix-mult mm-rtcg sieve 1mloop bpsieve loop-nest \
+					 6502emu int-spam
 
 CC?=gcc
 NODEJS?=node
