@@ -108,7 +108,6 @@ cell *rsp; // TODO Maybe find a register for this one?
 #if defined(__x86_64__)
 register cell *sp asm ("rbx");
 register code **ip asm ("rbp");
-register header *quitHeader asm ("r14");
 #else
 #error Not a known machine!
 #endif
@@ -723,6 +722,7 @@ void debug_words_(void) {
   }
 }
 
+header* quitHeader;
 volatile string quitString;
 bool initDone = false;
 
