@@ -1,4 +1,2 @@
-common/support.s
 test.out
-gen/*.in
-gen/forth
+*.in

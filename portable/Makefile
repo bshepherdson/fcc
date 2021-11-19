@@ -2,45 +2,19 @@ MODULE_DIR=core
 FORTH_MODULES=$(shell find $(MODULE_DIR) -name "*.fs")
 FORTH_OBJECTS := $(FORTH_MODULES:%.fs=%.o)
 
-LIBS=-leditline -ldl
-INCLUDES=-Iinclude
+# NOT this forth; the other Forth used for benchmark comparison.
+FORTH?=gforth
 
-BENCHMARKS=bubble-sort fib matrix-mult mm-rtcg sieve 1mloop bpsieve loop-nest
+LIBS=-leditline -ldl
+
+BENCHMARKS=bubble-sort fib matrix-mult mm-rtcg sieve 1mloop bpsieve loop-nest \
+					 6502emu int-spam
 
 CC?=gcc
 NODEJS?=node
 
-CFLAGS+=-std=c99 -Wall -Wextra -fomit-frame-pointer -no-pie -fno-pie
-ifeq ($(ACCOUNTING), yes)
-  CFLAGS+=-DACCOUNTING
-  SUPERINSTRUCTIONS=no
-endif
-
-ifneq ($(SUPERINSTRUCTIONS), no)
-  CFLAGS+=-DENABLE_SUPERINSTRUCTIONS
-endif
-
-ifeq ($(SUPERINSTRUCTION_DEBUG), yes)
-  CFLAGS+=-DSUPERINSTRUCTION_DEBUG
-endif
-
-ifneq ($(OPT), no)
-  # This is all the flags mentioned on -O1. -O1 itself fails, however.
-  # TODO: Figure out why, someday. For now, these help.
-  # TODO: Actually set up benchmarks.
-  CFLAGS+=-fbranch-count-reg -fcombine-stack-adjustments -fcompare-elim \
-      -fcprop-registers -fdefer-pop -fforward-propagate \
-      -fguess-branch-probability -fif-conversion2 -fif-conversion \
-      -finline-functions-called-once -fipa-profile  -fipa-pure-const \
-      -fipa-reference -fmove-loop-invariants -fshrink-wrap -fsplit-wide-types \
-      -fssa-phiopt -ftree-bit-ccp -ftree-ccp -ftree-ch -ftree-copy-prop \
-      -ftree-copyrename -ftree-dce -ftree-dominator-opts -ftree-dse -ftree-fre \
-      -ftree-pta -ftree-sink -ftree-slsr -ftree-sra -ftree-ter
-endif
-
-ifeq ($(DEBUG), yes)
-  CFLAGS+=-g
-endif
+CFLAGS+=-O2 -std=gnu17 -Wall -Wextra -Werror -Wno-unused-label -Wno-comment \
+				-Wno-stringop-truncation -fPIC -g
 
 
 ELF_FORMAT=$(shell objcopy --info | head -n 2 | tail -n 1)
@@ -58,44 +32,24 @@ ARCH=$(shell uname -m)
 
 default: all
 
-vm.o: asm/$(ARCH)/vm.s
-	$(CC) $(CFLAGS) $(INCLUDES) -c asm/$(ARCH)/vm.s $(LIBS)
+%.in: *.js
+	$(NODEJS) generator.js
+
+engine.o: engine.c primitives.in init.in
+	$(CC) $(CFLAGS) $(INCLUDES) -c engine.c $(LIBS)
 
 $(MODULE_DIR)/%.o: $(MODULE_DIR)/%.fs
 	objcopy --input binary --output $(ELF_FORMAT) \
 	  --binary-architecture $(ELF_ARCH) $< $@
 
-classic_forth: vm.o $(FORTH_OBJECTS)
-	$(CC) $(CFLAGS) $(CFLAGS_NORMAL) $(INCLUDES) -o classic-forth vm.o \
-	  $(FORTH_OBJECTS) $(LIBS)
-
-portable.o: vm.c
-	$(CC) $(CFLAGS) $(INCLUDES) -c vm.c -o portable.o $(LIBS)
-
-portable: portable.o $(FORTH_OBJECTS)
-	$(CC) $(CFLAGS) $(CFLAGS_NORMAL) $(INCLUDES) -o portable portable.o \
-	  $(FORTH_OBJECTS) $(LIBS)
-
-common.s: common/*.js
-	$(NODEJS) common/core.js $(ARCH) common.s
-
-common/support.s: common/support.c
-	$(CC) $(CFLAGS) $(CFLAGS_NORMAL) $(INCLUDES) \
-		-S common/support.c -o common/support.s
-
-common.o: common.s common/support.s
-	$(CC) $(CFLAGS) $(INCLUDES) -c common.s $(LIBS)
-
-forth: common.o $(FORTH_OBJECTS)
-	$(CC) $(CFLAGS) $(CFLAGS_NORMAL) $(INCLUDES) -o forth common.o \
+forth: engine.o $(FORTH_OBJECTS)
+	$(CC) $(CFLAGS) $(CFLAGS_NORMAL) $(INCLUDES) -o forth engine.o \
 		$(FORTH_OBJECTS) $(LIBS)
 
 all: forth
 
 clean: FORCE
-	rm -f *.o $(MODULE_DIR)/*.o \
-		common/*.o common/support.s common.s common.o \
-		forth forth_common portable
+	rm -f *.o $(MODULE_DIR)/*.o forth primitives.in init.in
 
 test: forth FORCE
 	./forth \
@@ -111,7 +65,7 @@ test: forth FORCE
 bench: FORCE forth
 	@for a in $(BENCHMARKS); do \
 	echo =======   $$a   ======== ; \
-	time $(FORTH) bench/$$a.fs ; \
+	time ./forth bench/$$a.fs ; \
 	done
 
 bench-baseline: FORCE
@@ -119,9 +73,6 @@ bench-baseline: FORCE
 	echo =======   $$a   ======== ; \
 	time $(FORTH) bench/$$a.fs ; \
 	done
-
-asm: FORCE vm.c
-	$(CC) $(CFLAGS) $(INCLUDES) -S vm.c -o vm_raw.s
 
 FORCE:
 

@@ -1,107 +1,76 @@
-# FCC - Portable C engine
+# FCC - Fast Forth written in portable C
 
-This C code implements a modest set of library functions for Forth. This enables
-the resulting Forth system to run on more or less any machine we have a decent C
-compiler for. It should be fairly straightforward to write a compatible
-implementation in assembly code on other systems.
+The C code implements a robust (not at all minimal) set of primitive functions
+for Forth. This enables the resulting Forth system to run on more or less any
+machine we have GCC (see Portability below).
 
 There is of course an associated library written in Forth itself. It is intended
 that this library use words hiding the system details (eg. `>CODE`, `CELLS`) so
 that it is portable across machines.
 
-## Problems with the C stack
+## Generated primitive code
 
-In using the portable C engine, it was discovered that certain words, especially
-those calling other library functions, were allocating space on the C stack
-(either to save registers, or apparently without need). Since the words don't
-return normally, the C stack was never getting cleaned up.
+The actual primitive implementations are built by a Javascript helper. They are
+defined in `primitives.js`, and `#include`d in the `engine.c` code.
 
-### Portably Fixing this Problem
+There are three reasons why code generation is useful:
 
-I tried to find GCC flags or function attributes that would fix this problem, or
-a way to force GCC to include the usual function epilogue code at the start of
-`NEXT`.
+- It makes abstracting over stack details (eg. TOS in register or not) easy.
+- It makes adding and adjusting "superinstructions" easier.
+- It can generate a lot of the stack accessing code for you based on a JSON data
+  description of the stack effect, handling casts and so on.
 
-I could not find such a way that works cross-platform. On ARM, GCC supports the
-`naked` attribute, which would probably work. No prologue or epilogue is
-necessary, and `naked` tells GCC not to include it.
+The optimized assembly output is very nicely optimized and generally all
+temporary values live in registers.
 
-Clang supports `naked` on all platforms, so I tried that. Clang is too much of a
-nanny, and I would need to find a way to override two of its unsuppressable
-errors:
-- Computed GOTOs leaving the function inside `NEXT`. (Whether `naked` or not.)
-- Only inline `asm` statements are "safe" inside a `naked` function. I know
-  that, and I'm prepared to take the risk since this isn't normal C code.
+## Portability
 
-Neither of those errors can be disabled in current Clang, so it's off the table
-too.
+The C code is mostly portable C17, and in particular the size of a pointer/cell
+is abstracted, but there are a few caveats.
 
-### Solution: Hand-optimized Assembly Code
+- There is some inline assembly for eg. pinning values to registers, that need
+  a version for each supported platform.
+- GCC extensions (`&&labels_as_values` and `goto *computed_goto`) are used
+  crucially. This should work under recent Clangs as well, I think?
 
-Instead, I took the generated assembly output (on `x86_64` only so far) and
-optimized it by hand, removing the code that allocates C stack space
-incorrectly.
+The intended support list is `x86_64`, `ARMv7` 32-bit, and `AArch64`; only
+`x86_64` so far since I don't have an ARM machine handy.
 
-In doing so, I also noticed that the generated code was often much less
-efficient than it could have been. In particular, I was armed with the extra
-information that the `c1`, `str1` and other global variables are actually
-scratch space, and writing them can be optimized away most of the time.
+**Windows support** is a non-goal. The POSIX file access routines are used
+directly. Porting to Windows would require fixing the file access and the C
+interop of eg. `(C-LIBRARY)`, which use `libdl` for dynamic linking at runtime.
 
-### Problems with That
-
-Of course, now the engine is only portable-ish. The pure C version should work
-passably, but eventually it will leak enough C stack space to overflow and
-crash.
-
-`make` (defaults to `make forth`) uses the assembly code from
-`asm/$PLATFORM/vm.s` and ignores `vm.c`.
-
-To port to a new platform:
-
-```
-$ make asm    # Creates vm_raw.s
-$ mkdir asm/`uname -m`
-$ mv vm_raw.s asm/`uname -m`
-$ make
-```
-
-That will work, but it's got the memory leaks and inefficiencies discussed
-above. I recommend hand-optimizing the assembly to
-
-1. Remove the needless stack allocations. There's no caller to return to, so no
-   registers need to be saved. And there's usually no need for scratch space or
-   using the stack for calls to other functions, but if there is, clean it up
-   before the `NEXT` part begins.
-2. Optimize generally. Writing to the global scratch variables can be avoided,
-   and there's often just useless write-then-read fiddling that can be removed.
 
 ## Engine Design
 
-The engine was originally indirect threaded, but that is long gone.
+This is "primitive-centric" direct threading. That means the code pointers in a
+thread are always pointers right to machine code we can execute. There's no
+indirection through a DOCOL and similar words; instead `forth_call` and `dodoes`
+are put in the thread with the next cell giving the Forth word to call.
 
-The current model is direct threading, where some primitives have a following
-value and some do not. Branches, literals and others have data following, as do
-`dodoes` words, but primitive invocations don't.
+### Superinstructions
 
-As words are `compile,`'d (usually inside a colon definition), they're actually
-enqueued with their data, and only when the queue is full (or we reach a control
-flow checkpoint like a branch or semicolon) do real operations get emitted.
+In order to support inlined "superinstructions" that combine 2, 3 or 4 Forth
+words into one call, we buffer compilation when words are `compile,`'d. When the
+queue is full, or we reach a control flow checkpoint like a branch or semicolon,
+then the queue is really compiled as 1 or more superinstructions and vanilla
+primitives.
 
-The purpose of this complexity is to allow matching against "superinstructions".
-These are essentially 2, 3 or 4 primitives commonly executed in sequence, which
-have been inlined into a single primitive. (A few examples help: `R> DUP >R`,
-`+ @`, `DUP >R`.)
+Superinstructions yield a substantial performance boost by capturing some common
+patterns and reducing the memory traffic they cause. Eg. `R> DUP >R`,
+`(dolit) + @`, `cells (dolit) + @`, `DUP >R` etc.
+
+**NB: Superinstructions are not actually implemented yet, but the queueing is.**
 
 ### Performance
 
-The move to direct threading brought a roughly 2x speedup over the indirect
-threading version.
+The performance is generally between 1.2x and 4x slower than Gforth on `x86_64`
+Linux.
 
-Adding a solid set of superinstructions brought another 2x speedup, and the
-hand-optimization of the assembly has so far brought a further 10% or so.
+However, there are several known paths to improved performance:
 
-However, for most workloads FCC is still 8-12 times slower than Gforth (on
-`x86_64` Linux; haven't tried elsewhere).
+- Keeping top-of-stack in register.
+- A decent set of static superinstructions
 
 
 ## Engine words
@@ -186,11 +155,3 @@ alphabetical order:
   `:`, or `:NONAME`, or any other similar defining word.
 
 
-### Possible future ops
-
-- Something to capture carrying, to enable a double-cell math library. Hard to
-  make portable?
-- Floating-point math
-- A base word usable by `:` and `:NONAME` for creating a new header.
-- Is it possible to write `:` in Forth by hand-assembling its own definition,
-  using the above new-header word? Probably.
