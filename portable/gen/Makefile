@@ -48,14 +48,14 @@ clean: FORCE
 	rm -f *.o $(MODULE_DIR)/*.o forth
 
 test: forth FORCE
-	./forth \
-	  ../test/ttester.fs \
-	  ../test/core01.fs \
-	  ../test/ext.fs \
-	  ../test/files.fs \
-	  ../test/final.fs \
-	  > test.out < ../test/test.in
-	cmp -s test.out $(TEST_GOLD) || (echo Tests failed, output does not match gold && diff test.out $(TEST_GOLD) && rm -f fatest*.txt test.out && exit 1)
+	cd ..; gen/forth \
+	  test/ttester.fs \
+	  test/core01.fs \
+	  test/ext.fs \
+	  test/files.fs \
+	  test/final.fs \
+	  > test.out < test/test.in
+	cmp -s ../test.out $(TEST_GOLD) || (echo Tests failed, output does not match gold && diff ../test.out $(TEST_GOLD) && rm -f ../fatest*.txt ../test.out && exit 1)
 	rm -f fatest*.txt test.out
 
 bench: FORCE forth

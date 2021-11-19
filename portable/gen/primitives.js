@@ -283,7 +283,6 @@ primitive('execute', 'EXECUTE', {sp: [['C1'], []]}, [
 // I/O routines
 primitive('evaluate', 'EVALUATE', {
   sp: [['s1', 'u1'], []],
-  rsp: [[], ['i2']],
 }, [
   `inputIndex++;`,
   `SRC.parseLength = u1;`,
@@ -293,12 +292,11 @@ primitive('evaluate', 'EVALUATE', {
 
   // Set up the return stack to aim at whatever we were doing when EVALUATE was
   // called, and then jump back into interpreting.
-  // TODO: This might be slowly leaking RSP frames?
-  // That might be solved by moving this hack to be a special case where quit_
-  // calls refill_. That's actually how my ARM assembler Forth system works.
-  `i2 = (cell) ip;`,
-  `goto *quit_inner;`,
-], /* immediate */ false, /* skipNext */ true);
+  `code **oldIP = ip;`,
+  `interpret_();`, // This doesn't return until the nested code is done.
+  `ip = oldIP;`,
+  // Then we're back to our normal state and can NEXT.
+]);
 
 primitive('refill', 'REFILL', {sp: [[], ['i1']]}, [
   `i1 = SRC.type == -1 ? 0 : refill_();`,
@@ -548,12 +546,11 @@ primitive('rsp_store', 'RP!', {sp: [['iRP'], []]}, [`rsp = (cell*) iRP;`]);
 
 
 primitive('quit', 'QUIT', {}, [
-  `inputIndex = 0;`,
-  `quit_();`,
+  `reset_interpreter_();`,
+  `return;`, // Jump out of interpret, and it will resume from the keyboard.
 ]);
 
 primitive('bye', 'BYE', {}, [
-  `printf("bye!\\n");`,
   `exit(0);`,
 ]);
 
@@ -824,8 +821,8 @@ primitive('colon', ':', {}, [
   `string s = parse_name_();`,
   `if (s.length == 0) {`,
   `  fprintf(stderr, "*** Colon definition with no name\\n");`,
-  `  goto quit_top;`,
-  // Never returns.
+  `  reset_interpreter_();`, // Clears stacks, pops to keyboard.
+  `  return;`, // Returns from INTERPRET to QUIT.
   `}`,
 
   //`fprintf(stderr, "Compiling : %.*s\\n", (int) s.length, s.text);`,

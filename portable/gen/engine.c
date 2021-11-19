@@ -140,7 +140,6 @@ header *searchOrder[16];
 cell searchIndex; // Index of the first word list to search.
 header **compilationWordlist;
 code **lastWord;
-void *quit_inner;
 
 char parseBuffers[INPUT_SOURCE_COUNT][256];
 
@@ -260,7 +259,7 @@ NEXT
 // Usually does nothing, this can be used to print debug info or to log
 // primitives for superinstruction profiling.
 // Includes the ; if it does anything!
-#define VERBOSE 1
+#define VERBOSE 0
 #if VERBOSE
 #define NAME(inst_name_string) { \
   fprintf(stderr, "Primitive: %s\n", inst_name_string); \
@@ -329,12 +328,8 @@ super_key_t key_dolit, key_call_forth;
 
 cell refill_(void) {
   if (SRC.type == -1) { // EVALUATE
-    // EVALUATE strings cannot be refilled. Pop the source.
+    // EVALUATE strings cannot be refilled. Pop the source and return false.
     inputIndex--;
-    // And do an EXIT to return to executing whoever called EVALUATE.
-    SET_ip((code**) rspTOS);
-    INC_rsp(1);
-    NEXT;
     return false;
   } else if (SRC.type == 0) { // KEYBOARD
     char* s = readline("> ");
@@ -729,6 +724,7 @@ void debug_words_(void) {
 }
 
 volatile string quitString;
+bool initDone = false;
 
 // #ifdef __arm__
 // #define QUIT_JUMP_IN __asm__("bx %0" : /* outputs  */ : "r" (**cfa) : "memory")
@@ -738,7 +734,23 @@ volatile string quitString;
 // #define QUIT_JUMP_IN __asm__("jmpq *%0" : /* outputs */ : "r" (*cfa) : "memory")
 // #endif
 
-void quit_(void) {
+void reset_interpreter_(void) {
+  sp = spTop;
+  rsp = rspTop;
+  state = INTERPRETING;
+
+  // If this is not the first QUIT, reset to keyboard input.
+  if (!firstQuit) {
+    inputIndex = 0;
+  }
+  firstQuit = 0;
+}
+
+// Runs a single input source until it runs out, then returns.
+// Expects that source to have already been refill'd once, so the buffer is
+// ready.
+void interpret_(void) {
+  // TODO Remove these? I think we can shrink or avoid this.
   cell blanks[256];
   (void)(blanks); // Touch it so it's not "unused".
 
@@ -746,90 +758,85 @@ void quit_(void) {
 #include "./primitives.in"
   }
 
-  printf("init\n");
+  // One-time init, partly generated and partly here.
+  if (!initDone) {
 #include "./init.in"
-  printf("init done\n");
 
-  *compilationWordlist = last_header;
-  ca_docol = &&prim_docol;
-  ca_dolit = &&prim_dolit;
-  ca_dodoes = &&prim_dodoes;
-  ca_branch = &&prim_branch;
-  ca_zbranch = &&prim_zbranch;
-  ca_exit = &&prim_exit;
-  ca_call = &&prim_call_forth;
+    *compilationWordlist = last_header;
+    ca_docol = &&prim_docol;
+    ca_dolit = &&prim_dolit;
+    ca_dodoes = &&prim_dodoes;
+    ca_branch = &&prim_branch;
+    ca_zbranch = &&prim_zbranch;
+    ca_exit = &&prim_exit;
+    ca_call = &&prim_call_forth;
+    initDone = true;
+  }
 
-quit_top:
-  // Empty the stacks.
-  while (true) {
-    sp = spTop;
-    rsp = rspTop;
-    state = INTERPRETING;
-
-    // If this is not the first QUIT, reset to keyboard input.
-    if (!firstQuit) {
-      inputIndex = 0;
-    }
-
-    quit_inner = &&quit_loop;
-
-    // Refill the input buffer.
-    refill_();
-    // And start trying to parse things.
 
 quit_loop:
+  while (true) {
     while (true) {
-      while (true) {
-        quitString = parse_name_();
-        if (quitString.length != 0) {
-          break;
-        } else {
-          if (SRC.type == 0) printf("  ok\n");
-          refill_();
-        }
-      }
-
-      quitHeader = find_(quitString.text, quitString.length);
-
-      if (quitHeader == NULL) { // Failed to parse. Try to parse as a number.
-        INC_sp(-4);
-        spREF(0) = quitString.length;
-        spREF(1) = (cell) quitString.text; // Bring back the string and length.
-        spREF(2) = 0;
-        spREF(3) = 0;
-
-        parse_number_();
-        if (spTOS == 0) { // Successful parse, handle the number.
-          if (state == COMPILING) {
-            INC_sp(3); // Number now on top.
-            compile_lit_(spTOS);
-            INC_sp(1);
-          } else {
-            // Clear my mess from the stack, but leave the new number atop it.
-            INC_sp(3);
-          }
-        } else { // Failed parse of a number. Unrecognized word.
-          strncpy(tempBuf, quitString.text, quitString.length);
-          tempBuf[quitString.length] = '\0';
-          fprintf(stderr, "*** Unrecognized word: %s\n", tempBuf);
-        }
+      quitString = parse_name_();
+      if (quitString.length != 0) {
+        break;
       } else {
-        // Successful parse: quitHeader holds the word.
-        if ((quitHeader->metadata & IMMEDIATE) == 0 && state == COMPILING) {
-          compile_(&quitHeader->code_field);
-        } else {
-          // Jump into the interpretive code.
-          quitTop = &&quit_loop;
-          SET_ip(&quitTop);
-          // cfa is a code**, ca is code*, and our jump target.
-          cfa = &quitHeader->code_field;
-          ca = cfa[0];
-          goto *ca;
-          //NEXT1;
-          //QUIT_JUMP_IN;
-        }
+        if (SRC.type == 0) printf("  ok\n");
+        if (!refill_()) return;
       }
     }
+
+    quitHeader = find_(quitString.text, quitString.length);
+
+    if (quitHeader == NULL) { // Failed to parse. Try to parse as a number.
+      INC_sp(-4);
+      spREF(0) = quitString.length;
+      spREF(1) = (cell) quitString.text; // Bring back the string and length.
+      spREF(2) = 0;
+      spREF(3) = 0;
+
+      parse_number_();
+      if (spTOS == 0) { // Successful parse, handle the number.
+        if (state == COMPILING) {
+          INC_sp(3); // Number now on top.
+          compile_lit_(spTOS);
+          INC_sp(1);
+        } else {
+          // Clear my mess from the stack, but leave the new number atop it.
+          INC_sp(3);
+        }
+      } else { // Failed parse of a number. Unrecognized word.
+        strncpy(tempBuf, quitString.text, quitString.length);
+        tempBuf[quitString.length] = '\0';
+        fprintf(stderr, "*** Unrecognized word: %s\n", tempBuf);
+      }
+    } else {
+      // Successful parse: quitHeader holds the word.
+      if ((quitHeader->metadata & IMMEDIATE) == 0 && state == COMPILING) {
+        compile_(&quitHeader->code_field);
+      } else {
+        // Jump into the interpretive code.
+        quitTop = &&quit_loop;
+        SET_ip(&quitTop);
+        // cfa is a code**, ca is code*, and our jump target.
+        cfa = &quitHeader->code_field;
+        ca = cfa[0];
+        goto *ca;
+        //NEXT1;
+        //QUIT_JUMP_IN;
+      }
+    }
+  }
+}
+
+
+void quit_(void) {
+  reset_interpreter_(); // Clears stacks, resets to keyboard (except first)
+  while (true) {
+    // Refill the input buffer the first time.
+    refill_();
+    // And start trying to parse things.
+    interpret_();
   }
 }
 
