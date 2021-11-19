@@ -2,6 +2,9 @@ MODULE_DIR=../core
 FORTH_MODULES=$(shell find $(MODULE_DIR) -name "*.fs")
 FORTH_OBJECTS := $(FORTH_MODULES:%.fs=%.o)
 
+# NOT this forth; the other Forth used for benchmark comparison.
+FORTH?=gforth
+
 LIBS=-leditline -ldl
 
 BENCHMARKS=bubble-sort fib matrix-mult mm-rtcg sieve 1mloop bpsieve loop-nest
@@ -61,7 +64,7 @@ test: forth FORCE
 bench: FORCE forth
 	@for a in $(BENCHMARKS); do \
 	echo =======   $$a   ======== ; \
-	time $(FORTH) ../bench/$$a.fs ; \
+	time ./forth ../bench/$$a.fs ; \
 	done
 
 bench-baseline: FORCE
