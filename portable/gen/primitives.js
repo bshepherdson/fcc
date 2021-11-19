@@ -225,6 +225,16 @@ primitive('cstore', 'C!', {sp: [['c1', 'a1'], []]}, [
   `*((unsigned char*) a1) = c1;`,
 ]);
 
+// i2 is at a1, i1 the next cell.
+primitive('two_fetch', '2@', {sp: [['a1'], ['i1', 'i2']]}, [
+  `i2 = a1[0];`,
+  `i1 = a1[1];`,
+]);
+primitive('two_store', '2!', {sp: [['i1', 'i2', 'a1'], []]}, [
+  `a1[0] = i2;`,
+  `a1[1] = i1;`,
+]);
+
 // HERE and memory values
 primitive('raw_alloc', '(ALLOCATE)', {sp: [['i1'], ['a1']]}, [
   `a1 = (cell*) malloc(i1);`,
@@ -286,7 +296,7 @@ primitive('evaluate', 'EVALUATE', {
   // TODO: This might be slowly leaking RSP frames?
   // That might be solved by moving this hack to be a special case where quit_
   // calls refill_. That's actually how my ARM assembler Forth system works.
-  `i2 = (cell) ipTOS;`,
+  `i2 = (cell) ip;`,
   `goto *quit_inner;`,
 ], /* immediate */ false, /* skipNext */ true);
 
@@ -409,6 +419,9 @@ primitive('docol', '(DOCOL)', {rsp: [[], ['C1']]}, [
   //
   // So we want to set IP to cfa + 1 cell, since that's where the thread begins.
   // We push the old IP onto the return stack.
+  `#if VERBOSE`,
+  `fprintf(stderr, "  %.*s\\n", (int) ((cell) cfa[-2]) & LEN_MASK, (char*) cfa[-1]);`,
+  `#endif`,
   `C1 = ip;`,
   `SET_ip(((void*)cfa) + sizeof(cell));`,
 ]);
@@ -421,14 +434,14 @@ primitive('dolit', '(DOLIT)', {
 ]);
 
 primitive('dostring', '(DOSTRING)', {
-  ip: [['s1'], []],
   sp: [[], ['s2', 'i1']],
 }, [
-  `s2 = s1 + 1;`,
-  `i1 = (cell) *s2;`,
+  `char *s = (char*) ip;`,
+  `i1 = (cell) *s;`,
+  `s2 = s + 1;`,
 
-  // The stack is ready but we need to skip the IP over it.
-  `char *s = s2 + i1 + (sizeof(cell) - 1);`,
+  // The stack is ready. Skip the IP forward over the string, and align it.
+  `s = s2 + i1 + (sizeof(cell) - 1);`,
   `s = (char*) (((cell) s) & ~(sizeof(cell) - 1));`,
   `SET_ip((code**) s);`,
 ]);
@@ -462,8 +475,11 @@ primitive('call_forth', '(call-forth)', {
   ip: [['iTarget'], []],
   rsp: [[], ['iRet']],
 }, [
+  `#if VERBOSE`,
+  `header *h = (header*) (iTarget - 4 * sizeof(cell));`,
+  `fprintf(stderr, "Call: %.*s\\n", (int) h->metadata & LEN_MASK, h->name);`,
+  `#endif`,
   `ca = (code*) iTarget;`,
-  `fprintf(stderr, "call into %" PRIxPTR "\\n", (cell) ca);`,
   `iRet = (cell) ip;`,
   `ip = (code**) ca;`,
 ]);
@@ -512,14 +528,24 @@ primitive('find', '(FIND)', {sp: [['sName', 'iLen'], ['CXT', 'iFlag']]}, [
   `}`,
 ]);
 
+primitive('dict_info', '(DICT-INFO)', {
+  sp: [[], ['iComp', 'iSearchIndex', 'iSearchArray']],
+}, [
+  `iComp = (cell) compilationWordlist;`,
+  `iSearchIndex = (cell) searchIndex;`,
+  `iSearchArray = (cell) searchOrder;`,
+]);
 
 // Tricky stack junk
-// Doesn't use the stack functionality; it makes it hard to reckon the depth.
-primitive('depth', 'DEPTH', {}, [
-  `cell c = (cell) (((char*) spTop) - ((char*) sp)) / sizeof(cell);`,
-  `INC_sp(-1);`,
-  `spTOS = c;`,
+primitive('depth', 'DEPTH', {sp: [[], ['iDepth']]}, [
+  `iDepth = (cell) ((((char*) spTop) - ((char*) sp)) / sizeof(cell)) - 1;`,
 ]);
+
+primitive('sp_fetch',  'SP@', {sp: [[], ['iSP']]}, [`iSP = (cell) sp;`]);
+primitive('sp_store',  'SP!', {sp: [['iSP'], []]}, [`sp = (cell*) iSP;`]);
+primitive('rsp_fetch', 'RP@', {sp: [[], ['iRP']]}, [`iRP = (cell) rsp;`]);
+primitive('rsp_store', 'RP!', {sp: [['iRP'], []]}, [`rsp = (cell*) iRP;`]);
+
 
 primitive('quit', 'QUIT', {}, [
   `inputIndex = 0;`,
@@ -578,6 +604,50 @@ primitive('debug_words', '(WORDS)', {}, [
   `debug_words_();`,
 ]);
 
+
+// C foreign calls
+// These are the versions with return values. The no-return forms are written in
+// Forth and just drop the nonce return values.
+primitive('ccall_0', 'CCALL0', {sp: [['iFn'], ['iRet']]}, [
+  `iRet = ((cell (*)(void)) iFn)();`,
+]);
+primitive('ccall_1', 'CCALL1', {sp: [['iFn', 'i1'], ['iRet']]}, [
+  `iRet = ((cell (*)(cell)) iFn)(i1);`,
+]);
+primitive('ccall_2', 'CCALL2', {sp: [['iFn', 'i1', 'i2'], ['iRet']]}, [
+  `iRet = ((cell (*)(cell, cell)) iFn)(i1, i2);`,
+]);
+primitive('ccall_3', 'CCALL3', {sp: [['iFn', 'i1', 'i2', 'i3'], ['iRet']]}, [
+  `iRet = ((cell (*)(cell, cell, cell)) iFn)(i1, i2, i3);`,
+]);
+primitive('ccall_4', 'CCALL4', {
+  sp: [['iFn', 'i1', 'i2', 'i3', 'i4'], ['iRet']],
+}, [
+  `iRet = ((cell (*)(cell, cell, cell, cell)) iFn)(i1, i2, i3, i4);`,
+]);
+primitive('ccall_5', 'CCALL5', {
+  sp: [['iFn', 'i1', 'i2', 'i3', 'i4', 'i5'], ['iRet']],
+}, [
+  `iRet = ((cell (*)(cell, cell, cell, cell, cell)) iFn)(i1, i2, i3, i4, i5);`,
+]);
+primitive('ccall_6', 'CCALL6', {
+  sp: [['iFn', 'i1', 'i2', 'i3', 'i4', 'i5', 'i6'], ['iRet']],
+}, [
+  `iRet = ((cell (*)(cell, cell, cell, cell, cell, cell)) iFn)(i1, i2, i3, i4, i5, i6);`,
+]);
+
+// Expects a NUL-terminated, C-style string on the stack, and dlopen()s it,
+// globally, so a generic dlsym() for it will work.
+// NULL = 0 indicates an error on return.
+primitive('c_library', '(C-LIBRARY)', {sp: [['s1'], ['iResult']]}, [
+  `iResult = (cell) dlopen(s1, RTLD_NOW | RTLD_GLOBAL);`,
+]);
+
+// Expects a NUL-terminated, C-style string on the stack, and dlsym()s it,
+// in the default mode that searches everything.
+primitive('c_symbol', '(C-SYMBOL)', {sp: [['s1'], ['iResult']]}, [
+  `iResult = (cell) dlsym(RTLD_DEFAULT, s1);`,
+]);
 
 
 // File access
@@ -758,7 +828,7 @@ primitive('colon', ':', {}, [
   // Never returns.
   `}`,
 
-  `fprintf(stderr, "Compiling : %.*s\\n", (int) s.length, s.text);`,
+  //`fprintf(stderr, "Compiling : %.*s\\n", (int) s.length, s.text);`,
   `h->name = (char*) malloc(s.length);`,
   `strncpy(h->name, s.text, s.length);`,
   `h->metadata = s.length | HIDDEN;`,

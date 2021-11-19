@@ -933,11 +933,13 @@ T{ GE3 EVALUATE ->     }T
 T{ GE4          -> 345 }T
 
 T{ : GE6 GE1 GE5 ; -> }T ( TEST EVALUATE IN COMPILE STATE )
+bye
 T{ GE6 -> 123 }T
 T{ : GE7 GE2 GE5 ; -> }T
 T{ GE7 -> 124 }T
 
 
+bye
 
 \ Input source control
 \ NB: THESE TESTS REQUIRE LINE BREAKS INSIDE THEM

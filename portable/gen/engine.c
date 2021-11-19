@@ -10,6 +10,8 @@
 #include <sys/stat.h>
 #include <sys/time.h>
 
+#include <dlfcn.h>
+
 #include <editline.h>
 
 // Meta-macro that takes another macro and runs it for each external library.
@@ -251,7 +253,6 @@ NEXT
 
 // Called at the top of primitives to create a jump label. These jumps are
 // prim_foo. Needs the identifier, not the Forth name.
-//#define LABEL(inst_name) asm volatile ("prim_" #inst_name ": .global prim_" #inst_name)
 #define LABEL(inst_name) prim_ ## inst_name: \
   asm volatile ("tag_" #inst_name ": .global tag_" #inst_name)
 
@@ -259,14 +260,17 @@ NEXT
 // Usually does nothing, this can be used to print debug info or to log
 // primitives for superinstruction profiling.
 // Includes the ; if it does anything!
+#define VERBOSE 1
+#if VERBOSE
 #define NAME(inst_name_string) { \
   fprintf(stderr, "Primitive: %s\n", inst_name_string); \
   for (cell *p = &(spTop[-1]); p >= sp; p--) {\
     fprintf(stderr, "\t%ld\n", *p);\
   }\
 }
-
-//#define NAME(inst_name_string)
+#else
+#define NAME(inst_name_string)
+#endif
 
 #define INC_ip_bytes(n) (ip = (code**) (((cell) ip) + ((cell) (n))))
 #define INC_ip(n) (ip += n)
@@ -464,22 +468,22 @@ void to_number_(void) {
 void parse_number_(void) {
   // sp[0] is the length, sp[1] the pointer, sp[2] the high word, sp[3] the low.
   // ( lo hi c-addr u -- lo hi c-addr u )
-  char *s = (char*) spREF(1);
+  char first = ((char*) spREF(1))[0];
   cell oldBase = base;
-  if (*s == '$' || *s == '#' || *s == '%') {
+  if (first == '$' || first == '#' || first == '%') {
 
-    base = *s == '$' ? 16 : *s == '#' ? 10 : 2;
-    s++;
+    base = first == '$' ? 16 : first == '#' ? 10 : 2;
+    spREF(1)++;
     spTOS--;
-  } else if (*s == '\'') {
+  } else if (first == '\'') {
     spTOS -= 3;
+    spREF(3) = (cell) ((char*) spREF(1))[1];
     spREF(1) += 3;
-    spREF(3) = (cell) s[1];
     return;
   }
 
   bool negated = false;
-  if (*s == '-') {
+  if (*((char*) spREF(1)) == '-') {
     spTOS--;
     spREF(1)++;
     negated = true;
