@@ -14,5 +14,5 @@ flags size + CONSTANT eflags
                 THEN 2 +
        LOOP   DROP ;
 
-: benchmark   0 100 0 DO primes nip LOOP . ." primes found." cr ;
+: benchmark   0 10000 0 DO primes nip LOOP . ." primes found." cr ;
 benchmark bye

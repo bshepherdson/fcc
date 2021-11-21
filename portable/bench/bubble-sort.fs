@@ -65,7 +65,7 @@ align create list elements cells allot
 ;
 
 : main
-bubble-sort
+20 0 DO bubble-sort LOOP
 ;
 
 main bye

@@ -8,6 +8,6 @@ swap 2 - recurse
 +
     then ;
 
-: main 34 fib . ;
+: main 20 0 DO 34 fib . LOOP ;
 
 main bye

@@ -53,5 +53,7 @@ align create imr mat-byte-size allot
   row-size cells +loop
   drop
 ;
-main bye
+
+: wrapper 20 0 DO main LOOP ;
+wrapper bye
 
