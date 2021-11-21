@@ -72,11 +72,24 @@ function primitive(ident, name, effects, code, opt_immediate, opt_skipNext) {
       depth--;
     }
 
+    // If there's at least one of both inputs and outputs, there's no need to
+    // save/load TOS (since the primitive will update it).
+    // If there are only outputs, we need to store the old one first.
+    if (stack === 'sp' && inputs.length === 0) {
+      inputCode.push(`  STORE_SP_TOS;`);
+    }
+
+    // Either way we need to adjust SP.
     if (inputs.length !== outputs.length) {
       // Stacks are generally full-descending, so if there's say 2 more inputs
       // than outputs, we want to increment by 2. If there's an extra output,
       // decrement by 1.
       inputCode.push(`  INC_${stack}(${inputs.length - outputs.length});`);
+    }
+
+    // If there's only inputs, we need to load the new spTOS.
+    if (stack === 'sp' && outputs.length === 0) {
+      inputCode.push(`  FETCH_SP_TOS;`);
     }
   }
 
@@ -143,7 +156,7 @@ primitive('dup', 'DUP', {sp: [['i1'], ['i2', 'i3']]}, [
   `i3 = i2 = i1;`,
 ]);
 
-primitive('drop', 'DROP', {}, [`INC_sp(1);`]);
+primitive('drop', 'DROP', {sp: [['i1'], []]}, [`(void)(i1);`]);
 primitive('swap', 'SWAP', {sp: [['ii1', 'ii2'], ['io1', 'io2']]}, [
   `io1 = ii2;`,
   `io2 = ii1;`,
@@ -170,7 +183,10 @@ primitive('neg_rot', '-ROT',
   `io3 = ii2;`,
 ]);
 
-primitive('two_drop', '2DROP', {}, [`INC_sp(2);`]);
+primitive('two_drop', '2DROP', {sp: [['i1', 'i2'], []]}, [
+  `(void)(i1);`,
+  `(void)(i2);`,
+]);
 primitive('two_dup',  '2DUP',  {
   sp: [['ii1', 'ii2'], ['io1', 'io2', 'io3', 'io4']],
 }, [
@@ -551,6 +567,7 @@ primitive('quit', 'QUIT', {}, [
 ]);
 
 primitive('bye', 'BYE', {}, [
+  `fprintf(stderr, "bye\\n");`,
   `exit(0);`,
 ]);
 
@@ -855,8 +872,6 @@ primitive('semicolon', ';', {}, [
   // And stop compiling.
   `state = INTERPRETING;`,
 ], /* immediate */ true);
-
-// TODO Implement SEE
 
 // Misc
 // Pushes microseconds since the epoch as a double-cell integer.

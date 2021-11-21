@@ -3,7 +3,6 @@
 : IMMEDIATE (LATEST) @ (/CELL) +   dup @ 512 or   swap ! ;
 
 
-
 : ( 41 parse drop drop ; IMMEDIATE
 : \ refill drop ; IMMEDIATE
 

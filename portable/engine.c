@@ -108,6 +108,7 @@ cell *rsp; // TODO Maybe find a register for this one?
 #if defined(__x86_64__)
 register cell *sp asm ("rbx");
 register code **ip asm ("rbp");
+register cell tos asm ("r14");
 #else
 #error Not a known machine!
 #endif
@@ -279,7 +280,9 @@ NEXT
 #define SET_sp(target) (sp = target)
 // Accesses the stack at the given value.
 #define spREF(index) (sp[index])
-#define spTOS (spREF(0))
+#define spTOS (tos)
+#define STORE_SP_TOS (sp[0] = tos)
+#define FETCH_SP_TOS (tos = sp[0])
 
 #define INC_rsp(n) (rsp += n)
 #define SET_rsp(target) (rsp = target)
@@ -789,8 +792,9 @@ quit_loop:
     quitHeader = find_(quitString.text, quitString.length);
 
     if (quitHeader == NULL) { // Failed to parse. Try to parse as a number.
+      STORE_SP_TOS;
       INC_sp(-4);
-      spREF(0) = quitString.length;
+      spTOS = quitString.length;
       spREF(1) = (cell) quitString.text; // Bring back the string and length.
       spREF(2) = 0;
       spREF(3) = 0;
@@ -798,11 +802,12 @@ quit_loop:
       parse_number_();
       if (spTOS == 0) { // Successful parse, handle the number.
         if (state == COMPILING) {
-          INC_sp(3); // Number now on top.
-          compile_lit_(spTOS);
-          INC_sp(1);
+          compile_lit_(sp[3]);
+          INC_sp(4); // Number now on top.
+          FETCH_SP_TOS;
         } else {
           // Clear my mess from the stack, but leave the new number atop it.
+          spTOS = sp[3];
           INC_sp(3);
         }
       } else { // Failed parse of a number. Unrecognized word.
