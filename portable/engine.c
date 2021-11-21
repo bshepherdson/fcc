@@ -105,11 +105,12 @@ typedef struct header_ {
 // Stacks are full-descending, and can therefore be used like arrays.
 
 #define DATA_STACK_SIZE 16384
-cell _stack_data[DATA_STACK_SIZE];
-cell *spTop = &(_stack_data[DATA_STACK_SIZE]);
+cell _stack_data[DATA_STACK_SIZE] __attribute__ ((aligned (1024)));
 
 #define RETURN_STACK_SIZE 1024
-cell _stack_return[RETURN_STACK_SIZE];
+cell _stack_return[RETURN_STACK_SIZE] __attribute__ ((aligned (1024)));
+
+cell *spTop = &(_stack_data[DATA_STACK_SIZE]);
 cell *rspTop = &(_stack_return[RETURN_STACK_SIZE]);
 cell *rsp; // TODO Maybe find a register for this one?
 
