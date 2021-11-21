@@ -572,7 +572,6 @@ primitive('bye', 'BYE', {}, [
 ]);
 
 primitive('compile_comma', 'COMPILE,', {sp: [['C1'], []]}, [
-  `breakpoint();`,
   `compile_(C1);`,
 ]);
 

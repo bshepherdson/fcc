@@ -132,7 +132,6 @@ code *ca;
 
 bool firstQuit = 1;
 void *quitTop = NULL;
-//code **quitTopPtr = &quitTop;
 
 union {
   cell* cells;
@@ -166,23 +165,9 @@ cell inputIndex;
 #define SRC (inputSources[inputIndex])
 
 
-// And some miscellaneous helpers. These exist because I can't use locals in
-// these C implementations without leaking stack space.
+// And some miscellaneous helper globals used in a few functions.
 cell c1, c2, c3;
-//char ch1;
-//char* str1;
-//char** strptr1;
-//size_t tempSize;
-//header* tempHeader;
-//header** tempHeaderPtr;
 char tempBuf[256];
-//unsigned char numBuf[sizeof(cell) * 2];
-//FILE* tempFile;
-//struct stat tempStat;
-//struct timeval timeVal;
-//uint64_t i64;
-//
-//struct termios old_tio, new_tio;
 
 
 // These definitions and variables are for the primitive system, for the queue
@@ -218,11 +203,6 @@ header *last_header;
 
 
 
-// Implementations of the VM primitives.
-// These functions MUST NOT USE locals, since that will use the stack.
-// They should probably be one-liners, or nearly so, in C.
-// They should generally finish with the NEXT or NEXT1 macros.
-
 #define LEN_MASK        (0xff)
 #define LEN_HIDDEN_MASK (0x1ff)
 #define HIDDEN          (0x100)
@@ -250,15 +230,6 @@ typedef struct {
 // NB: If NEXT changes, EXECUTE might need to change too (it uses NEXT1)
 #define NEXT1 do { goto *ca; } while(0)
 #define NEXT do { goto **ip++; } while(0)
-
-// Pop the return stack and NEXT into it.
-#define EXIT_NEXT ip = *(rsp++);\
-NEXT
-
-#define CALL_NEXT ca = *(ip++);\
-  *(--rsp) = (cell) ip;\
-  ip = (code**) ca;\
-  NEXT
 
 
 // Called at the top of primitives to create a jump label. These jumps are
@@ -661,10 +632,6 @@ char *file_modes[16] = {
   "w+b" // 15 = read/write, bin, truncated
 };
 
-// DEBUG things
-// TODO Remove these
-void breakpoint(void) {
-}
 
 // Given a code field address (eg. &h->code_field) this searches through the
 // word lists until it finds the corresponding word, and returns it.
@@ -746,13 +713,6 @@ header* quitHeader;
 volatile string quitString;
 bool initDone = false;
 
-// #ifdef __arm__
-// #define QUIT_JUMP_IN __asm__("bx %0" : /* outputs  */ : "r" (**cfa) : "memory")
-// #elif __i386__
-// #define QUIT_JUMP_IN __asm__("jmpl *%0" : /* outputs */ : "r" (*cfa) : "memory")
-// #elif __x86_64__
-// #define QUIT_JUMP_IN __asm__("jmpq *%0" : /* outputs */ : "r" (*cfa) : "memory")
-// #endif
 
 void reset_interpreter_(void) {
   sp = spTop;
@@ -844,8 +804,6 @@ quit_loop:
         cfa = &quitHeader->code_field;
         ca = cfa[0];
         goto *ca;
-        //NEXT1;
-        //QUIT_JUMP_IN;
       }
     }
   }
@@ -868,7 +826,6 @@ int main(int argc, char **argv) {
   inputIndex = 0;
   SRC.type = SRC.parseLength = SRC.inputPtr = 0;
   SRC.parseBuffer = parseBuffers[inputIndex];
-  //dsp.chars = (char*) malloc(16 * 1024 * 1024);
 
   // Open the input files in reverse order and push them as file inputs.
   argc--;
