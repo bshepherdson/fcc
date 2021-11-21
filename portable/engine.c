@@ -14,6 +14,14 @@
 
 #include <editline.h>
 
+// Verbose output - every primitive, colon word, and call is announced.
+#define VERBOSE 0
+
+// Keep TOS in a register. This is a modest for substantial performance
+// improvement, roughly 5% by itself on x86_64.
+#define TOS_REG 1
+
+
 // Meta-macro that takes another macro and runs it for each external library.
 // To add a new external file, it should be sufficient to add it here.
 // NB: THESE ARE IN REVERSE ORDER. The bottom-most is loaded first!
@@ -108,7 +116,9 @@ cell *rsp; // TODO Maybe find a register for this one?
 #if defined(__x86_64__)
 register cell *sp asm ("rbx");
 register code **ip asm ("rbp");
+#if TOS_REG
 register cell tos asm ("r14");
+#endif
 #else
 #error Not a known machine!
 #endif
@@ -259,7 +269,6 @@ NEXT
 // Usually does nothing, this can be used to print debug info or to log
 // primitives for superinstruction profiling.
 // Includes the ; if it does anything!
-#define VERBOSE 0
 #if VERBOSE
 #define NAME(inst_name_string) { \
   fprintf(stderr, "Primitive: %s\n", inst_name_string); \
@@ -280,9 +289,16 @@ NEXT
 #define SET_sp(target) (sp = target)
 // Accesses the stack at the given value.
 #define spREF(index) (sp[index])
+
+#if TOS_REG
 #define spTOS (tos)
 #define STORE_SP_TOS (sp[0] = tos)
 #define FETCH_SP_TOS (tos = sp[0])
+#else
+#define spTOS (spREF(0))
+#define STORE_SP_TOS ({})
+#define FETCH_SP_TOS ({})
+#endif
 
 #define INC_rsp(n) (rsp += n)
 #define SET_rsp(target) (rsp = target)
