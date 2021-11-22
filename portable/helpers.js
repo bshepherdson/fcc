@@ -13,8 +13,7 @@ const stacks = {
   },
   ip: {
     lv(i) {
-      if (i !== 0) throw new Error('Only ipTOS is really accessible easily');
-      return `ip[0]`;
+      return `ip[${i}]`;
     },
     type: 'code*',
   },
@@ -47,6 +46,11 @@ function builder(ident, name, effects, code, opt_immediate, opt_skipNext) {
     if (!effects[stack]) continue;
 
     const [inputs, outputs] = effects[stack];
+
+    if (outputs.length > 0 && stack === 'ip') {
+      throw new Error('IP cannot have outputs');
+    }
+
     let depth = inputs.length - 1;
     for (const input of inputs) {
       const prefix = stackPrefixes[input[0]];
@@ -103,6 +107,8 @@ function builder(ident, name, effects, code, opt_immediate, opt_skipNext) {
         '}',
       ]),
 
+    rawCode: code,
+
     header: {
       ident,
       name,
@@ -112,4 +118,13 @@ function builder(ident, name, effects, code, opt_immediate, opt_skipNext) {
 }
 
 exports.builder = builder;
+
+// delta is an offset from where the offset is stored, but IP has already
+// been incremented by fetching the itself. So we need to increment by 0
+// or by delta - sizeof(cell).
+function zbrancher(flag, delta) {
+  return `INC_ip_bytes(${flag} == 0 ? ${delta} - sizeof(cell) : 0);`;
+}
+
+exports.zbrancher = zbrancher;
 

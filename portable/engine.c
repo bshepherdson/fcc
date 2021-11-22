@@ -328,7 +328,9 @@ typedef struct {
 #define conv_rsp_from_C(rhs) ((cell) (rhs))
 
 #define conv_ip_to_i(rhs) ((cell) (rhs))
+#define conv_ip_to_a(rhs) ((cell*) (rhs))
 #define conv_ip_to_s(rhs) ((char*) (rhs))
+#define conv_ip_to_C(rhs) ((code*) (rhs))
 
 code *ca_docol;
 code *ca_dolit;

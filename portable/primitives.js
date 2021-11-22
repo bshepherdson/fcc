@@ -155,16 +155,13 @@ primitive('here_ptr', '(>HERE)', {sp: [[], ['a1']]}, [
 // Control flow - note that the offsets are in *bytes*.
 primitive('branch', '(BRANCH)', {ip: [['iDelta'], []]}, [
   // IP points *after* iDelta, since fetching iDelta has itself moved IP.
-  `INC_ip_bytes(iDelta - sizeof(cell));`
+  `INC_ip_bytes(iDelta - sizeof(cell));`,
 ]);
 primitive('zbranch', '(0BRANCH)', {
   sp: [['iCond'], []],
   ip: [['iDelta'], []],
 }, [
-  // iDelta is an offset from where the offset is stored, but IP has already
-  // been incremented by fetching iDelta itself. So we need to increment by 0
-  // or by iDelta - 8.
-  `INC_ip_bytes(iCond == 0 ? iDelta - sizeof(cell) : 0);`,
+  helpers.zbrancher('iCond', 'iDelta'),
 ]);
 
 primitive('loop_end', '(LOOP-END)', {
@@ -754,7 +751,7 @@ primitive('colon_no_name', ':NONAME', {sp: [[], ['a1']]}, [
 ]);
 
 primitive('exit', 'EXIT', {rsp: [['C1'], []]}, [
-  `ip = C1;`,
+  `SET_ip(C1);`,
 ]);
 
 primitive('semicolon', ';', {}, [

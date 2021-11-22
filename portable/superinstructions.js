@@ -41,23 +41,99 @@ superinstruction(['from_r', 'from_r', 'two_drop'], {
   `(void)(i2);`,
 ]);
 
-// Probable candidates:
-// R> R> 2DROP EXIT
-// R> R> 2DROP                    -- unless R> R> 2drop exit gets them all
-// SWAP >R >R
-// (dolit) compile,
-// (dolit) (loop-end) (0branch)   -- maybe?
-// swap !                         -- maybe?
-// (dolit) = (0branch)
-// state @ (0branch)
-// (dolit) ! exit
-// (dolit) @
-// (dolit) !
-// (dolit) < (0branch)
-// (dolit) cells
-// (dolit) cells +
-// swap drop
-// cells +
+superinstruction(['swap', 'to_r', 'to_r'], {
+  sp:  [['is1', 'is2'], []],
+  rsp: [[], ['id1', 'id2']],
+}, [
+  `id1 = is1;`,
+  `id2 = is2;`,
+]);
+
+superinstruction(['dolit', 'compile_comma'], {ip: [['C1'], []]}, [
+  `compile_(C1);`,
+]);
+
+// This is the phrase that implements LOOP.
+superinstruction(['dolit', 'loop_end', 'zbranch'], {
+  // IP is a reversed stack! So these look like they're swapped.
+  ip: [['iBranchDelta', 'iDelta'], []],
+  rsp: [['iIndex1'], ['iIndex2']],
+}, [
+  `cell iExit;`,
+  // Happens to use the same names for iDelta, iIndex1 and iIndex2.
+  ...primitives.find(p => p.header.ident === 'loop_end').rawCode,
+  helpers.zbrancher('iExit', 'iBranchDelta'),
+]);
+
+superinstruction(['swap', 'store'], {sp: [['a1', 'i1'], []]}, [
+  `*a1 = i1;`,
+]);
+
+superinstruction(['dolit', 'equals', 'zbranch'], {
+  // IP is a reversed stack! So these look like they're swapped.
+  ip: [['iBranchDelta', 'iLit'], []],
+  sp: [['i1'], []],
+}, [
+  `cell cond = iLit == i1;`,
+  helpers.zbrancher('cond', 'iBranchDelta'),
+]);
+
+superinstruction(['dolit', 'less_than', 'zbranch'], {
+  // IP is a reversed stack! So these look like they're swapped.
+  ip: [['iBranchDelta', 'iLit'], []],
+  sp: [['i1'], []],
+}, [
+  `cell cond = i1 < iLit;`,
+  helpers.zbrancher('cond', 'iBranchDelta'),
+]);
+
+superinstruction(['state', 'fetch', 'zbranch'], {ip: [['iBranchDelta'], []]}, [
+  helpers.zbrancher('state', 'iBranchDelta'),
+]);
+
+superinstruction(['dolit', 'store', 'exit'], {
+  sp: [['iValue'], []],
+  rsp: [['CExit'], []],
+  ip: [['aLit'], []],
+}, [
+  `*aLit = iValue;`,
+  `SET_ip(CExit);`,
+]);
+
+superinstruction(['dolit', 'fetch'], {
+  ip: [['aLit'], []],
+  sp: [[], ['iValue']],
+}, [
+  `iValue = *aLit;`,
+]);
+
+superinstruction(['dolit', 'store'], {
+  ip: [['aLit'], []],
+  sp: [['iValue'], []],
+}, [
+  `*aLit = iValue;`,
+]);
+
+superinstruction(['dolit', 'cells', 'plus'], {
+  ip: [['iLit'], []],
+  sp: [['iBase'], ['iResult']],
+}, [
+  `iResult = iBase + (iLit * sizeof(cell));`,
+]);
+
+superinstruction(['dolit', 'cells'], {
+  ip: [['iLit'], []],
+  sp: [[], ['iResult']],
+}, [
+  `iResult = iLit * sizeof(cell);`,
+]);
+
+superinstruction(['cells', 'plus'], {
+  sp: [['iBase', 'iCells'], ['iResult']],
+}, [
+  `iResult = iBase + (iCells * sizeof(cell));`,
+]);
+
 
 module.exports = superinstructions;
 
