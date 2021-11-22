@@ -127,18 +127,19 @@ cell _stack_return[RETURN_STACK_SIZE] __attribute__ ((aligned (1024)));
 
 cell *spTop = &(_stack_data[DATA_STACK_SIZE]);
 cell *rspTop = &(_stack_return[RETURN_STACK_SIZE]);
-cell *rsp; // TODO Maybe find a register for this one?
 
 
 #if defined(__x86_64__)
 register cell *sp asm ("rbx");
 register code **ip asm ("rbp");
+register cell *rsp asm("r13");
 #if TOS_REG
 register cell tos asm ("r14");
 #endif
 #elif defined(__arm__)
 register cell *sp asm ("v7");  // Variable 7 = r10
 register code **ip asm ("v5"); // Variable 5 = r8
+register cell *rsp asm("v3");  // Variable 3 = r6
 #if TOS_REG
 register cell tos asm ("v4");  // Variable 4 = r7
 #endif

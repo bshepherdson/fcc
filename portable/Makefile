@@ -26,6 +26,10 @@ else
 CFLAGS+=-DSUPERINSTRUCTIONS
 endif
 
+ifeq ($(PROFILING), 1)
+CFLAGS+=-pg
+endif
+
 
 ELF_FORMAT=$(shell objcopy --info | head -n 2 | tail -n 1)
 ELF_ARCH=$(shell objcopy --info | head -n 4 | tail -n 1)
