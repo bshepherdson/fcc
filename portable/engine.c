@@ -552,14 +552,14 @@ superinstruction* match_superinstruction(super_key_t key) {
 
 void drain_queue_(void) {
 #ifdef ACCOUNTING
-  queued_primitive *q = queue;
+  queued_primitive *aq = queue;
   fprintf(account, ",[");
   for (int i = 0; i < queue_length; i++) {
     fprintf(account, "%s\"%.*s\"",
         i > 0 ? ", " : "",
-        (int) (byKey[q->key]->metadata & LEN_MASK),
-        byKey[q->key]->name);
-    q = q->next;
+        (int) (byKey[aq->key]->metadata & LEN_MASK),
+        byKey[aq->key]->name);
+    aq = aq->next;
   }
   fprintf(account, "]\n");
 #endif
