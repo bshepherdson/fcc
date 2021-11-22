@@ -21,6 +21,12 @@
 // improvement, roughly 5% by itself on x86_64.
 #define TOS_REG 1
 
+// SUPERINSTRUCTIONS is set by the Makefile.
+// ACCOUNTING is also set by the Makefile.
+
+#ifdef ACCOUNTING
+volatile FILE *account;
+#endif
 
 // Meta-macro that takes another macro and runs it for each external library.
 // To add a new external file, it should be sufficient to add it here.
@@ -105,7 +111,16 @@ typedef struct header_ {
 // Stacks are full-descending, and can therefore be used like arrays.
 
 #define DATA_STACK_SIZE 16384
-cell _stack_data[DATA_STACK_SIZE] __attribute__ ((aligned (1024)));
+
+#if TOS_REG
+// 1 extra because of TOS in register
+#define DATA_STACK_PADDING 1
+#else
+#define DATA_STACK_PADDING 0
+#endif
+
+cell _stack_data[DATA_STACK_SIZE + DATA_STACK_PADDING]
+    __attribute__ ((aligned (1024)));
 
 #define RETURN_STACK_SIZE 1024
 cell _stack_return[RETURN_STACK_SIZE] __attribute__ ((aligned (1024)));
@@ -113,6 +128,7 @@ cell _stack_return[RETURN_STACK_SIZE] __attribute__ ((aligned (1024)));
 cell *spTop = &(_stack_data[DATA_STACK_SIZE]);
 cell *rspTop = &(_stack_return[RETURN_STACK_SIZE]);
 cell *rsp; // TODO Maybe find a register for this one?
+
 
 #if defined(__x86_64__)
 register cell *sp asm ("rbx");
@@ -202,9 +218,11 @@ typedef struct {
   super_key_t key;
 } superinstruction;
 
+header* byKey[256];
 superinstruction primitives[256];
 superinstruction superinstructions[256];
 int primitive_count = 0;
+int superinstruction_count = 0;
 header *last_header;
 
 
@@ -320,7 +338,7 @@ code *ca_branch;
 code *ca_zbranch;
 code *ca_call;
 
-super_key_t key_dolit, key_call_forth;
+super_key_t global_key_dolit, global_key_call_forth;
 
 cell refill_(void) {
   if (SRC.type == -1) { // EVALUATE
@@ -520,14 +538,66 @@ super_key_t lookup_primitive(code* target) {
   exit(40);
 }
 
+superinstruction* match_superinstruction(super_key_t key) {
+  for (int i = 0; i < superinstruction_count; i++) {
+    if (superinstructions[i].key == key) {
+      return &superinstructions[i];
+    }
+  }
+  return NULL;
+}
+
 
 void drain_queue_(void) {
-  // TODO Superinstructions implementations
+#ifdef ACCOUNTING
+  queued_primitive *q = queue;
+  fprintf(account, ",[");
+  for (int i = 0; i < queue_length; i++) {
+    fprintf(account, "%s\"%.*s\"",
+        i > 0 ? ", " : "",
+        (int) (byKey[q->key]->metadata & LEN_MASK),
+        byKey[q->key]->name);
+    q = q->next;
+  }
+  fprintf(account, "]\n");
+#endif
+
+  int draining = 1;
+
+#ifdef SUPERINSTRUCTIONS
+  // Try to match the prefix of the queue against all the superinstructions.
+  int key = 0;
+  queued_primitive *q = queue;
+  for (int i = 0; i < queue_length; i++) {
+    key = key | (q->key << (8 * i));
+    q = q->next;
+  }
+
+  superinstruction *sup = NULL;
+  if (queue_length == 4 && (sup = match_superinstruction(key)) != NULL) {
+    draining = 4;
+  } else if (queue_length >= 3 && (sup = match_superinstruction(key & 0xffffff)) != NULL) {
+    draining = 3;
+  } else if (queue_length >= 2 && (sup = match_superinstruction(key & 0xffff)) != NULL) {
+    draining = 2;
+  }
+
+  if (sup != NULL) {
+    *(dsp.cells++) = (cell) sup->implementation;
+  } else {
+    *(dsp.cells++) = (cell) queue->target;
+  }
+#else
   *(dsp.cells++) = (cell) queue->target;
-  if (queue->hasValue) *(dsp.cells++) = queue->value;
-  queue = queue->next;
-  if (queue == NULL) queueTail = NULL;
-  queue_length--;
+#endif
+
+  while (draining > 0) {
+    if (queue->hasValue) *(dsp.cells++) = queue->value;
+    queue = queue->next;
+    if (queue == NULL) queueTail = NULL;
+    queue_length--;
+    draining--;
+  }
 }
 
 void bump_queue_tail_(void) {
@@ -567,7 +637,7 @@ void compile_(code** cfa) {
     // cfa[0] is docol; cfa[1] is the first real word.
     // &cfa[1], then, is the pointer we actually want.
     queueTail->value = (cell) &cfa[1];
-    queueTail->key = key_call_forth;
+    queueTail->key = global_key_call_forth;
   } else if (cfa[0] == ca_dodoes) {
     // (DODOES) pushes the data space pointer (&cfa[2]) onto the stack,
     // then checks cfa[1]. If it's 0, do nothing. If not, it's another CFA, jump
@@ -577,7 +647,7 @@ void compile_(code** cfa) {
     queueTail->target = ca_dolit;
     queueTail->hasValue = 1;
     queueTail->value = (cell) &cfa[2];
-    queueTail->key = key_dolit;
+    queueTail->key = global_key_dolit;
 
     if (cfa[1] != 0) {
       if (queue_length == 4) drain_queue_();
@@ -585,7 +655,7 @@ void compile_(code** cfa) {
       queueTail->target = ca_call;
       queueTail->hasValue = 1;
       queueTail->value = (cell) cfa[1];
-      queueTail->key = key_call_forth;
+      queueTail->key = global_key_call_forth;
     }
   } else {
     // For a primitive, the type of cfa is a lie. It's actually a code*
@@ -607,7 +677,7 @@ void compile_lit_(cell value) {
   queueTail->target = ca_dolit;
   queueTail->hasValue = 1;
   queueTail->value = value;
-  queueTail->key = key_dolit;
+  queueTail->key = global_key_dolit;
 }
 
 
@@ -660,32 +730,69 @@ header* find_by_cfa_(code ***cfa) {
 }
 
 void print_name_(header *h) {
-  printf("%.*s \n", (int) h->metadata & LEN_MASK, h->name);
+  printf("  %.*s \n", (int) h->metadata & LEN_MASK, h->name);
 }
 
 void see_singular_(char* label, header *word) {
   printf("%s<%.*s>\n", label, (int) word->metadata & LEN_MASK, word->name);
 }
 
+// Prints the name and contents of the next item in the thread, returning the
+// new thread (in case of eg. literal values).
+// This can recurse in the case of superinstructions.
+// Returns NULL if we've seen EXIT and should abort.
+code** show_word(code **thread) {
+  if (*thread == ca_dolit) {
+    printf("  %" PRIdPTR "__$%" PRIxPTR " \n", (cell) thread[1], (ucell) thread[1]);
+    return thread + 2;
+  }
+  if (*thread == ca_zbranch || *thread == ca_branch) {
+    printf("  %s: %" PRIdPTR " bytes / %" PRIdPTR " cells\n",
+        *thread == ca_zbranch ? "0branch" : "branch",
+        (cell) thread[1], ((cell) thread[1]) / sizeof(cell));
+    return thread + 2;
+  }
+
+  // find_by_cfa moves the thread pointer if there's an extra field there, eg.
+  // for a forth_call into a colon definition.
+  header* word;
+  word = find_by_cfa_(&thread);
+  if (word != NULL) {
+    print_name_(word);
+    return word->code_field == ca_exit ? NULL : thread + 1;
+  }
+
+  // If we're still here, it's a superinstruction.
+  // We break it down into its parts, and print them too.
+
+  for (int i = 0; i < superinstruction_count; i++) {
+    if (superinstructions[i].implementation == *thread) {
+      // fakeThread[0] becomes the next inner word, fakeThread[1] the next data.
+      code *fakeThread[2];
+      super_key_t key = superinstructions[i].key;
+      thread++; // Points at the next data field.
+      for (int j = 0; j < 4; j++) {
+        super_key_t subkey = (key >> (8 * j)) & 0xff;
+        if (subkey == 0) break;
+        fakeThread[0] = byKey[subkey]->code_field;
+        fakeThread[1] = *thread;
+        printf("  (%08x) ", key);
+        code **adjusted = show_word(fakeThread);
+        if (adjusted == fakeThread + 2) thread++; // It consumed the data.
+      }
+      return thread;
+    }
+  }
+
+  printf("*** Cannot SEE this word - should not happen!\n");
+  exit(41);
+}
+
 void see_docol_(header *word) {
   printf(": %.*s   \n", (int) word->metadata & LEN_MASK, word->name);
   code **thread = ((code**) word) + 4;
-  while (true) {
-    if (*thread == ca_dolit) {
-      printf("%" PRIdPTR "__$%" PRIxPTR " \n", (cell) thread[1], (ucell) thread[1]);
-      thread += 2;
-    } else if (*thread == ca_zbranch || *thread == ca_branch) {
-      printf("%s: %" PRIdPTR " bytes / %" PRIdPTR " cells\n",
-          *thread == ca_zbranch ? "0branch" : "branch",
-          (cell) thread[1], ((cell) thread[1]) / sizeof(cell));
-      thread += 2;
-    } else {
-      // find_by_cfa moves the thread pointer if there's an extra field there.
-      header* word = find_by_cfa_(&thread);
-      print_name_(word);
-      thread++;
-      if (word->code_field == ca_exit) break;
-    }
+  while (thread != NULL) {
+    thread = show_word(thread);
   }
   putchar('\n');
 }
@@ -742,6 +849,10 @@ void interpret_(void) {
 
   if (false) {
 #include "./primitives.in"
+
+#ifdef SUPERINSTRUCTIONS
+#include "./superinstructions.in"
+#endif
   }
 
   // One-time init, partly generated and partly here.
@@ -757,6 +868,9 @@ void interpret_(void) {
     ca_exit = &&prim_exit;
     ca_call = &&prim_call_forth;
     initDone = true;
+
+    global_key_call_forth = key_call_forth;
+    global_key_dolit = key_dolit;
   }
 
 
@@ -832,6 +946,11 @@ int main(int argc, char **argv) {
   inputIndex = 0;
   SRC.type = SRC.parseLength = SRC.inputPtr = 0;
   SRC.parseBuffer = parseBuffers[inputIndex];
+
+
+#ifdef ACCOUNTING
+  account = fopen("account.json", "a");
+#endif
 
   // Open the input files in reverse order and push them as file inputs.
   argc--;

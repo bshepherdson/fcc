@@ -16,6 +16,16 @@ NODEJS?=node
 CFLAGS+=-O2 -std=gnu17 -Wall -Wextra -Werror -Wno-unused-label -Wno-comment \
 				-Wno-stringop-truncation -Wno-stringop-overflow -fPIC -g
 
+ifeq ($(ACCOUNTING), 1)
+CFLAGS+=-DACCOUNTING -Wno-discarded-qualifiers
+endif
+
+ifeq ($(DISABLE_SUPERINSTRUCTIONS), 1)
+CFLAGS+=-USUPERINSTRUCTIONS
+else
+CFLAGS+=-DSUPERINSTRUCTIONS
+endif
+
 
 ELF_FORMAT=$(shell objcopy --info | head -n 2 | tail -n 1)
 ELF_ARCH=$(shell objcopy --info | head -n 4 | tail -n 1)
