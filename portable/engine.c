@@ -131,7 +131,7 @@ cell *rspTop = &(_stack_return[RETURN_STACK_SIZE]);
 
 #if defined(__x86_64__)
 register cell *sp asm ("rbx");
-register code **ip asm ("rbp");
+register code **ip asm ("r15");
 register cell *rsp asm("r13");
 #if TOS_REG
 register cell tos asm ("r14");
