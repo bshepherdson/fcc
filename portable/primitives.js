@@ -608,10 +608,10 @@ primitive('control_flush', '(CONTROL-FLUSH)', {}, [
 // Does nothing; this only exists to be a breakpoint.
 primitive('debug_break', '(DEBUG)', {}, []);
 primitive('debug_print', '(PRINT)', {sp: [['i1'], []]}, [
-  `printf("%ld %" PRIxPTR "\\n", i1, i1);`,
+  `printf("%" PRIdPTR " %" PRIxPTR "\\n", i1, i1);`,
 ]);
 primitive('debug_star_print', '(*PRINT)', {sp: [['a1'], []]}, [
-  `printf("%" PRIxPTR ": %ld %" PRIxPTR "\\n", (ucell) a1, *a1, *a1);`,
+  `printf("%" PRIxPTR ": %" PRIdPTR " %" PRIxPTR "\\n", (ucell) a1, *a1, *a1);`,
 ]);
 primitive('debug_words', '(WORDS)', {}, [
   `debug_words_();`,

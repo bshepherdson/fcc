@@ -120,6 +120,12 @@ register code **ip asm ("rbp");
 #if TOS_REG
 register cell tos asm ("r14");
 #endif
+#elif defined(__arm__)
+register cell *sp asm ("v7");  // Variable 7 = r10
+register code **ip asm ("v5"); // Variable 5 = r8
+#if TOS_REG
+register cell tos asm ("v4");  // Variable 4 = r7
+#endif
 #else
 #error Not a known machine!
 #endif
@@ -705,7 +711,7 @@ void see_(void) {
 void debug_words_(void) {
   printf("Words:\n");
   for (header *h = *compilationWordlist; h != 0; h = h->link) {
-    printf("%ld\t'%.*s'\n", h->metadata, (int) (h->metadata & LEN_MASK), h->name);
+    printf("%"PRIdPTR"\t'%.*s'\n", h->metadata, (int) (h->metadata & LEN_MASK), h->name);
   }
 }
 
