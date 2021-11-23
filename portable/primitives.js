@@ -435,7 +435,7 @@ primitive('dict_info', '(DICT-INFO)', {
   sp: [[], ['iComp', 'iSearchIndex', 'iSearchArray']],
 }, [
   `iComp = (cell) compilationWordlist;`,
-  `iSearchIndex = (cell) searchIndex;`,
+  `iSearchIndex = (cell) &searchIndex;`,
   `iSearchArray = (cell) searchOrder;`,
 ]);
 
@@ -517,30 +517,32 @@ primitive('debug_words', '(WORDS)', {}, [
 // C foreign calls
 // These are the versions with return values. The no-return forms are written in
 // Forth and just drop the nonce return values.
+// The expected stack is ( arg1 arg2 arg3 fn-addr ccall3 -- result ) where
+// fn-addr is the result of calling a c-call-named word.
 primitive('ccall_0', 'CCALL0', {sp: [['iFn'], ['iRet']]}, [
   `iRet = ((cell (*)(void)) iFn)();`,
 ]);
-primitive('ccall_1', 'CCALL1', {sp: [['iFn', 'i1'], ['iRet']]}, [
+primitive('ccall_1', 'CCALL1', {sp: [['i1', 'iFn'], ['iRet']]}, [
   `iRet = ((cell (*)(cell)) iFn)(i1);`,
 ]);
-primitive('ccall_2', 'CCALL2', {sp: [['iFn', 'i1', 'i2'], ['iRet']]}, [
+primitive('ccall_2', 'CCALL2', {sp: [['i1', 'i2', 'iFn'], ['iRet']]}, [
   `iRet = ((cell (*)(cell, cell)) iFn)(i1, i2);`,
 ]);
-primitive('ccall_3', 'CCALL3', {sp: [['iFn', 'i1', 'i2', 'i3'], ['iRet']]}, [
+primitive('ccall_3', 'CCALL3', {sp: [['i1', 'i2', 'i3', 'iFn'], ['iRet']]}, [
   `iRet = ((cell (*)(cell, cell, cell)) iFn)(i1, i2, i3);`,
 ]);
 primitive('ccall_4', 'CCALL4', {
-  sp: [['iFn', 'i1', 'i2', 'i3', 'i4'], ['iRet']],
+  sp: [['i1', 'i2', 'i3', 'i4', 'iFn'], ['iRet']],
 }, [
   `iRet = ((cell (*)(cell, cell, cell, cell)) iFn)(i1, i2, i3, i4);`,
 ]);
 primitive('ccall_5', 'CCALL5', {
-  sp: [['iFn', 'i1', 'i2', 'i3', 'i4', 'i5'], ['iRet']],
+  sp: [['i1', 'i2', 'i3', 'i4', 'i5', 'iFn'], ['iRet']],
 }, [
   `iRet = ((cell (*)(cell, cell, cell, cell, cell)) iFn)(i1, i2, i3, i4, i5);`,
 ]);
 primitive('ccall_6', 'CCALL6', {
-  sp: [['iFn', 'i1', 'i2', 'i3', 'i4', 'i5', 'i6'], ['iRet']],
+  sp: [['i1', 'i2', 'i3', 'i4', 'i5', 'i6', 'iFn'], ['iRet']],
 }, [
   `iRet = ((cell (*)(cell, cell, cell, cell, cell, cell)) iFn)(i1, i2, i3, i4, i5, i6);`,
 ]);
