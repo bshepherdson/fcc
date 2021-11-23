@@ -234,3 +234,13 @@ T{ -333 vd2 -> }T
 T{ v2 -> -333 }T
 T{ v1 ->  222 }T
 
+\ PICK and ROLL
+T{ 7 8 9 0 pick -> 7 8 9 9 }T
+T{ 7 8 9 1 pick -> 7 8 9 8 }T
+T{ 7 8 9 2 pick -> 7 8 9 7 }T
+
+\ 0 roll is a NOP, 1 roll is SWAP and 2 roll is ROT
+T{ 7 8 9 0 roll -> 7 8 9 }T
+T{ 7 8 9 1 roll -> 7 9 8 }T
+T{ 7 8 9 2 roll -> 8 9 7 }T
+

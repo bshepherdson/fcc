@@ -444,11 +444,15 @@ primitive('depth', 'DEPTH', {sp: [[], ['iDepth']]}, [
   `iDepth = (cell) ((((char*) spTop) - ((char*) sp)) / sizeof(cell)) - 1;`,
 ]);
 
-primitive('sp_fetch',  'SP@', {sp: [[], ['iSP']]}, [`iSP = (cell) sp;`]);
+// SP@ needs to account for the fact that sp will already have been adjusted
+// down by one to hold iSP.
+primitive('sp_fetch',  'SP@', {sp: [[], ['iSP']]}, [
+  `iSP = (cell) sp + sizeof(cell);`,
+]);
+
 primitive('sp_store',  'SP!', {sp: [['iSP'], []]}, [`sp = (cell*) iSP;`]);
 primitive('rsp_fetch', 'RP@', {sp: [[], ['iRP']]}, [`iRP = (cell) rsp;`]);
 primitive('rsp_store', 'RP!', {sp: [['iRP'], []]}, [`rsp = (cell*) iRP;`]);
-
 
 primitive('quit', 'QUIT', {}, [
   `reset_interpreter_();`,
