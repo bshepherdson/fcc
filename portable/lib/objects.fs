@@ -3,7 +3,7 @@
 \ written by Anton Ertl 1996-2000
 \ public domain; NO WARRANTY
 
-\ REQUIRES struct.fs
+REQUIRE ./struct.fs
 
 \ This (in combination with struct.fs) is in ANS Forth (with an
 \ environmental dependence on case insensitivity; convert everything

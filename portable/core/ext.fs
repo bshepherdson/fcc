@@ -104,9 +104,9 @@
 : 2R> ( -- x1 x2 ) ( R: x1 x2 -- ) R> R> swap ;
 : 2R@ ( -- x1 x2 ) ( R: x1 x2 -- x1 x2 ) R> R>   2dup   >R >R   swap ;
 
-\ A linked list of (link ptr, length cell, string content....) entries giving
-\ the previously required files. Defined here for MARKER's use, and set when new
-\ files get REQUIRED.
+\ A linked list of (link ptr, FILE*, length cell, string content....) entries
+\ giving the previously required files. Defined here for MARKER's use, and set
+\ when new files get REQUIRED.
 VARIABLE (included-file-list)
 0 (included-file-list) !
 

@@ -2,7 +2,7 @@
 \ dumb parts).
 \ Support iterators, pleasant FP-style operations over them, and more.
 
-\ REQUIRE objects.fs
+REQUIRE ./objects.fs
 
 interface
   selector iter@ ( iterator -- x ) \ Returns the value at the current location.

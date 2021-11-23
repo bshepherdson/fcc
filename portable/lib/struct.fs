@@ -2,7 +2,7 @@
 
 \ This file is in the public domain. NO WARRANTY.
 
-\ REQUIRES lib/compat/float.fs
+REQUIRE ./compat/float.fs
 
 
 : naligned ( addr1 n -- addr2 )

@@ -32,12 +32,60 @@
 ; IMMEDIATE
 
 
+\ Given a string naming a file, works backwards to the last / in the path.
+\ Does NOT include the /
+\ UNIX-ONLY
+: (dirname) ( c-addr u -- c-addr u )
+  BEGIN dup WHILE
+    2dup + c@ '/' = IF EXIT THEN \ Found it, so bail.
+    1-
+  REPEAT
+;
+
+\ Given two strings, a directory and a ./ relative path, combines them into a
+\ newly allocated string.
+: (combine-paths) ( c-addr1 u1 c-addr2 u2 -- c-addr u )
+  1- >R 1+ R>        \ Drop the leading .
+  2 pick over + dup allocate ABORT" Failed to allocate string"
+  ( ca1 u1 ca2 u2 u1+u2 caNew )
+  2dup >R >R          ( ca1 u1 ca2 u2 u1+u2 caNew    R: caNew u1+u2 )
+  nip -rot >R >R      ( ca1 u1 caNew   R: caNew u1+u2 u2 ca2 )
+
+  \ Copy the first string to it.
+  2dup + >R           ( ca1 u1 caNew   R: caNew u1+u2 u2 ca2 caNew+u1 )
+  swap move           ( R: caNew u1+u2 u2 ca2 caNew+u1 )
+
+  R> R> swap R>       ( ca2 caNew+u1 u2   R: caNew u1+u2 )
+  move
+  R> R> swap          ( caNew u1+u2 )
+;
+
+
+\ Given a relative path, looks up the current SOURCE-ID in the included file
+\ list and then appends the given path to that file's containing directory.
+: (relative-include) ( c-addr u -- c-addr u )
+    (included-file-list) @ BEGIN ?dup WHILE
+      \ Each included file is [link, FILE*, length, str...] so we compare the
+      \ FILE* against the current source-id until we find a match.
+      dup cell+ @   source-id   = IF  ( file-list )
+        2 cells +   dup cell+   swap @ ( c-addr1 u1 c-addr2 u2 )
+        (dirname) 2swap (combine-paths)
+        0 \ Loop ender
+      ELSE
+        @
+      THEN
+    REPEAT
+;
+
 : INCLUDED ( i*x c-addr u -- j*x )
+  over dup c@ '.' = swap 1+ c@ '/' = and IF \ Relative path handling
+    (relative-include)
+  THEN
   2dup r/o open-file ABORT" Could not open file" >R
   \ Record this file in the inclusion names list.
   (included-file-list) @   here (included-file-list) !
   ( c-addr u list-head    R: fd )
-  ,   dup ,   here swap    dup allot    move align ( R: fd )
+  ,   r@ ,   dup ,   here swap    dup allot    move align ( R: fd )
   R> include-file
 ;
 
@@ -49,7 +97,7 @@
   (included-file-list) @
   BEGIN ?dup WHILE
     >R 2dup ( c-addr u c-addr u   R: *entry )
-    R@ cell+ dup cell+ swap @ ( c-addr1 u1 c-addr1 u1 c-addr2 u2   R: *entry )
+    R@ 2 cells + dup cell+ swap @ ( c-addr1 u1 c-addr1 u1 c-addr2 u2   R: *entry )
     compare 0= IF R> drop 2drop ( ) EXIT THEN \ Already done, bail.
     R> @ ( c-addr u *entry' )
   REPEAT
