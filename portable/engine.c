@@ -17,6 +17,11 @@
 // Verbose output - every primitive, colon word, and call is announced.
 #define VERBOSE 0
 
+// Set REGISTERS to 0 to force the key globals (sp, rsp, ip, tos) to all be in
+// memory rather than in registers. This causes a massive slowdown, and the
+// faster your CPU is relative to its caches, the worse it will be.
+#define REGISTERS 1
+
 // Keep TOS in a register. This is a modest for substantial performance
 // improvement, roughly 5% by itself on x86_64.
 #define TOS_REG 1
@@ -112,7 +117,7 @@ typedef struct header_ {
 
 #define DATA_STACK_SIZE 16384
 
-#if TOS_REG
+#if REGISTERS && TOS_REG
 // 1 extra because of TOS in register
 #define DATA_STACK_PADDING 1
 #else
@@ -129,22 +134,26 @@ cell *spTop = &(_stack_data[DATA_STACK_SIZE]);
 cell *rspTop = &(_stack_return[RETURN_STACK_SIZE]);
 
 
-#if defined(__x86_64__)
+#if REGISTERS && defined(__x86_64__)
 register cell *sp asm ("rbx");
 register code **ip asm ("r15");
 register cell *rsp asm("r13");
 #if TOS_REG
 register cell tos asm ("r14");
 #endif
-#elif defined(__arm__)
+#elif REGISTERS && defined(__arm__)
 register cell *sp asm ("v7");  // Variable 7 = r10
-register code **ip asm ("v5"); // Variable 5 = r8
+register code **ip asm ("v5"); // Variable 5 = r8 - USED IN NEXT!
 register cell *rsp asm("v3");  // Variable 3 = r6
 #if TOS_REG
 register cell tos asm ("v4");  // Variable 4 = r7
 #endif
 #else
-#error Not a known machine!
+// Dummy globals, should work everywhere, but slowly.
+cell *sp;
+cell *rsp;
+code **ip;
+#pragma message "Using globals for sp, rsp, ip. Slow!"
 #endif
 
 // Only used for "heavy" calls - EXECUTE, etc.
@@ -287,7 +296,7 @@ typedef struct {
 // Accesses the stack at the given value.
 #define spREF(index) (sp[index])
 
-#if TOS_REG
+#if REGISTERS && TOS_REG
 #define spTOS (tos)
 #define STORE_SP_TOS (sp[0] = tos)
 #define FETCH_SP_TOS (tos = sp[0])
