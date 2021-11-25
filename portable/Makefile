@@ -71,6 +71,7 @@ test: forth FORCE
 	  test/core01.fs \
 	  test/ext.fs \
 	  test/files.fs \
+	  test/tools.fs \
 	  test/final.fs \
 	  > test.out < test/test.in
 	cmp -s test.out $(TEST_GOLD) || (echo Tests failed, output does not match gold && diff test.out $(TEST_GOLD) && rm -f fatest*.txt test.out && exit 1)

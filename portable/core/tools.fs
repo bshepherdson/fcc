@@ -82,6 +82,34 @@ VARIABLE (saved-return-address)
 : [DEFINED] ( "<spaces>name" -- defined? ) bl word find nip 0<> ; IMMEDIATE
 : [UNDEFINED] ( "<spaces>name" -- undefined? ) bl word find nip 0= ; IMMEDIATE
 
+VARIABLE ([if]-depth)
+
+: [ELSE] ( -- )
+  1 BEGIN
+    BEGIN bl word count dup WHILE
+      2dup S" [IF]" compare 0= IF
+        2drop 1+
+      ELSE
+        2dup S" [ELSE]" compare 0= IF
+          2drop 1- dup IF 1+ THEN
+        ELSE
+          S" [THEN]" compare 0= IF
+            1-
+          THEN
+        THEN
+      THEN ?dup 0= IF EXIT THEN
+    REPEAT 2drop
+  REFILL 0= UNTIL
+  drop
+; IMMEDIATE
+
+: [THEN] ; IMMEDIATE
+
+: [IF] ( ? -- )
+  0= IF POSTPONE [ELSE] THEN
+  ; IMMEDIATE
+
+
 : FIND-NAME ( c-addr u -- nt|0 )
   (LATEST) @ BEGIN dup WHILE ( c-addr u nt )
     >R 2dup R@ name>string compare-ic 0= IF
