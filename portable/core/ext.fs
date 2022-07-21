@@ -1,7 +1,5 @@
 \ CORE EXT words, selectively.
 
-: cr 10 emit ;
-
 : .(   [char] ) parse type ; IMMEDIATE
 
 : <> = NOT ;

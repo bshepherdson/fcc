@@ -263,13 +263,6 @@ VARIABLE (loop-top)
 
 : ABORT quit ;
 
-\ Safer ['], checks whether we found the word and ABORTs if not.
-\ TODO Do this later and use ABORT" ?
-: ['] ( "<spaces>name<space>" -- xt )
-  parse-name (find)
-  IF [literal] ELSE ABORT THEN
-; IMMEDIATE
-
 VARIABLE (string-buffer-index)
 8 CONSTANT (string-buffer-count)
 0 (string-buffer-index) !
@@ -306,7 +299,27 @@ here 256 8 * chars allot CONSTANT (string-buffers)
 
 : ." postpone S" ['] type compile, ; IMMEDIATE
 
-: ABORT" postpone IF postpone ." ['] ABORT compile, postpone THEN ; IMMEDIATE
+\ Technically a CORE EXT word but it's useful for ABORT"
+: cr 10 emit ;
+
+: ABORT"
+  postpone IF postpone ." ['] CR compile, ['] ABORT compile, postpone THEN
+; IMMEDIATE
+
+\ Safer ' and ['], checks whether we found the word and ABORTs if not.
+: ' ( "name" -- xt )
+  parse-name 2dup (find) IF
+    >R 2drop R>
+  ELSE
+    drop ." *** Failed to look up ' " type cr ABORT
+  THEN
+;
+
+: ['] ( "<spaces>name<space>" -- xt )
+  parse-name 2dup (find)
+  IF [literal] 2drop
+  ELSE drop ." *** Failed to look up ['] " type cr ABORT THEN
+; IMMEDIATE
 
 \ Turns a two-cell string into a counted string.
 \ The new string is in a transient region!
