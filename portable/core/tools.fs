@@ -31,6 +31,17 @@ DECIMAL
   @ \ nt already points at the link.
 ;
 
+\ Given an xt, tries to recover the nt for it.
+\ This is expensive, since it walks all words, comparing their xts with this.
+: >NAME ( xt -- nt|0 )
+  (LATEST) @
+  BEGIN ?dup WHILE ( xt nt )
+    2dup (>cfa) = IF nip EXIT THEN
+    (name>link)
+  REPEAT
+  drop 0
+;
+
 \ This is married to the structure of a dictionary header, and the dictionary
 \ table in the portable VM. If either of those change, this needs to change too.
 \ TODO Should this be hiding the hidden words? Internal words?
