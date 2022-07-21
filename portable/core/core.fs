@@ -325,7 +325,20 @@ here 256 8 * chars allot CONSTANT (string-buffers)
 \ The new string is in a transient region!
 : UNCOUNT ( c-addr u -- c-addr ) dup here c!   here 1+ swap move   here ;
 
-: WORD ( char "<chars>ccc<char>" -- c-addr ) parse uncount ;
+: (peek-input) ( -- char|0 )
+  source >in @ < IF >in @ + c@ ELSE 0 THEN ;
+
+: (skip-delims) ( char-delim -- )
+  BEGIN
+    (peek-input) dup 0= IF 2drop EXIT THEN \ Input empty
+    over =
+  WHILE
+    1 >IN +!
+  REPEAT ( delim )
+  drop
+;
+
+: WORD ( char "<chars>ccc<char>" -- c-addr ) dup (skip-delims)   parse uncount ;
 
 : FIND ( c-addr -- c-addr 0 | xt 1 | xt -1 )
   dup count (find) ( c-addr xt flag )
