@@ -12,7 +12,7 @@
 
 #include <dlfcn.h>
 
-#include <editline.h>
+#include "vendor/linenoise/linenoise.h"
 
 // Verbose output - every primitive, colon word, and call is announced.
 #define VERBOSE 0
@@ -56,8 +56,8 @@ volatile FILE *account;
 #define EXTERNAL_SYMBOL_FLAG (1)
 #define EXTERNAL_SYMBOL_MASK (~1)
 
-#define EXTERNAL_START(name) _binary_core_ ## name ## _fs_start
-#define EXTERNAL_END(name) _binary_core_ ## name ## _fs_end
+#define EXTERNAL_START(name) core_ ## name ## _start
+#define EXTERNAL_END(name)   core_ ## name ## _end
 #define FORTH_EXTERN(name) \
   extern char EXTERNAL_START(name);\
   extern char EXTERNAL_END(name);
@@ -87,9 +87,9 @@ typedef struct {
 // Sizes in address units.
 typedef intptr_t cell;
 typedef uintptr_t ucell;
-typedef unsigned char bool;
-#define true (-1)
-#define false (0)
+//typedef unsigned char bool;
+#define ftrue (-1)
+#define ffalse (0)
 #define CHAR_SIZE 1
 #define CELL_SIZE sizeof(cell)
 
@@ -149,6 +149,14 @@ register cell *rsp asm("v3");  // Variable 3 = r6
 register cell loopIndex asm ("v6"); // Variable 6 = r9
 #if TOS_REG
 register cell tos asm ("v4");  // Variable 4 = r7
+#endif
+#elif REGISTERS && defined(__arm64__)
+static cell *sp asm ("x21");
+static code **ip asm ("x20");
+static cell *rsp asm("x19");
+register cell loopIndex asm ("x23");
+#if TOS_REG
+register cell tos asm ("x22");
 #endif
 #else
 // Dummy globals, should work everywhere, but slowly.
@@ -358,20 +366,20 @@ cell refill_(void) {
   if (SRC.type == -1) { // EVALUATE
     // EVALUATE strings cannot be refilled. Pop the source and return false.
     inputIndex--;
-    return false;
+    return ffalse;
   } else if (SRC.type == 0) { // KEYBOARD
-    char* s = readline("> ");
+    char* s = linenoise("> ");
     SRC.parseLength = strlen(s);
     strncpy(SRC.parseBuffer, s, SRC.parseLength);
     SRC.inputPtr = 0;
     free(s);
-    return true;
+    return ftrue;
   } else if ( (SRC.type & EXTERNAL_SYMBOL_FLAG) != 0 ) {
     // External symbol, pseudofile.
     external_source *ext = (external_source*) (SRC.type & EXTERNAL_SYMBOL_MASK);
     if (ext->current >= ext->end) {
       inputIndex--;
-      return false;
+      return ffalse;
     }
 
     char* s = ext->current;
@@ -387,7 +395,7 @@ cell refill_(void) {
     SRC.inputPtr = 0;
 
     ext->current = s < ext->end ? s + 1 : ext->end;
-    return true;
+    return ftrue;
   } else {
     // Real file.
     char *s = NULL;
@@ -397,7 +405,7 @@ cell refill_(void) {
     if (read == -1) {
       // Dump the source and recurse.
       inputIndex--;
-      return false;
+      return ffalse;
     } else {
       // Knock off the trailing newline, if present.
       if (s[read - 1] == '\n') read--;
@@ -405,7 +413,7 @@ cell refill_(void) {
       free(s);
       SRC.parseLength = read;
       SRC.inputPtr = 0;
-      return true;
+      return ftrue;
     }
   }
 }
@@ -505,11 +513,11 @@ void parse_number_(void) {
     return;
   }
 
-  bool negated = false;
+  bool negated = ffalse;
   if (*((char*) spREF(1)) == '-') {
     spTOS--;
     spREF(1)++;
-    negated = true;
+    negated = ftrue;
   }
 
   // Now parse the number itself.
@@ -881,7 +889,7 @@ void interpret_(void) {
     ca_zbranch = &&prim_zbranch;
     ca_exit = &&prim_exit;
     ca_call = &&prim_call_forth;
-    initDone = true;
+    initDone = ftrue;
 
     global_key_call_forth = key_call_forth;
     global_key_dolit = key_dolit;

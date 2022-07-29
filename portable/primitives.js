@@ -183,7 +183,7 @@ primitive('loop_end', '(LOOP-END)', {
   `loopIndex += iDelta;`,
   `bool sameSigns = (idl ^ il) >= 0;`,
   `bool wantSameSigns = (iDelta ^ il) >= 0;`,
-  `iExit = (sameSigns || wantSameSigns) ? false : true;`,
+  `iExit = (sameSigns || wantSameSigns) ? ffalse : ftrue;`,
 ]);
 
 primitive('i_loop_index', 'I', {sp: [[], ['i1']]}, [
@@ -232,7 +232,7 @@ primitive('refill', 'REFILL', {sp: [[], ['i1']]}, [
 ]);
 
 primitive('accept', 'ACCEPT', {sp: [['s1', 'i1'], ['i2']]}, [
-  `char* temp = readline(NULL);`, // No prompt for accept.
+  `char* temp = linenoise(NULL);`, // No prompt for accept.
   `i2 = strlen(temp);`,
   `if (i2 > i1) i2 = i1;`,
   `strncpy(s1, temp, i2);`,
@@ -703,7 +703,7 @@ primitive('read_line', 'READ-LINE', {
   `  }`,
   `  strncpy(s1, s, i2-1);`,
   `  ior = 0;`,
-  `  iFlag = true;`,
+  `  iFlag = ftrue;`,
   `  i2--;`,
   `}`,
 

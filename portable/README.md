@@ -2,7 +2,7 @@
 
 The C code implements a robust (not at all minimal) set of primitive functions
 for Forth. This enables the resulting Forth system to run on more or less any
-machine we have GCC (see Portability below).
+machine where we have GCC (see Portability below).
 
 There is of course an associated library written in Forth itself. It is intended
 that this library use words hiding the system details (eg. `>CODE`, `CELLS`) so
@@ -11,7 +11,8 @@ that it is portable across machines.
 ## Generated primitive code
 
 The actual primitive implementations are built by a Javascript helper. They are
-defined in `primitives.js`, and `#include`d in the `engine.c` code.
+defined in `primitives.js`, and the generated code is `#include`d in the
+`engine.c` code.
 
 There are three reasons why code generation is useful:
 
@@ -20,8 +21,8 @@ There are three reasons why code generation is useful:
 - It can generate a lot of the stack accessing code for you based on a JSON data
   description of the stack effect, handling casts and so on.
 
-The optimized assembly output is very nicely optimized and generally all
-temporary values live in registers.
+The `-O2` assembly output is very nicely optimized and generally all temporary
+values live in registers.
 
 ## Portability
 
@@ -31,10 +32,14 @@ is abstracted, but there are a few caveats.
 - There is some inline assembly for eg. pinning values to registers, that need
   a version for each supported platform.
 - GCC extensions (`&&labels_as_values` and `goto *computed_goto`) are used
-  crucially. This should work under recent Clangs as well, I think?
+  crucially.
+    - It's known not to work under Clang. I'm not sure it can be fixed with
+      the right flags.
 
-The intended support list is `x86_64`, `ARMv7` 32-bit, and `AArch64`; only
-`x86_64` so far since I don't have an ARM machine handy.
+There are C preprocessor defines for the right registers on x86_64, 32-bit
+ARMv7, and arm64. 32-bit ARM and x86_64 work on Linux; arm64 works on
+M1 Macs. (The other combinations, eg. x86_64 on Intel Macs, are likely to
+work, maybe with adjustment of flags, but I don't have machines to test on.)
 
 **Windows support** is a non-goal. The POSIX file access routines are used
 directly. Porting to Windows would require fixing the file access and the C
@@ -45,7 +50,7 @@ interop of eg. `(C-LIBRARY)`, which use `libdl` for dynamic linking at runtime.
 
 This is "primitive-centric" direct threading. That means the code pointers in a
 thread are always pointers right to machine code we can execute. There's no
-indirection through a DOCOL and similar words; instead `forth_call` and `dodoes`
+indirection through a DOCOL and similar words; instead `call_forth` and `dodoes`
 are put in the thread with the next cell giving the Forth word to call.
 
 ### Superinstructions
@@ -57,51 +62,36 @@ then the queue is really compiled as 1 or more superinstructions and vanilla
 primitives.
 
 Superinstructions yield a substantial performance boost by capturing some common
-patterns and reducing the memory traffic they cause. Eg. `R> DUP >R`,
-`(dolit) + @`, `cells (dolit) + @`, `DUP >R` etc.
+patterns and greatly reducing the memory traffic they cause. Eg. `R> DUP >R`,
+`(dolit) + @`, `cells (dolit) + @`, `DUP >R`, `R> R> 2drop` etc.
 
-**NB: Superinstructions are not actually implemented yet, but the queueing is.**
+## Performance
 
-### Performance
+The performance is strong on `x86_64`, faster than Gforth. Generally between
+0.55x and 0.9x where x is the time taken by Gforth, on my aging dev machine's
+i7-2600K 3.40GHz.
 
-The performance is generally between 1.2x and 4x slower than Gforth on `x86_64`
-Linux.
+On 32-bit ARM it's somewhat slower, generally 1.2x to 2x on my RasPi 4.
 
-However, there are several known paths to improved performance:
+On 64-bit ARM it's similarly slower, on my M1 Mac roughly 1.1x to 1.9x.
 
-- Keeping top-of-stack in register.
-- A decent set of static superinstructions
+### Improving Performance
 
+I'm not sure why the relative performance is so different on x86_64. In
+particular it's not clear whether Gforth is unusually slow there, or FCC
+unusually fast, or both. Given the importance of x86_64, it seems unlikely
+Gforth would be unusually slow there!
 
-## Engine words
+I speculate that something about how FCC works is making it slower on ARM.
+Perhaps GCC's own optimizations are lacking; I should examine some of the
+hotter assembly code (eg. `(LOOP-END)`) to see if it's doing anything
+obviously dumb.
 
-Here are all the words defined natively by the engine, which must be implemented
-by any compatible runtimes.
+Failing that, cache friendliness seems a likely spot to look next. Can we align
+primitives or nonprimitives to some kind of page boundaries that would make it
+faster?
 
-It is not a minimal set; some more operations could be extracted. All operations
-in `(...)` are internal, nonstandard words.
-
-- Math: `+`, `-`, `*`, `U/`, `/`, `MOD`, `UMOD`
-- Bitwise: `AND`, `OR`, `XOR`
-- Shifts: `LSHIFT`, `RSHIFT`
-- Comparison: `<`, `U<`, `=`
-- Stack: `DUP`, `SWAP`, `DROP`, `OVER`, `ROT`, `-ROT`, `2DROP`, `2DUP`, `2SWAP`,
-  `2OVER`, `>R`, `R>`, `DEPTH`, `SP@`, `SP!`, `RP@`, `RP!`
-- Variables: `BASE`, `STATE`
-- Memory: `@`, `!`, `C@`, `C!`, `(ALLOCATE)`, `(>HERE)`, `EXECUTE`
-- Control flow: `(BRANCH)`, `(0BRANCH)`, `QUIT`, `EXIT`, `BYE`
-- Input: `REFILL`, `>IN`, `ACCEPT`, `KEY`, `SOURCE`, `SOURCE-ID`
-- Output: `EMIT`, `.S`, `U.S`
-- Words: `(LATEST)`, `(>CODE)`, `>BODY`, `(LAST-WORD)`
-- Doers: `(DOCOL)`, `(DOLIT)`, `(DOSTRING)`, `(DODOES)`
-- Parsing: `PARSE`, `PARSE-NAME`, `>NUMBER`, `CREATE`, `(FIND)`, `EVALUATE`
-- Defining: `:`, `:NONAME`, `;`, `COMPILE,`, `LITERAL`, `[LITERAL]`,
-  `[0BRANCH]`, `[BRANCH]`, `(CONTROL-FLUSH)`, `(DEBUG)`
-- Portability: `CELLS`, `CHARS`
-- Internals: `(/CELL)`, `(/CHAR)`, `(ADDRESS-UNIT-BITS)`, `(STACK-CELLS)`,
-  `(RETURN-STACK-CELLS)`, `(>DOES)`, `(>CFA)`
-
-### Nonstandard words:
+## Nonstandard words:
 
 All words without surrounding parens are as defined in the Forth 2012 standard
 (barring bugs).
@@ -153,5 +143,3 @@ alphabetical order:
 - `(LATEST)`: `( -- a-addr )` The address of the header for the
   most-recently-defined word. That word might have been defined by `CREATE`,
   `:`, or `:NONAME`, or any other similar defining word.
-
-

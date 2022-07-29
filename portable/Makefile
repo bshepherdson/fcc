@@ -3,18 +3,46 @@ FORTH_MODULES=$(shell find $(MODULE_DIR) -name "*.fs")
 FORTH_OBJECTS := $(FORTH_MODULES:%.fs=%.o)
 
 # NOT this forth; the other Forth used for benchmark comparison.
-FORTH?=gforth
+BASE_FORTH?=gforth
 
-LIBS=-leditline -ldl
+NODEJS?=node
+OBJCOPY?=objcopy
+
+# For Linux
+UNAME := $(shell uname)
+EXTRA_SOURCES := vendor/linenoise/linenoise.c
+ARCH := $(shell uname -m)
+
+ifeq ($(UNAME), Linux)
+LIBS=-ldl
+CC?=gcc
+endif
+
+ifeq ($(UNAME), Darwin)
+LIBS=
+INCLUDES=-I/usr/local/include
+LINK_FLAGS+=-L/opt/homebrew/Cellar/binutils/2.40/lib -fuse-ld=lld
+
+export PATH := /opt/homebrew/Cellar/llvm@12/12.0.1_1/bin:$(PATH)
+
+ifeq ($(ARCH), arm64)
+CC=/opt/homebrew/bin/aarch64-apple-darwin21-gcc-12
+OBJCOPY=/opt/homebrew/Cellar/binutils/2.40/aarch64-apple-darwin21.6.0/bin/objcopy
+else
+$(error TODO fix the flags for x86_64 gcc on Mac - I don't have one to test)
+endif
+endif
+
+
+WARNINGS=-Wall -Wextra -Werror -Wno-unused-label -Wno-comment \
+	 -Wno-stringop-truncation -Wno-stringop-overflow
 
 BENCHMARKS=bubble-sort fib matrix-mult mm-rtcg sieve 1mloop bpsieve loop-nest \
-					 6502emu int-spam
+	   6502emu int-spam
 
-CC?=gcc
-NODEJS?=node
+#CC=/Users/braden/bin/gcc
+CFLAGS+=-O2 -std=gnu17 $(WARNINGS) -fPIC -g $(LINK_FLAGS)
 
-CFLAGS+=-O2 -std=gnu17 -Wall -Wextra -Werror -Wno-unused-label -Wno-comment \
-				-Wno-stringop-truncation -Wno-stringop-overflow -fPIC -g
 
 ifeq ($(ACCOUNTING), 1)
 CFLAGS+=-DACCOUNTING -Wno-discarded-qualifiers
@@ -31,16 +59,11 @@ CFLAGS+=-pg
 endif
 
 
-ELF_FORMAT=$(shell objcopy --info | head -n 2 | tail -n 1)
-ELF_ARCH=$(shell objcopy --info | head -n 4 | tail -n 1)
-
 # Need to have slightly different gold test output on 32- and 64-bit platforms.
 TEST_GOLD=test/test.32.gold
 ifneq ($(filter %64,$(shell uname -m)),)
     TEST_GOLD=test/test.64.gold
 endif
-
-ARCH=$(shell uname -m)
 
 .PHONY: all
 
@@ -50,20 +73,22 @@ default: all
 	$(NODEJS) generator.js
 
 engine.o: engine.c primitives.in init.in
-	$(CC) $(CFLAGS) $(INCLUDES) -c engine.c $(LIBS)
+	$(CC) $(CFLAGS) $(INCLUDES) -c engine.c $(EXTRA_SOURCES) $(LIBS)
 
-$(MODULE_DIR)/%.o: $(MODULE_DIR)/%.fs
-	objcopy --input binary --output $(ELF_FORMAT) \
-	  --binary-architecture $(ELF_ARCH) $< $@
+$(MODULE_DIR)/%.s: $(MODULE_DIR)/%.fs embed.js
+	$(NODEJS) embed.js $< $@
+
+$(MODULE_DIR)/%.o: $(MODULE_DIR)/%.s
+	$(CC) -c -o $@ $<
 
 forth: engine.o $(FORTH_OBJECTS)
 	$(CC) $(CFLAGS) $(CFLAGS_NORMAL) $(INCLUDES) -o forth engine.o \
-		$(FORTH_OBJECTS) $(LIBS)
+		$(EXTRA_SOURCES) $(FORTH_OBJECTS) $(LIBS)
 
 all: forth
 
 clean: FORCE
-	rm -f *.o $(MODULE_DIR)/*.o forth primitives.in init.in
+	rm -f *.o $(MODULE_DIR)/*.o $(MODULE_DIR)/*.s forth primitives.in init.in
 
 test: forth FORCE
 	./forth \
@@ -86,7 +111,7 @@ bench: FORCE forth
 bench-baseline: FORCE
 	@for a in $(BENCHMARKS); do \
 	echo =======   $$a   ======== ; \
-	time $(FORTH) bench/$$a.fs ; \
+	time $(BASE_FORTH) bench/$$a.fs ; \
 	done
 
 FORCE:
