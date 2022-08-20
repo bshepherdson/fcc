@@ -171,19 +171,12 @@
 VARIABLE (loop-top)
 
 : DO ( limit index --   C: old-jump-addr )
-  ['] swap compile, ['] >r dup compile, compile,
+  ['] (DO) compile,
+  \ ['] swap compile, ['] >r dup compile, compile,
   1 [literal]   [0branch] ( new-loop-top )
   (loop-top) @ swap   (loop-top) ! ( C: old-jump-addr )
 ; IMMEDIATE
 
-
-: I ( -- index ) ['] R@ compile, ; IMMEDIATE
-: J ( -- index )
-  R> R> R> R@ ( exit index1 limit1 index2 )
-  -rot ( exit index2 index1 limit1 )
-  >R >R ( exit index2 )
-  swap >R ( index2 )
-;
 
 \ PICK is actually from CORE EXT, but it's useful for (LOOP-END).
 : PICK ( xn ... x1 x0 u -- xn ... x1 x0 xn )
@@ -223,7 +216,7 @@ VARIABLE (loop-top)
   2dup -       ( C: old-jump-addr end-addr target delta )
   swap !       ( C: old-jump-addr end-addr )
   drop (loop-top) ! ( C: -- )
-  ['] R> dup compile, compile, ['] 2drop compile,  ( )
+  ['] UNLOOP compile,
 ; IMMEDIATE
 
 : LOOP ( --   C: jump-addr ) 1 [LITERAL] POSTPONE +LOOP ; IMMEDIATE
@@ -234,12 +227,6 @@ VARIABLE (loop-top)
   [branch] ( top target )
   swap over - swap !
 ; IMMEDIATE
-
-: UNLOOP ( -- ) ( R: limit index exit -- exit )
-  R> ( exit )
-  R> R> 2drop ( exit   R: -- )
-  >R
-;
 
 
 : MIN ( a b -- min ) 2dup > IF swap THEN drop ;
@@ -326,7 +313,7 @@ here 256 8 * chars allot CONSTANT (string-buffers)
 : UNCOUNT ( c-addr u -- c-addr ) dup here c!   here 1+ swap move   here ;
 
 : (peek-input) ( -- char|0 )
-  source >in @ < IF >in @ + c@ ELSE 0 THEN ;
+  source ( c-addr u ) >in @ < ( c-addr ? ) IF >in @ + c@ ELSE drop 0 THEN ;
 
 : (skip-delims) ( char-delim -- )
   BEGIN

@@ -138,6 +138,7 @@ cell *rspTop = &(_stack_return[RETURN_STACK_SIZE]);
 register cell *sp asm ("rbx");
 register code **ip asm ("r15");
 register cell *rsp asm("r13");
+register cell loopIndex asm ("r12");
 #if TOS_REG
 register cell tos asm ("r14");
 #endif
@@ -145,6 +146,7 @@ register cell tos asm ("r14");
 register cell *sp asm ("v7");  // Variable 7 = r10
 register code **ip asm ("v5"); // Variable 5 = r8 - USED IN NEXT!
 register cell *rsp asm("v3");  // Variable 3 = r6
+register cell loopIndex asm ("v6"); // Variable 6 = r9
 #if TOS_REG
 register cell tos asm ("v4");  // Variable 4 = r7
 #endif

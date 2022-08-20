@@ -57,10 +57,9 @@ superinstruction(['dolit', 'compile_comma'], {ip: [['C1'], []]}, [
 superinstruction(['dolit', 'loop_end', 'zbranch'], {
   // IP is a reversed stack! So these look like they're swapped.
   ip: [['iBranchDelta', 'iDelta'], []],
-  rsp: [['iIndex1'], ['iIndex2']],
 }, [
   `cell iExit;`,
-  // Happens to use the same names for iDelta, iIndex1 and iIndex2.
+  // Happens to use the same name for iDelta.
   ...primitives.find(p => p.header.ident === 'loop_end').rawCode,
   helpers.zbrancher('iExit', 'iBranchDelta'),
 ]);

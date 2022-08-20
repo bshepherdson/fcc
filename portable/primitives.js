@@ -164,18 +164,42 @@ primitive('zbranch', '(0BRANCH)', {
   helpers.zbrancher('iCond', 'iDelta'),
 ]);
 
+primitive('do_start', '(DO)', {
+  sp: [['iLimit1', 'iIndex'], []],
+  rsp: [[], ['iOldIndex', 'iLimit2']],
+}, [
+  `iOldIndex = loopIndex;`,
+  `iLimit2 = iLimit1;`,
+  `loopIndex = iIndex;`,
+]);
+
 primitive('loop_end', '(LOOP-END)', {
   sp: [['iDelta'], ['iExit']],
-  // Limit is the next value up on the stack, rsp[1].
-  rsp: [['iIndex1'], ['iIndex2']],
+  // Limit is on the return stack, then the old index.
 }, [
-  `cell limit = rspREF(1);`,
-  `cell il = iIndex1 - limit;`,
+  `cell limit = rspTOS;`,
+  `cell il = loopIndex - limit;`,
   `cell idl = iDelta + il;`,
-  `iIndex2 = iIndex1 + iDelta;`,
+  `loopIndex += iDelta;`,
   `bool sameSigns = (idl ^ il) >= 0;`,
   `bool wantSameSigns = (iDelta ^ il) >= 0;`,
   `iExit = (sameSigns || wantSameSigns) ? false : true;`,
+]);
+
+primitive('i_loop_index', 'I', {sp: [[], ['i1']]}, [
+  `i1 = loopIndex;`,
+]);
+
+// The return stack inside a DO LOOP is R: oldIndex limit.
+primitive('j_loop_index', 'J', {sp: [[], ['i1']]}, [
+  `i1 = rspREF(1);`,
+]);
+
+primitive('unloop', 'UNLOOP', {
+  rsp: [['iOldIndex', 'iLimit'], []],
+}, [
+  `(void) iLimit;`,
+  `loopIndex = iOldIndex;`,
 ]);
 
 primitive('execute', 'EXECUTE', {sp: [['C1'], []]}, [

@@ -8,7 +8,7 @@
 \ : :NONAME ( -- xt ) here dup (last-word) !   ['] (docol) @ ,   ] ;
 
 : ?DO ( limit index --   C: old-jump-addr )
-  ['] 2dup compile, ['] swap compile, ['] >r dup compile, compile,
+  ['] 2dup compile, ['] (DO) compile,
   ['] <> compile, ['] (0branch) compile,
   (loop-top) @    here (loop-top) ! ( C: old-jump-addr )
   0 , \ Placeholder for the jump offset to go.
