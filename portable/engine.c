@@ -1,4 +1,5 @@
 #define _GNU_SOURCE
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -56,8 +57,8 @@ volatile FILE *account;
 #define EXTERNAL_SYMBOL_FLAG (1)
 #define EXTERNAL_SYMBOL_MASK (~1)
 
-#define EXTERNAL_START(name) core_ ## name ## _start
-#define EXTERNAL_END(name)   core_ ## name ## _end
+#define EXTERNAL_START(name) _core_ ## name ## _start
+#define EXTERNAL_END(name)   _core_ ## name ## _end
 #define FORTH_EXTERN(name) \
   extern char EXTERNAL_START(name);\
   extern char EXTERNAL_END(name);
