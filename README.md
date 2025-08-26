@@ -6,7 +6,8 @@ implementation, and a bootstrapping Forth library that runs on top of it.
 ## Goals
 
 - **Fast** - ideally competitive with Gforth.
-  - Currently the performance is respectable, but it doesn't rival `gforth-fast`.
+  - On x86_64, [beats Gforth](https://docs.google.com/spreadsheets/d/18xRAziwn76odf12ZHe6l7A-YGZVU5xCj4OXuechtGpM/edit?gid=0#gid=0) on most benchmarks.
+  - On M1 Macs (ARM64), trails Gforth by 4-6x.
 - **Portable** to many platforms both rich and embedded.
   - It should be portable to most things with a C compiler, and translating the C
     to assembly by hand is tractable. Most of the heavy lifting is in Forth.
