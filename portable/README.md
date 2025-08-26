@@ -45,6 +45,15 @@ work, maybe with adjustment of flags, but I don't have machines to test on.)
 directly. Porting to Windows would require fixing the file access and the C
 interop of eg. `(C-LIBRARY)`, which use `libdl` for dynamic linking at runtime.
 
+### Mac instructions
+
+```bash
+$ brew install gcc lld binutils
+$ make test
+```
+
+If the GCC that installs is not 15.x, then the Makefile must be tweaked.
+(Homebrew GCC does not have a symlink or binary for plain `gcc`.)
 
 ## Engine Design
 
@@ -67,9 +76,9 @@ patterns and greatly reducing the memory traffic they cause. Eg. `R> DUP >R`,
 
 ## Performance
 
-The performance is strong on `x86_64`, faster than Gforth. Generally between
-0.55x and 0.9x where x is the time taken by Gforth, on my aging dev machine's
-i7-2600K 3.40GHz.
+The performance is good on `x86_64` and `arm64`, between 1x and 1.8x slower than
+the faster of `gforth` and `gforth-fast`. (For obscure reasons `gforth-fast` is
+significantly slower than `gforth` on `arm64`.)
 
 On 32-bit ARM it's somewhat slower, generally 1.2x to 2x on my RasPi 4.
 

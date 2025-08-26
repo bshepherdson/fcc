@@ -21,13 +21,26 @@ endif
 ifeq ($(UNAME), Darwin)
 LIBS=
 INCLUDES=-I/usr/local/include
-LINK_FLAGS+=-L/opt/homebrew/Cellar/binutils/2.40/lib -fuse-ld=lld
+CFLAGS+=-I/opt/homebrew/opt/binutils/include
 
-export PATH := /opt/homebrew/Cellar/llvm@12/12.0.1_1/bin:$(PATH)
+MACOS_SDK := $(shell sw_vers -productVersion)
+
+LINK_FLAGS+=-L/opt/homebrew/opt/binutils/lib -fuse-ld=lld
+
+# Need to pass -platform_version macos 15.5 15.5 (yes, repeating the version)
+# to the linker. It's janky but each word needs its own -Xlinker.
+LINK_FLAGS+=-Xlinker -platform_version
+LINK_FLAGS+=-Xlinker macos
+LINK_FLAGS+=-Xlinker $(MACOS_SDK)
+# Yes, twice!
+LINK_FLAGS+=-Xlinker $(MACOS_SDK)
+
+
+#export PATH := /opt/homebrew/Cellar/llvm@12/12.0.1_1/bin:$(PATH)
 
 ifeq ($(ARCH), arm64)
-CC=/opt/homebrew/bin/aarch64-apple-darwin21-gcc-12
-OBJCOPY=/opt/homebrew/Cellar/binutils/2.40/aarch64-apple-darwin21.6.0/bin/objcopy
+CC=/opt/homebrew/opt/gcc/bin/gcc-15
+OBJCOPY=/opt/homebrew/opt/binutils/bin/objcopy
 else
 $(error TODO fix the flags for x86_64 gcc on Mac - I don't have one to test)
 endif
@@ -115,4 +128,3 @@ bench-baseline: FORCE
 	done
 
 FORCE:
-

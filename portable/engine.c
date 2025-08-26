@@ -57,8 +57,15 @@ volatile FILE *account;
 #define EXTERNAL_SYMBOL_FLAG (1)
 #define EXTERNAL_SYMBOL_MASK (~1)
 
+#ifdef __APPLE__
+// Apple's LLD linker does not add a leading underscore like GNU's linkers do.
+#define EXTERNAL_START(name) core_ ## name ## _start
+#define EXTERNAL_END(name)   core_ ## name ## _end
+#else
 #define EXTERNAL_START(name) _core_ ## name ## _start
 #define EXTERNAL_END(name)   _core_ ## name ## _end
+#endif
+
 #define FORTH_EXTERN(name) \
   extern char EXTERNAL_START(name);\
   extern char EXTERNAL_END(name);
@@ -995,4 +1002,3 @@ int main(int argc, char **argv) {
 
   quit_();
 }
-
